@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* Base styles for the app */
+@layer base {
+  html, body {
+    @apply h-full;
+  }
+  
+  body {
+    @apply font-sans antialiased;
+  }
+}
+
+/* Custom component styles */
+@layer components {
+  .node-text {
+    @apply bg-white border border-gray-300 rounded-lg p-4 shadow-sm;
+  }
+  
+  .node-choice {
+    @apply bg-blue-50 border border-blue-300 rounded-lg p-4 shadow-sm;
+  }
+  
+  .property-panel {
+    @apply bg-white border-l border-gray-300 h-full overflow-y-auto;
+  }
+  
+  .toolbar {
+    @apply bg-gray-50 border-b border-gray-300 p-2 flex items-center gap-2;
+  }
+}
