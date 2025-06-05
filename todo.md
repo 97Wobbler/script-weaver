@@ -7,116 +7,33 @@
 
 ## ✅ 완료된 작업
 
-### 프로젝트 초기 설정
-- [x] React + Vite + TypeScript 프로젝트 생성
-- [x] 필수 의존성 설치
-  - [x] React Flow (reactflow ^11.11.4)
-  - [x] Zustand (^5.0.5) - 상태 관리
-  - [x] Zod (^3.25.51) - 스키마 검증
-  - [x] Tailwind CSS (^4.1.8) - 스타일링
-- [x] **Tailwind CSS 설정 완료**
-  - [x] @tailwindcss/postcss 패키지 설치 및 설정
-  - [x] postcss.config.js 설정 (4.x 방식)
-  - [x] src/index.css에 @import "tailwindcss" 추가
-  - [x] 기본 컴포넌트 스타일 클래스 정의
-  - [x] 브라우저에서 스타일 정상 적용 확인
-
-### 데이터 모델 및 스키마
-- [x] **Dialogue 타입 정의** (src/types/dialogue.ts)
-  - [x] DialogueSpeed enum
-  - [x] BaseDialogue, TextDialogue, ChoiceDialogue, InputDialogue 인터페이스
-  - [x] EditorNodeWrapper, Scene, TemplateDialogues 타입
-  - [x] EditorState, CSV 관련 타입들
-  - [x] ValidationResult 타입
-- [x] **Zod 스키마 정의** (src/schemas/dialogue.ts)
-  - [x] 모든 타입에 대응하는 Zod 스키마
-  - [x] Discriminated Union 스키마
-  - [x] 검증 스키마들
-
-### 기본 UI 구조
-- [x] **Script Weaver 에디터 레이아웃 완성**
-  - [x] 헤더 (제목 및 버전 정보)
-  - [x] 좌측 툴바 (노드 추가, 프로젝트 정보, 내보내기)
-  - [x] 중앙 캔버스 영역 (플레이스홀더 완료)
-  - [x] 우측 속성 패널 (플레이스홀더 완료)
-  - [x] 하단 상태 바 (노드 수, 상태, 자동저장 표시)
-- [x] **Tailwind CSS 스타일링 적용**
-  - [x] 반응형 레이아웃 구조
-  - [x] 컴포넌트별 색상 테마 적용
-  - [x] 호버 효과 및 트랜지션
+### 1-2주차: 기본 시스템 구축 ✅ **완료!**
+- [x] **프로젝트 환경 설정**: React + Vite + TypeScript, Tailwind CSS 4.x, React Flow, Zustand
+- [x] **데이터 모델**: Dialogue 타입, Zod 스키마, EditorStore 상태 관리
+- [x] **기본 UI**: 에디터 레이아웃, Canvas, 툴바, 속성 패널, 상태바
+- [x] **노드 시스템**: TextNode/ChoiceNode 생성, 편집, 위치 저장, localStorage 지속성
+- [x] **속성 패널**: 실시간 편집, 선택지 관리, 노드 선택 연동
+- [x] **연결 시스템**: React Flow Handle 기반 드래그 연결, 핸들 위치 정렬, 연결 해제
 
 ---
 
-## 🔥 진행 중인 작업
+## 🎯 현재 진행 상황
 
-### 1주차: 기본 프로젝트 셋업 및 타입 정의 ✅ **완료!**
-- [x] **데이터 스키마 정의** (document/data_scheme.md 기반)
-  - [x] Dialogue 타입 정의 (TextDialogue, ChoiceDialogue, InputDialogue)
-  - [x] EditorNodeWrapper 타입 정의
-  - [x] Scene, TemplateDialogues 타입 정의
-  - [x] EditorState 타입 정의
-- [x] **Zustand 상태 스토어 설정** ✅ **완료!**
-  - [x] 기본 EditorStore 인터페이스 정의
-  - [x] 상태 관리 메소드들 구현
-  - [x] ✅ **타입 오류 해결 완료**: Scene 타입과 빈 객체 초기화 문제 해결
-  - [ ] localStorage persist 미들웨어 연동 테스트
-- [x] **기본 컴포넌트 구조 설계** ✅ **완료!**
-  - [x] 메인 레이아웃 컴포넌트 완성
-  - [x] ✅ **노드 캔버스 (React Flow 기반) 구현 완료**
-  - [x] ✅ **우측 속성 패널 기능 구현 완료**
-  - [x] ✅ **툴바 버튼 기능 연결 완료**
-- [x] **React Flow POC** ✅ **완료!**
-  - [x] ✅ **기본 캔버스 설정 완료** (drag, zoom, pan, background, controls, minimap)
-  - [x] ✅ **커스텀 노드 타입 정의 완료** (TextNode, ChoiceNode)
-
----
-
-## 📋 다음 우선순위 작업
-
-### 🚧 진행 중 (QA 이슈 발견)
-- [x] **우측 속성 패널 기능화** ✅ **Critical 이슈 수정 완료!**
-  - [x] ✅ **노드 선택 시 패널에 속성 표시** 
-  - [x] ✅ **선택지 추가/삭제/편집 기능** (실시간 반영 정상)
-  - [x] ✅ **기본 레이아웃 및 UI 구성**
-  - [x] ✅ **실시간 편집 구현**: onChange 이벤트로 즉시 반영 완료
-  - [x] ✅ **저장 버튼 제거**: 자동 저장 상태 표시로 대체 완료
-  - [x] ✅ **노드 선택 로직 수정**: onNodeClick 핸들러로 직접 처리
-  - [x] ✅ **선택지 노드 표시 일관성**: 빈값/긴텍스트 처리 통일
-  - [x] ✅ **패널 스크롤 영역**: h-full overflow-y-auto 적용 완료
-  - [ ] 📝 **P2 - 중간**: 공백 문자 처리 정책 검토 (추후)
-
-### 🎯 다음 개발 단계 (2주차) - 수정 계획
-- [x] **우측 속성 패널 기능화** ✅ **Critical 이슈 수정 완료!**
-  - [x] 🚨 **P0 - 즉시 수정**: 실시간 반영 구현 (onChange 이벤트 연결)
-  - [x] 🚨 **P0 - 즉시 수정**: 저장 버튼 제거 및 자동 저장 표시 추가
-  - [x] ⚠️ **P1 - 높음**: 노드 선택 로직 수정 (Canvas.tsx handleNodesChange)
-  - [x] ⚠️ **P1 - 높음**: 선택지 노드 텍스트 표시 일관성 (ChoiceNode.tsx)
-  - [x] ⚠️ **P1 - 높음**: 패널 스크롤 영역 제한 (overflow-y-auto 적용)
-  - [ ] 📝 **P2 - 중간**: 공백 문자 처리 정책 검토
-
-### 🚀 다음 최우선 순위 작업
-- [ ] **노드 연결 시스템** 🎯 **현재 최우선 순위**
-  - [ ] 선택지별 개별 연결 (각 선택지 오른쪽 "+" 버튼)
-  - [ ] nextNodeKey 자동 연결
-  - [ ] 연결선 시각화 개선
-  - [ ] 연결 끊기 기능
+### 📋 다음 최우선 순위 작업
+- [ ] **Import/Export 기능 구현** 🎯 **3주차 목표**
+  - [ ] JSON 형식 내보내기/가져오기
+  - [ ] CSV 형식 내보내기 (dialogue.csv + localization.csv)
+  - [ ] 파일 업로드 UI 및 파싱 로직
+- [ ] **검증 시스템 구현**
+  - [ ] Zod 스키마 기반 실시간 유효성 검사
+  - [ ] dangling nextNodeKey 감지
+  - [ ] Export 버튼 활성화/비활성화 조건
 
 ---
 
 ## 📋 예정된 작업
 
-### 2주차: 노드 추가/편집 및 우측 패널
-- [x] **우측 속성 패널 기능화** ✅ **완료!**
-  - [x] 노드 선택 시 패널 열기
-  - [x] 실시간 편집 및 미리보기 반영
-  - [x] speaker, text, choices 필드 편집
-- [ ] **노드 연결 시스템** 🎯 **현재 최우선 순위**
-  - [ ] 선택지별 개별 연결 (각 선택지 오른쪽 "+" 버튼)
-  - [ ] nextNodeKey 자동 연결
-  - [ ] 연결선 시각화 개선
-  - [ ] 연결 끊기 기능
-
-### 3주차: Import/Export 및 검증 시스템
+### 3주차: Import/Export 및 검증 시스템 🎯 **현재 진행**
 - [ ] **Export 기능**
   - [ ] JSON 형식 내보내기
   - [ ] CSV 형식 내보내기 (dialogue.csv + localization.csv)
@@ -185,14 +102,9 @@
 - ✅ Zod (스키마 검증)
 
 ### 현재 프로젝트 상태
-- ✅ **기본 UI 완성**: http://localhost:5174에서 Script Weaver 에디터 확인 가능
-- ✅ **Tailwind CSS 정상 작동**: 모든 스타일이 올바르게 적용됨
-- ✅ **React Flow 캔버스 완성**: 커스텀 노드들이 정상 렌더링됨
-- ✅ **Zustand 타입 오류 해결 완료**: 모든 빌드 오류 해결
-- ✅ **노드 생성 시스템 완성**: 툴바 버튼으로 즉시 노드 생성 가능
-- ✅ **데이터 지속성 완성**: localStorage 자동 저장/복원 정상 작동
-- ✅ **우측 속성 패널 완성**: 실시간 편집, 선택지 관리, QA 이슈 해결 완료
-- 🔥 **다음 단계**: 노드 연결 시스템 (선택지별 개별 연결)
+- ✅ **2주차 목표 완료**: 노드 생성, 편집, 연결 시스템 모든 기능 완성
+- ✅ **주요 기능**: 드래그 연결, 실시간 편집, 속성 패널, localStorage 지속성
+- 🎯 **3주차 목표**: Import/Export 기능 및 검증 시스템 구현
 
 ### 주요 제약사항 (MVP)
 - 템플릿당 100개 노드 제한
@@ -201,8 +113,7 @@
 - 서버 없는 SPA, localStorage만 사용
 
 ### 주요 해결 완료 이슈
-- ✅ **Zustand Store 타입 오류**: Scene 타입과 빈 객체 초기화 불일치 해결 완료
-- ✅ **우측 속성 패널**: 실시간 편집, 노드 선택, 스크롤 영역 모든 QA 이슈 해결 완료
+- ✅ **모든 핵심 기능 완성**: 타입 시스템, 상태 관리, UI/UX, 노드 연결 시스템
 
 ### Acceptance Criteria 체크리스트
 - [x] AC-01: 새 텍스트 노드 추가 → JSON 저장 동일 내용 존재 ✅ **완료**

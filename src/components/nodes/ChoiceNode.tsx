@@ -1,6 +1,8 @@
+import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import type { NodeProps } from 'reactflow';
 import type { ChoiceDialogue } from '../../types/dialogue';
+import { useEditorStore } from '../../store/editorStore';
 
 interface ChoiceNodeData {
   dialogue: ChoiceDialogue;
@@ -10,6 +12,14 @@ interface ChoiceNodeData {
 export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>) {
   const { dialogue, nodeKey } = data;
   const choiceEntries = Object.entries(dialogue.choices);
+  const { disconnectNodes } = useEditorStore();
+  const [hoveredChoice, setHoveredChoice] = useState<string | null>(null);
+
+  // 선택지 연결 제거 핸들러
+  const handleDisconnectChoice = (choiceKey: string) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    disconnectNodes(nodeKey, choiceKey);
+  };
 
   return (
     <div className={`
@@ -49,28 +59,35 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
             선택지 ({choiceEntries.length}개)
           </span>
           <div className="space-y-2 mt-1">
-            {choiceEntries.map(([choiceKey, choice], index) => (
+                        {choiceEntries.map(([choiceKey, choice], index) => (
               <div
                 key={choiceKey}
                 className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded text-xs relative"
+                onMouseEnter={() => setHoveredChoice(choiceKey)}
+                onMouseLeave={() => setHoveredChoice(null)}
               >
                 <span className="flex-1 truncate">{choice.textKey}</span>
-                <button className="ml-2 w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center hover:bg-green-600 transition-colors">
-                  +
-                </button>
-                {/* Individual choice handle */}
+                
+                {/* Handle을 각 선택지 항목 내에 배치 */}
                 <Handle
                   type="source"
                   position={Position.Right}
                   id={`choice-${choiceKey}`}
+                  className={`
+                    !w-4 !h-4 !border-2 !border-white !transition-all !duration-200 !absolute
+                    ${choice.nextNodeKey 
+                      ? `!cursor-pointer ${hoveredChoice === choiceKey ? '!bg-red-500' : '!bg-green-500'}` 
+                      : hoveredChoice === choiceKey 
+                        ? '!bg-green-500 !cursor-pointer' 
+                        : '!bg-gray-300'
+                    }
+                  `}
                   style={{ 
-                    top: `${70 + (index * 32) + 24}px`,
-                    right: '-6px',
-                    background: '#10b981',
-                    width: '12px',
-                    height: '12px'
+                    right: '-20px',
+                    top: '50%',
+                    transform: 'translateY(-50%)'
                   }}
-                  className="border-2 border-white"
+                  onClick={choice.nextNodeKey ? handleDisconnectChoice(choiceKey) : undefined}
                 />
               </div>
             ))}
@@ -88,7 +105,8 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
       <Handle
         type="target"
         position={Position.Left}
-        className="w-3 h-3 bg-gray-400 border-2 border-white"
+        className="!w-4 !h-4 !bg-gray-400 !border-2 !border-white"
+        style={{ left: '-20px' }}
       />
     </div>
   );

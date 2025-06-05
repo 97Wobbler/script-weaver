@@ -37,6 +37,7 @@ interface EditorStore extends EditorState {
   
   // 연결 관리
   connectNodes: (fromNodeKey: string, toNodeKey: string, choiceKey?: string) => void;
+  disconnectNodes: (fromNodeKey: string, choiceKey?: string) => void;
   
   // 템플릿/씬 관리
   createTemplate: (templateKey: string) => void;
@@ -373,6 +374,48 @@ export const useEditorStore = create<EditorStore>()(
             updatedDialogue.choices[choiceKey] = {
               ...updatedDialogue.choices[choiceKey],
               nextNodeKey: toNodeKey
+            };
+          }
+          updatedNode = { ...fromNode, dialogue: updatedDialogue };
+        } else {
+          return state;
+        }
+        
+        const updatedScene = setNode(currentScene, fromNodeKey, updatedNode);
+        
+        return {
+          templateData: {
+            ...state.templateData,
+            [state.currentTemplate]: {
+              ...state.templateData[state.currentTemplate],
+              [state.currentScene]: updatedScene
+            }
+          }
+        };
+      }),
+
+      // 연결 끊기
+      disconnectNodes: (fromNodeKey, choiceKey) => set((state) => {
+        const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+        if (!currentScene) return state;
+        
+        const fromNode = getNode(currentScene, fromNodeKey);
+        if (!fromNode) return state;
+        
+        let updatedNode: EditorNodeWrapper;
+        
+        if (fromNode.dialogue.type === 'text') {
+          // 텍스트 노드의 경우 nextNodeKey 제거
+          const updatedDialogue = { ...fromNode.dialogue };
+          delete updatedDialogue.nextNodeKey;
+          updatedNode = { ...fromNode, dialogue: updatedDialogue };
+        } else if (fromNode.dialogue.type === 'choice' && choiceKey) {
+          // 선택지 노드의 경우 특정 선택지의 nextNodeKey 제거
+          const updatedDialogue = { ...fromNode.dialogue };
+          if (updatedDialogue.choices[choiceKey]) {
+            updatedDialogue.choices[choiceKey] = {
+              ...updatedDialogue.choices[choiceKey],
+              nextNodeKey: ''
             };
           }
           updatedNode = { ...fromNode, dialogue: updatedDialogue };

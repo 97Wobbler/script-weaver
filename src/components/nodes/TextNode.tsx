@@ -1,6 +1,8 @@
+import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import type { NodeProps } from 'reactflow';
 import type { TextDialogue } from '../../types/dialogue';
+import { useEditorStore } from '../../store/editorStore';
 
 interface TextNodeData {
   dialogue: TextDialogue;
@@ -9,6 +11,14 @@ interface TextNodeData {
 
 export default function TextNode({ data, selected }: NodeProps<TextNodeData>) {
   const { dialogue, nodeKey } = data;
+  const { disconnectNodes } = useEditorStore();
+  const [isHovering, setIsHovering] = useState(false);
+
+  // 연결 제거 핸들러
+  const handleDisconnect = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    disconnectNodes(nodeKey);
+  };
 
   return (
     <div className={`
@@ -54,12 +64,28 @@ export default function TextNode({ data, selected }: NodeProps<TextNodeData>) {
       <Handle
         type="target"
         position={Position.Left}
-        className="w-3 h-3 bg-gray-400 border-2 border-white"
+        className="!w-4 !h-4 !bg-gray-400 !border-2 !border-white"
+        style={{ left: '-20px' }}
       />
+      
+      {/* Source Handle */}
       <Handle
         type="source"
         position={Position.Right}
-        className="w-3 h-3 bg-blue-500 border-2 border-white"
+        id="text-output"
+        className={`
+          !w-4 !h-4 !border-2 !border-white !transition-all !duration-200
+          ${dialogue.nextNodeKey 
+            ? `!cursor-pointer ${isHovering ? '!bg-red-500' : '!bg-blue-500'}` 
+            : isHovering 
+              ? '!bg-blue-500 !cursor-pointer' 
+              : '!bg-gray-300'
+          }
+        `}
+        style={{ right: '-20px' }}
+        onClick={dialogue.nextNodeKey ? handleDisconnect : undefined}
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
       />
     </div>
   );

@@ -10,7 +10,8 @@ import {
   type Node,
   type Edge,
   type NodeChange,
-  type EdgeChange
+  type EdgeChange,
+  type Connection
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import TextNode from './nodes/TextNode';
@@ -18,6 +19,7 @@ import ChoiceNode from './nodes/ChoiceNode';
 import { useEditorStore } from '../store/editorStore';
 import type { EditorNodeWrapper } from '../types/dialogue';
 
+// React Flow nodeTypes는 컴포넌트 외부에서 정의하여 재생성 방지
 const nodeTypes = {
   textNode: TextNode,
   choiceNode: ChoiceNode,
@@ -52,6 +54,7 @@ const generateEdges = (nodeWrappers: EditorNodeWrapper[]): Edge[] => {
         id: `${nodeKey}-to-${dialogue.nextNodeKey}`,
         source: nodeKey,
         target: dialogue.nextNodeKey,
+        sourceHandle: 'text-output', // 명시적 source handle ID
         style: { stroke: '#6b7280', strokeWidth: 2 },
       });
     } else if (dialogue.type === 'choice') {
@@ -62,8 +65,11 @@ const generateEdges = (nodeWrappers: EditorNodeWrapper[]): Edge[] => {
             id: `${nodeKey}-${choiceKey}-to-${choice.nextNodeKey}`,
             source: nodeKey,
             target: choice.nextNodeKey,
-            sourceHandle: choiceKey, // 선택지별 개별 연결점
+            sourceHandle: `choice-${choiceKey}`, // ChoiceNode에서 정의한 핸들 ID와 일치
             style: { stroke: '#22c55e', strokeWidth: 2 },
+            label: choice.textKey.length > 20 ? `${choice.textKey.substring(0, 20)}...` : choice.textKey,
+            labelStyle: { fontSize: 10, fill: '#22c55e' },
+            labelBgStyle: { fill: '#f0fdf4', fillOpacity: 0.8 },
           });
         }
       });
@@ -80,7 +86,10 @@ export default function Canvas() {
     currentScene, 
     moveNode,
     setSelectedNode,
-    selectedNodeKey
+    selectedNodeKey,
+    disconnectNodes,
+    connectNodes,
+    createTextNode
   } = useEditorStore();
 
   // 현재 씬의 노드들을 React Flow 형식으로 변환
@@ -143,6 +152,28 @@ export default function Canvas() {
     setSelectedNode(undefined);
   }, [setSelectedNode]);
 
+  // React Flow 드래그 연결 핸들러
+  const handleConnect = useCallback((connection: Connection) => {
+    console.log('새 연결:', connection);
+    
+    if (!connection.source || !connection.target) return;
+    
+    // 기존 노드와 연결
+    if (connection.sourceHandle?.startsWith('choice-')) {
+      // 선택지 연결
+      const choiceKey = connection.sourceHandle.replace('choice-', '');
+      connectNodes(connection.source, connection.target, choiceKey);
+    } else if (connection.sourceHandle === 'text-output') {
+      // 텍스트 노드 연결
+      connectNodes(connection.source, connection.target);
+    } else {
+      // 기본 처리 (sourceHandle이 없는 경우)
+      connectNodes(connection.source, connection.target);
+    }
+  }, [connectNodes]);
+
+
+
   return (
     <div className="h-full w-full">
       <ReactFlow
@@ -153,6 +184,7 @@ export default function Canvas() {
         onNodeClick={handleNodeClick}
         onNodeDragStop={handleNodeDragStop}
         onPaneClick={handlePaneClick}
+        onConnect={handleConnect}
         multiSelectionKeyCode={null}
         nodeTypes={nodeTypes}
         fitView
