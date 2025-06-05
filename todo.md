@@ -73,17 +73,23 @@
 
 ## 📋 다음 우선순위 작업
 
-### 🚨 즉시 해결해야 할 문제 (우선순위 높음)
-- [ ] **Zustand 스토어 타입 문제 해결**
-  - Scene = Record<string, EditorNodeWrapper>인데 빈 객체 초기화 시 타입 오류
-  - 해결 방안: 타입 단언 사용하거나 초기 상태 구조 변경
-  - currentScene 접근 시 인덱싱 타입 오류 해결
-- [ ] **TypeScript strict 모드 설정 검토**
-  - tsconfig.json의 strict 설정 확인
-  - 필요시 조정하거나 타입 가드 추가
+### ✅ 해결 완료!
+- [x] **Zustand 스토어 타입 문제 해결** ⭐ **완료**
+  - ✅ **문제 해결 완료**: Scene/TemplateDialogues 타입 구조 재설계
+  - ✅ **변경 사항**:
+    - DialogueSpeed enum → const 객체 + 타입으로 변경 (erasableSyntaxOnly 대응)
+    - 타입 안전한 헬퍼 함수들 추가 (getNode, setNode, deleteNodeFromScene)
+    - 빈 Scene/Template 생성 함수들 추가
+    - updateDialogue에서 union 타입 명시적 처리
+    - 불필요한 state 파라미터 제거
+  - ✅ **결과**: npm run build 성공! 모든 타입 오류 해결
+  - ✅ **효과**: 
+    - 완전한 타입 안전성 확보 ✨
+    - IDE 자동완성 및 힌트 정상 작동
+    - 빌드 성공으로 React Flow 통합 준비 완료
 
 ### 🎯 다음 개발 단계 (1-2주차)
-- [ ] **React Flow 캔버스 구현**
+- [ ] **React Flow 캔버스 구현** 🚀 **다음 최우선 순위**
   - [ ] React Flow 컴포넌트 통합
   - [ ] 기본 캔버스 설정 (drag, zoom, pan)
   - [ ] 커스텀 노드 컴포넌트 생성

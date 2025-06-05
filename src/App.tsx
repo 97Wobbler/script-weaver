@@ -1,4 +1,4 @@
-import React from 'react';
+// React import removed as it's not needed with jsx transform
 
 function App() {
   return (

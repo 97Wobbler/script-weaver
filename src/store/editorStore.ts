@@ -6,6 +6,7 @@ import type {
   Dialogue, 
   TextDialogue, 
   ChoiceDialogue,
+  InputDialogue,
   Scene,
   TemplateDialogues
 } from '../types/dialogue';
@@ -53,14 +54,61 @@ interface EditorStore extends EditorState {
   loadFromLocalStorage: () => void;
 }
 
+// 타입 안전한 헬퍼 함수들
+const createEmptyScene = (): Scene => ({});
+
+const createEmptyTemplate = (): TemplateDialogues => ({
+  default: {
+    main: createEmptyScene()
+  }
+});
+
+const ensureTemplateExists = (templateData: TemplateDialogues, templateKey: string): TemplateDialogues => {
+  if (!templateData[templateKey]) {
+    return {
+      ...templateData,
+      [templateKey]: { main: createEmptyScene() }
+    };
+  }
+  return templateData;
+};
+
+const ensureSceneExists = (templateData: TemplateDialogues, templateKey: string, sceneKey: string): TemplateDialogues => {
+  const updatedData = ensureTemplateExists(templateData, templateKey);
+  if (!updatedData[templateKey][sceneKey]) {
+    return {
+      ...updatedData,
+      [templateKey]: {
+        ...updatedData[templateKey],
+        [sceneKey]: createEmptyScene()
+      }
+    };
+  }
+  return updatedData;
+};
+
+// 타입 안전한 Scene 접근 헬퍼
+const getNode = (scene: Scene, nodeKey: string): EditorNodeWrapper | undefined => {
+  return scene[nodeKey];
+};
+
+const setNode = (scene: Scene, nodeKey: string, node: EditorNodeWrapper): Scene => {
+  return {
+    ...scene,
+    [nodeKey]: node
+  };
+};
+
+const deleteNodeFromScene = (scene: Scene, nodeKey: string): Scene => {
+  const newScene = { ...scene };
+  delete newScene[nodeKey];
+  return newScene;
+};
+
 // 기본 상태
 const initialState: EditorState = {
   currentTemplate: 'default',
-  templateData: {
-    default: {
-      main: {}
-    }
-  },
+  templateData: createEmptyTemplate(),
   currentScene: 'main',
   selectedNodeKey: undefined,
   lastNodePosition: { x: 250, y: 100 }
@@ -73,100 +121,141 @@ export const useEditorStore = create<EditorStore>()(
       
       // 기본 설정
       setCurrentTemplate: (templateKey) => 
-        set((state) => ({ currentTemplate: templateKey })),
+        set(() => ({ currentTemplate: templateKey })),
       
       setCurrentScene: (sceneKey) => 
-        set((state) => ({ currentScene: sceneKey })),
+        set(() => ({ currentScene: sceneKey })),
       
       setSelectedNode: (nodeKey) => 
-        set((state) => ({ selectedNodeKey: nodeKey })),
+        set(() => ({ selectedNodeKey: nodeKey })),
       
       // 노드 관리
       addNode: (node) => set((state) => {
-        const newTemplateData = { ...state.templateData };
-        if (!newTemplateData[state.currentTemplate]) {
-          newTemplateData[state.currentTemplate] = {};
-        }
-        if (!newTemplateData[state.currentTemplate][state.currentScene]) {
-          newTemplateData[state.currentTemplate][state.currentScene] = {};
-        }
+        const newTemplateData = ensureSceneExists(
+          state.templateData,
+          state.currentTemplate,
+          state.currentScene
+        );
         
-        newTemplateData[state.currentTemplate][state.currentScene] = {
-          ...newTemplateData[state.currentTemplate][state.currentScene],
-          [node.nodeKey]: node
-        };
+        const currentScene = newTemplateData[state.currentTemplate][state.currentScene];
+        const updatedScene = setNode(currentScene, node.nodeKey, node);
         
         return {
-          templateData: newTemplateData,
+          templateData: {
+            ...newTemplateData,
+            [state.currentTemplate]: {
+              ...newTemplateData[state.currentTemplate],
+              [state.currentScene]: updatedScene
+            }
+          },
           lastNodePosition: node.position,
           selectedNodeKey: node.nodeKey
         };
       }),
       
       updateNode: (nodeKey, updates) => set((state) => {
-        const newTemplateData = { ...state.templateData };
-        const currentScene = newTemplateData[state.currentTemplate]?.[state.currentScene];
-        const currentNode = currentScene?.[nodeKey];
+        const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+        if (!currentScene) return state;
         
-        if (currentNode && currentScene) {
-          currentScene[nodeKey] = {
-            ...currentNode,
-            ...updates
-          };
-        }
+        const currentNode = getNode(currentScene, nodeKey);
+        if (!currentNode) return state;
         
-        return { templateData: newTemplateData };
+        const updatedNode = { ...currentNode, ...updates };
+        const updatedScene = setNode(currentScene, nodeKey, updatedNode);
+        
+        return {
+          templateData: {
+            ...state.templateData,
+            [state.currentTemplate]: {
+              ...state.templateData[state.currentTemplate],
+              [state.currentScene]: updatedScene
+            }
+          }
+        };
       }),
       
       deleteNode: (nodeKey) => set((state) => {
-        const newTemplateData = { ...state.templateData };
-        const currentScene = newTemplateData[state.currentTemplate]?.[state.currentScene];
+        const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+        if (!currentScene) return state;
         
-        if (currentScene) {
-          delete currentScene[nodeKey];
-        }
+        const updatedScene = deleteNodeFromScene(currentScene, nodeKey);
         
         return {
-          templateData: newTemplateData,
+          templateData: {
+            ...state.templateData,
+            [state.currentTemplate]: {
+              ...state.templateData[state.currentTemplate],
+              [state.currentScene]: updatedScene
+            }
+          },
           selectedNodeKey: state.selectedNodeKey === nodeKey ? undefined : state.selectedNodeKey
         };
       }),
       
       moveNode: (nodeKey, position) => set((state) => {
-        const newTemplateData = { ...state.templateData };
-        const currentScene = newTemplateData[state.currentTemplate]?.[state.currentScene];
-        const currentNode = currentScene?.[nodeKey];
+        const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+        if (!currentScene) return state;
         
-        if (currentNode && currentScene) {
-          currentScene[nodeKey] = {
-            ...currentNode,
-            position
-          };
-        }
+        const currentNode = getNode(currentScene, nodeKey);
+        if (!currentNode) return state;
+        
+        const updatedNode = { ...currentNode, position };
+        const updatedScene = setNode(currentScene, nodeKey, updatedNode);
         
         return {
-          templateData: newTemplateData,
+          templateData: {
+            ...state.templateData,
+            [state.currentTemplate]: {
+              ...state.templateData[state.currentTemplate],
+              [state.currentScene]: updatedScene
+            }
+          },
           lastNodePosition: position
         };
       }),
       
       // 대화 내용 수정
       updateDialogue: (nodeKey, dialogue) => set((state) => {
-        const newTemplateData = { ...state.templateData };
-        const currentScene = newTemplateData[state.currentTemplate]?.[state.currentScene];
-        const currentNode = currentScene?.[nodeKey];
+        const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+        if (!currentScene) return state;
         
-        if (currentNode && currentScene) {
-          currentScene[nodeKey] = {
-            ...currentNode,
-            dialogue: {
-              ...currentNode.dialogue,
-              ...dialogue
-            }
-          };
+        const currentNode = getNode(currentScene, nodeKey);
+        if (!currentNode) return state;
+        
+        let updatedDialogue: Dialogue;
+        
+        if (currentNode.dialogue.type === 'text') {
+          updatedDialogue = {
+            ...currentNode.dialogue,
+            ...dialogue
+          } as TextDialogue;
+        } else if (currentNode.dialogue.type === 'choice') {
+          updatedDialogue = {
+            ...currentNode.dialogue,
+            ...dialogue
+          } as ChoiceDialogue;
+        } else {
+          updatedDialogue = {
+            ...currentNode.dialogue,
+            ...dialogue
+          } as InputDialogue;
         }
         
-        return { templateData: newTemplateData };
+        const updatedNode = {
+          ...currentNode,
+          dialogue: updatedDialogue
+        };
+        const updatedScene = setNode(currentScene, nodeKey, updatedNode);
+        
+        return {
+          templateData: {
+            ...state.templateData,
+            [state.currentTemplate]: {
+              ...state.templateData[state.currentTemplate],
+              [state.currentScene]: updatedScene
+            }
+          }
+        };
       }),
       
       // 자동 노드 생성
@@ -215,94 +304,103 @@ export const useEditorStore = create<EditorStore>()(
       
       // 선택지 관리
       addChoice: (nodeKey, choiceKey, choice) => set((state) => {
-        const newTemplateData = { ...state.templateData };
-        const currentScene = newTemplateData[state.currentTemplate]?.[state.currentScene];
-        const currentNode = currentScene?.[nodeKey];
+        const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+        if (!currentScene) return state;
         
-        if (currentNode && currentNode.dialogue.type === 'choice' && currentScene) {
-          const updatedDialogue = { ...currentNode.dialogue };
-          updatedDialogue.choices[choiceKey] = choice;
-          
-          currentScene[nodeKey] = {
-            ...currentNode,
-            dialogue: updatedDialogue
-          };
-        }
+        const currentNode = getNode(currentScene, nodeKey);
+        if (!currentNode || currentNode.dialogue.type !== 'choice') return state;
         
-        return { templateData: newTemplateData };
+        const updatedDialogue = { ...currentNode.dialogue };
+        updatedDialogue.choices[choiceKey] = choice;
+        
+        const updatedNode = { ...currentNode, dialogue: updatedDialogue };
+        const updatedScene = setNode(currentScene, nodeKey, updatedNode);
+        
+        return {
+          templateData: {
+            ...state.templateData,
+            [state.currentTemplate]: {
+              ...state.templateData[state.currentTemplate],
+              [state.currentScene]: updatedScene
+            }
+          }
+        };
       }),
       
       removeChoice: (nodeKey, choiceKey) => set((state) => {
-        const newTemplateData = { ...state.templateData };
-        const currentScene = newTemplateData[state.currentTemplate]?.[state.currentScene];
-        const currentNode = currentScene?.[nodeKey];
+        const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+        if (!currentScene) return state;
         
-        if (currentNode && currentNode.dialogue.type === 'choice' && currentScene) {
-          const updatedDialogue = { ...currentNode.dialogue };
-          delete updatedDialogue.choices[choiceKey];
-          
-          currentScene[nodeKey] = {
-            ...currentNode,
-            dialogue: updatedDialogue
-          };
-        }
+        const currentNode = getNode(currentScene, nodeKey);
+        if (!currentNode || currentNode.dialogue.type !== 'choice') return state;
         
-        return { templateData: newTemplateData };
+        const updatedDialogue = { ...currentNode.dialogue };
+        delete updatedDialogue.choices[choiceKey];
+        
+        const updatedNode = { ...currentNode, dialogue: updatedDialogue };
+        const updatedScene = setNode(currentScene, nodeKey, updatedNode);
+        
+        return {
+          templateData: {
+            ...state.templateData,
+            [state.currentTemplate]: {
+              ...state.templateData[state.currentTemplate],
+              [state.currentScene]: updatedScene
+            }
+          }
+        };
       }),
       
       // 연결 관리
       connectNodes: (fromNodeKey, toNodeKey, choiceKey) => set((state) => {
-        const newTemplateData = { ...state.templateData };
-        const currentScene = newTemplateData[state.currentTemplate]?.[state.currentScene];
-        const fromNode = currentScene?.[fromNodeKey];
+        const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+        if (!currentScene) return state;
         
-        if (fromNode && currentScene) {
-          if (fromNode.dialogue.type === 'text') {
-            // 텍스트 노드의 경우 nextNodeKey 설정
-            const updatedDialogue = { ...fromNode.dialogue };
-            updatedDialogue.nextNodeKey = toNodeKey;
-            
-            currentScene[fromNodeKey] = {
-              ...fromNode,
-              dialogue: updatedDialogue
-            };
-          } else if (fromNode.dialogue.type === 'choice' && choiceKey) {
-            // 선택지 노드의 경우 특정 선택지의 nextNodeKey 설정
-            const updatedDialogue = { ...fromNode.dialogue };
-            if (updatedDialogue.choices[choiceKey]) {
-              updatedDialogue.choices[choiceKey].nextNodeKey = toNodeKey;
-            }
-            
-            currentScene[fromNodeKey] = {
-              ...fromNode,
-              dialogue: updatedDialogue
+        const fromNode = getNode(currentScene, fromNodeKey);
+        if (!fromNode) return state;
+        
+        let updatedNode: EditorNodeWrapper;
+        
+        if (fromNode.dialogue.type === 'text') {
+          // 텍스트 노드의 경우 nextNodeKey 설정
+          const updatedDialogue = { ...fromNode.dialogue };
+          updatedDialogue.nextNodeKey = toNodeKey;
+          updatedNode = { ...fromNode, dialogue: updatedDialogue };
+        } else if (fromNode.dialogue.type === 'choice' && choiceKey) {
+          // 선택지 노드의 경우 특정 선택지의 nextNodeKey 설정
+          const updatedDialogue = { ...fromNode.dialogue };
+          if (updatedDialogue.choices[choiceKey]) {
+            updatedDialogue.choices[choiceKey] = {
+              ...updatedDialogue.choices[choiceKey],
+              nextNodeKey: toNodeKey
             };
           }
+          updatedNode = { ...fromNode, dialogue: updatedDialogue };
+        } else {
+          return state;
         }
         
-        return { templateData: newTemplateData };
+        const updatedScene = setNode(currentScene, fromNodeKey, updatedNode);
+        
+        return {
+          templateData: {
+            ...state.templateData,
+            [state.currentTemplate]: {
+              ...state.templateData[state.currentTemplate],
+              [state.currentScene]: updatedScene
+            }
+          }
+        };
       }),
       
       // 템플릿/씬 관리
       createTemplate: (templateKey) => set((state) => ({
-        templateData: {
-          ...state.templateData,
-          [templateKey]: { main: {} }
-        }
+        templateData: ensureTemplateExists(state.templateData, templateKey)
       })),
       
-      createScene: (templateKey, sceneKey) => set((state) => {
-        const newTemplateData = { ...state.templateData };
-        if (!newTemplateData[templateKey]) {
-          newTemplateData[templateKey] = {};
-        }
-        newTemplateData[templateKey] = {
-          ...newTemplateData[templateKey],
-          [sceneKey]: {}
-        };
-        
-        return { templateData: newTemplateData };
-      }),
+      createScene: (templateKey, sceneKey) => set((state) => ({
+        templateData: ensureSceneExists(state.templateData, templateKey, sceneKey)
+      })),
       
       // 유틸리티
       getNextNodePosition: () => {
@@ -340,7 +438,7 @@ export const useEditorStore = create<EditorStore>()(
           // 타입별 검증
           if (dialogue.type === 'text') {
             // 텍스트 노드는 nextNodeKey가 있어야 함 (또는 마지막 노드)
-            if (dialogue.nextNodeKey && !currentScene[dialogue.nextNodeKey]) {
+            if (dialogue.nextNodeKey && !getNode(currentScene, dialogue.nextNodeKey)) {
               errors.push(`노드 ${nodeKey}: 존재하지 않는 노드 '${dialogue.nextNodeKey}'를 참조합니다.`);
             }
           } else if (dialogue.type === 'choice') {
@@ -354,7 +452,7 @@ export const useEditorStore = create<EditorStore>()(
             Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
               if (!choice.nextNodeKey) {
                 errors.push(`노드 ${nodeKey}, 선택지 ${choiceKey}: nextNodeKey가 비어있습니다.`);
-              } else if (!currentScene[choice.nextNodeKey]) {
+              } else if (!getNode(currentScene, choice.nextNodeKey)) {
                 errors.push(`노드 ${nodeKey}, 선택지 ${choiceKey}: 존재하지 않는 노드 '${choice.nextNodeKey}'를 참조합니다.`);
               }
             });

@@ -1,9 +1,11 @@
-// 열거형: 대화 출력 속도
-export enum DialogueSpeed {
-  SLOW = "SLOW",
-  NORMAL = "NORMAL",
-  FAST = "FAST",
-}
+// 대화 출력 속도 상수
+export const DialogueSpeed = {
+  SLOW: "SLOW",
+  NORMAL: "NORMAL",
+  FAST: "FAST",
+} as const;
+
+export type DialogueSpeed = typeof DialogueSpeed[keyof typeof DialogueSpeed];
 
 // 액션 타입 (분기 후 동작 정의)
 export interface DialogueAction {
@@ -63,11 +65,11 @@ export interface EditorNodeWrapper {
   position: { x: number; y: number };
 }
 
-// 씬 타입 (노드들의 집합)
-export type Scene = Record<string, EditorNodeWrapper>;
+// 씬 타입 (노드들의 집합) - 빈 객체도 허용
+export type Scene = { [nodeKey: string]: EditorNodeWrapper };
 
-// 템플릿 타입 (씬들의 집합)
-export type TemplateDialogues = Record<string, Scene>;
+// 템플릿 타입 (씬들의 집합) - 빈 객체도 허용
+export type TemplateDialogues = { [templateKey: string]: { [sceneKey: string]: Scene } };
 
 // 에디터 상태
 export interface EditorState {
