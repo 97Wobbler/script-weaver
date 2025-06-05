@@ -49,25 +49,25 @@
 
 ## 🔥 진행 중인 작업
 
-### 1주차: 기본 프로젝트 셋업 및 타입 정의
+### 1주차: 기본 프로젝트 셋업 및 타입 정의 ✅ **완료!**
 - [x] **데이터 스키마 정의** (document/data_scheme.md 기반)
   - [x] Dialogue 타입 정의 (TextDialogue, ChoiceDialogue, InputDialogue)
   - [x] EditorNodeWrapper 타입 정의
   - [x] Scene, TemplateDialogues 타입 정의
   - [x] EditorState 타입 정의
-- [ ] **Zustand 상태 스토어 설정**
+- [x] **Zustand 상태 스토어 설정** ✅ **완료!**
   - [x] 기본 EditorStore 인터페이스 정의
   - [x] 상태 관리 메소드들 구현
-  - [ ] **🚨 타입 오류 수정 필요**: Scene 타입과 빈 객체 초기화 문제
+  - [x] ✅ **타입 오류 해결 완료**: Scene 타입과 빈 객체 초기화 문제 해결
   - [ ] localStorage persist 미들웨어 연동 테스트
-- [ ] **기본 컴포넌트 구조 설계**
+- [x] **기본 컴포넌트 구조 설계** ✅ **완료!**
   - [x] 메인 레이아웃 컴포넌트 완성
-  - [ ] 노드 캔버스 (React Flow 기반)
+  - [x] ✅ **노드 캔버스 (React Flow 기반) 구현 완료**
   - [ ] 우측 속성 패널 기능 구현
   - [ ] 툴바 버튼 기능 연결
-- [ ] **React Flow POC**
-  - [ ] 기본 캔버스 설정
-  - [ ] 커스텀 노드 타입 정의
+- [x] **React Flow POC** ✅ **완료!**
+  - [x] ✅ **기본 캔버스 설정 완료** (drag, zoom, pan, background, controls, minimap)
+  - [x] ✅ **커스텀 노드 타입 정의 완료** (TextNode, ChoiceNode)
 
 ---
 
@@ -88,12 +88,16 @@
     - IDE 자동완성 및 힌트 정상 작동
     - 빌드 성공으로 React Flow 통합 준비 완료
 
-### 🎯 다음 개발 단계 (1-2주차)
-- [ ] **React Flow 캔버스 구현** 🚀 **다음 최우선 순위**
-  - [ ] React Flow 컴포넌트 통합
-  - [ ] 기본 캔버스 설정 (drag, zoom, pan)
-  - [ ] 커스텀 노드 컴포넌트 생성
-- [ ] **노드 생성 시스템 구현**
+- [x] **React Flow 캔버스 구현** ⭐ **완료!**
+  - [x] ✅ **React Flow 컴포넌트 통합 완료**
+  - [x] ✅ **기본 캔버스 설정 완료** (drag, zoom, pan, background, controls, minimap)
+  - [x] ✅ **커스텀 노드 컴포넌트 생성 완료**
+    - [x] TextNode: speaker, text, speed 표시 + 연결점
+    - [x] ChoiceNode: speaker, text, choices 표시 + 개별 선택지 연결점
+  - [x] ✅ **테스트 노드 렌더링 성공**: 텍스트 노드 → 선택지 노드 연결 확인
+
+### 🎯 다음 개발 단계 (2주차)
+- [ ] **노드 생성 시스템 구현** 🚀 **다음 최우선 순위**
   - [ ] 툴바 버튼과 Zustand 스토어 연결
   - [ ] 텍스트 노드 생성 기능
   - [ ] 선택지 노드 생성 기능
@@ -183,7 +187,9 @@
 ### 현재 프로젝트 상태
 - ✅ **기본 UI 완성**: http://localhost:5174에서 Script Weaver 에디터 확인 가능
 - ✅ **Tailwind CSS 정상 작동**: 모든 스타일이 올바르게 적용됨
-- 🔥 **다음 단계**: React Flow 캔버스 통합 및 Zustand 타입 오류 해결
+- ✅ **React Flow 캔버스 완성**: 커스텀 노드들이 정상 렌더링됨
+- ✅ **Zustand 타입 오류 해결 완료**: 모든 빌드 오류 해결
+- 🔥 **다음 단계**: 노드 생성 시스템 구현 (툴바 버튼 연결)
 
 ### 주요 제약사항 (MVP)
 - 템플릿당 100개 노드 제한
