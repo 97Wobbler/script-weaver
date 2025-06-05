@@ -36,14 +36,12 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
         </div>
 
         {/* Text */}
-        {dialogue.textKey && (
-          <div>
-            <span className="text-xs text-gray-500 uppercase tracking-wide">내용</span>
-            <p className="text-sm text-gray-700 leading-relaxed">
-              {dialogue.textKey}
-            </p>
-          </div>
-        )}
+        <div>
+          <span className="text-xs text-gray-500 uppercase tracking-wide">내용</span>
+          <p className="text-sm text-gray-700 leading-relaxed line-clamp-3">
+            {dialogue.textKey || '(내용 없음)'}
+          </p>
+        </div>
 
         {/* Choices */}
         <div>

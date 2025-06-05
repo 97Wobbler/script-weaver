@@ -110,14 +110,18 @@ export default function Canvas() {
           console.log(`노드 위치 저장: ${change.id}`, change.position);
           moveNode(change.id, change.position);
         }
-      } else if (change.type === 'select' && change.selected) {
-        // 노드 선택 시 스토어 업데이트
-        setSelectedNode(change.id);
       }
+      // select 이벤트는 onNodeClick에서 처리하도록 제거
     });
     
     onNodesChange(changes);
-  }, [moveNode, setSelectedNode, onNodesChange]);
+  }, [moveNode, onNodesChange]);
+
+  // 노드 클릭 핸들러 (더 직접적인 선택 처리)
+  const handleNodeClick = useCallback((event: any, node: any) => {
+    console.log(`노드 클릭: ${node.id}`);
+    setSelectedNode(node.id);
+  }, [setSelectedNode]);
 
   // React Flow nodes와 edges를 실시간으로 동기화
   React.useEffect(() => {
@@ -134,6 +138,11 @@ export default function Canvas() {
     moveNode(node.id, node.position);
   }, [moveNode]);
 
+  // 패널 클릭 핸들러 (배경 클릭 시 선택 해제)
+  const handlePaneClick = useCallback(() => {
+    setSelectedNode(undefined);
+  }, [setSelectedNode]);
+
   return (
     <div className="h-full w-full">
       <ReactFlow
@@ -141,7 +150,10 @@ export default function Canvas() {
         edges={edges}
         onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeClick={handleNodeClick}
         onNodeDragStop={handleNodeDragStop}
+        onPaneClick={handlePaneClick}
+        multiSelectionKeyCode={null}
         nodeTypes={nodeTypes}
         fitView
         className="bg-gray-50"
