@@ -1,3 +1,4 @@
+import React, { useMemo, useCallback } from 'react';
 import {
   ReactFlow,
   Background,
@@ -6,85 +7,145 @@ import {
   useNodesState,
   useEdgesState,
   BackgroundVariant,
+  type Node,
+  type Edge,
+  type NodeChange,
+  type EdgeChange
 } from 'reactflow';
-import type { Node, Edge } from 'reactflow';
 import 'reactflow/dist/style.css';
 import TextNode from './nodes/TextNode';
 import ChoiceNode from './nodes/ChoiceNode';
-import type { DialogueSpeed } from '../types/dialogue';
+import { useEditorStore } from '../store/editorStore';
+import type { EditorNodeWrapper } from '../types/dialogue';
 
 const nodeTypes = {
   textNode: TextNode,
   choiceNode: ChoiceNode,
 };
 
-// 테스트용 초기 노드들
-const createTestNodes = (): Node[] => [
-  {
-    id: 'test-text-1',
-    type: 'textNode',
-    position: { x: 100, y: 100 },
+// EditorNodeWrapper를 React Flow Node로 변환
+const convertToReactFlowNode = (wrapper: EditorNodeWrapper, selectedKey?: string): Node => {
+  const nodeType = wrapper.dialogue.type === 'text' ? 'textNode' : 'choiceNode';
+  
+  return {
+    id: wrapper.nodeKey,
+    type: nodeType,
+    position: wrapper.position,
+    selected: wrapper.nodeKey === selectedKey, // 선택 상태 설정
     data: {
-      nodeKey: 'test-text-1',
-      dialogue: {
-        type: 'text' as const,
-        speakerKey: 'narrator',
-        textKey: '게임이 시작됩니다.',
-        nextNodeKey: 'test-choice-1',
-        speed: 'NORMAL' as DialogueSpeed,
-      },
+      nodeKey: wrapper.nodeKey,
+      dialogue: wrapper.dialogue,
     },
-  },
-  {
-    id: 'test-choice-1',
-    type: 'choiceNode',
-    position: { x: 400, y: 100 },
-    data: {
-      nodeKey: 'test-choice-1',
-      dialogue: {
-        type: 'choice' as const,
-        speakerKey: 'narrator',
-        textKey: '어떻게 하시겠습니까?',
-        choices: {
-          'choice-1': {
-            textKey: '앞으로 가기',
-            nextNodeKey: 'test-text-2',
-          },
-          'choice-2': {
-            textKey: '뒤로 가기',
-            nextNodeKey: 'test-text-3',
-          },
-        },
-        speed: 'NORMAL' as DialogueSpeed,
-      },
-    },
-  },
-];
+  };
+};
 
-const initialNodes: Node[] = createTestNodes();
-const initialEdges: Edge[] = [
-  {
-    id: 'test-text-1-to-choice-1',
-    source: 'test-text-1',
-    target: 'test-choice-1',
-    style: { stroke: '#6b7280', strokeWidth: 2 },
-  },
-];
+// 연결선 생성 (nextNodeKey 기반)
+const generateEdges = (nodeWrappers: EditorNodeWrapper[]): Edge[] => {
+  const edges: Edge[] = [];
+  
+  nodeWrappers.forEach((wrapper) => {
+    const { dialogue, nodeKey } = wrapper;
+    
+    if (dialogue.type === 'text' && dialogue.nextNodeKey) {
+      // 텍스트 노드의 연결
+      edges.push({
+        id: `${nodeKey}-to-${dialogue.nextNodeKey}`,
+        source: nodeKey,
+        target: dialogue.nextNodeKey,
+        style: { stroke: '#6b7280', strokeWidth: 2 },
+      });
+    } else if (dialogue.type === 'choice') {
+      // 선택지 노드의 연결들
+      Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
+        if (choice.nextNodeKey) {
+          edges.push({
+            id: `${nodeKey}-${choiceKey}-to-${choice.nextNodeKey}`,
+            source: nodeKey,
+            target: choice.nextNodeKey,
+            sourceHandle: choiceKey, // 선택지별 개별 연결점
+            style: { stroke: '#22c55e', strokeWidth: 2 },
+          });
+        }
+      });
+    }
+  });
+  
+  return edges;
+};
 
 export default function Canvas() {
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
-  const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+  const { 
+    templateData, 
+    currentTemplate, 
+    currentScene, 
+    moveNode,
+    setSelectedNode,
+    selectedNodeKey
+  } = useEditorStore();
+
+  // 현재 씬의 노드들을 React Flow 형식으로 변환
+  const { nodes: reactFlowNodes, edges: reactFlowEdges } = useMemo(() => {
+    const currentSceneData = templateData[currentTemplate]?.[currentScene];
+    
+    if (!currentSceneData) {
+      return { nodes: [], edges: [] };
+    }
+    
+    const nodeWrappers = Object.values(currentSceneData);
+    const nodes = nodeWrappers.map(wrapper => convertToReactFlowNode(wrapper, selectedNodeKey));
+    const edges = generateEdges(nodeWrappers);
+    
+    return { nodes, edges };
+  }, [templateData, currentTemplate, currentScene, selectedNodeKey]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(reactFlowNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(reactFlowEdges);
+
+  // 노드 변경 핸들러 (위치 이동 시 스토어 업데이트)
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    changes.forEach((change) => {
+      if (change.type === 'position' && change.position) {
+        // 드래그 중이 아닐 때만 스토어 업데이트 (드래그 완료시)
+        if (!change.dragging) {
+          console.log(`노드 위치 저장: ${change.id}`, change.position);
+          moveNode(change.id, change.position);
+        }
+      } else if (change.type === 'select' && change.selected) {
+        // 노드 선택 시 스토어 업데이트
+        setSelectedNode(change.id);
+      }
+    });
+    
+    onNodesChange(changes);
+  }, [moveNode, setSelectedNode, onNodesChange]);
+
+  // React Flow nodes와 edges를 실시간으로 동기화
+  React.useEffect(() => {
+    setNodes(reactFlowNodes);
+  }, [reactFlowNodes, setNodes]);
+
+  React.useEffect(() => {
+    setEdges(reactFlowEdges);
+  }, [reactFlowEdges, setEdges]);
+
+  // 노드 드래그 완료 핸들러 (더 확실한 위치 저장)
+  const handleNodeDragStop = useCallback((event: any, node: any) => {
+    console.log(`노드 드래그 완료: ${node.id}`, node.position);
+    moveNode(node.id, node.position);
+  }, [moveNode]);
 
   return (
     <div className="h-full w-full">
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
+        onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeDragStop={handleNodeDragStop}
         nodeTypes={nodeTypes}
         fitView
         className="bg-gray-50"
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <Controls />
