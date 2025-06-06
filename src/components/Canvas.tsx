@@ -89,7 +89,8 @@ export default function Canvas() {
     selectedNodeKey,
     disconnectNodes,
     connectNodes,
-    createTextNode
+    createTextNode,
+    deleteNode
   } = useEditorStore();
 
   // 현재 씬의 노드들을 React Flow 형식으로 변환
@@ -172,7 +173,57 @@ export default function Canvas() {
     }
   }, [connectNodes]);
 
+  // 키보드 이벤트 핸들러 (노드 삭제)
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    if ((event.key === 'Delete' || event.key === 'Backspace') && selectedNodeKey) {
+      event.preventDefault();
+      
+      // 현재 씬 데이터 가져오기
+      const currentSceneData = templateData[currentTemplate]?.[currentScene];
+      if (!currentSceneData) return;
+      
+      // 삭제할 노드를 참조하는 다른 노드들 찾기
+      const referencingNodes: string[] = [];
+      Object.entries(currentSceneData).forEach(([key, nodeWrapper]) => {
+        if (key === selectedNodeKey) return; // 자기 자신은 제외
+        
+        const { dialogue } = nodeWrapper;
+        
+        // TextDialogue 참조 확인
+        if (dialogue.type === 'text' && dialogue.nextNodeKey === selectedNodeKey) {
+          referencingNodes.push(`${key} (텍스트 노드)`);
+        }
+        
+        // ChoiceDialogue 참조 확인
+        if (dialogue.type === 'choice' && dialogue.choices) {
+          Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
+            if (choice.nextNodeKey === selectedNodeKey) {
+              referencingNodes.push(`${key} (선택지 "${choice.textKey}")`);
+            }
+          });
+        }
+      });
+      
+      // 확인 메시지 구성
+      let confirmMessage = `노드 "${selectedNodeKey}"를 삭제하시겠습니까?`;
+      if (referencingNodes.length > 0) {
+        confirmMessage += `\n\n⚠️ 이 노드를 참조하는 ${referencingNodes.length}개의 연결이 함께 제거됩니다:\n• ${referencingNodes.join('\n• ')}`;
+      }
+      
+      if (confirm(confirmMessage)) {
+        deleteNode(selectedNodeKey);
+        setSelectedNode(undefined);
+      }
+    }
+  }, [selectedNodeKey, deleteNode, setSelectedNode, templateData, currentTemplate, currentScene]);
 
+  // 키보드 이벤트 리스너 등록
+  React.useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
 
   return (
     <div className="h-full w-full">

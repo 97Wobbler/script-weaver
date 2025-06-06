@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { DialogueSpeed } from '../types/dialogue';
 
 // 열거형 스키마
-export const DialogueSpeedSchema = z.nativeEnum(DialogueSpeed);
+export const DialogueSpeedSchema = z.enum(['SLOW', 'NORMAL', 'FAST']);
 
 // 액션 스키마
 export const DialogueActionSchema = z.object({
@@ -34,7 +34,7 @@ export const ChoiceDialogueSchema = BaseDialogueSchema.extend({
     textKey: z.string(),
     nextNodeKey: z.string(),
     onSelectedCallbackKey: z.string().optional(),
-  })),
+  })).optional().default({}),
   speed: DialogueSpeedSchema.optional(),
   shuffle: z.boolean().optional(),
 });
@@ -67,11 +67,50 @@ export const EditorNodeWrapperSchema = z.object({
   }),
 });
 
-// 씬 스키마
-export const SceneSchema = z.record(EditorNodeWrapperSchema);
+// 씬 스키마 - nodeKey를 키로 사용하는 Record 구조
+export const SceneSchema = z.record(
+  z.string(), // nodeKey (키값)
+  z.object({
+    nodeKey: z.string(),
+    dialogue: DialogueSchema,
+    position: z.object({
+      x: z.number(),
+      y: z.number(),
+    }),
+  })
+);
 
-// 템플릿 스키마
-export const TemplateDialoguesSchema = z.record(SceneSchema);
+// 템플릿 스키마 - 더 유연한 구조로 변경
+export const TemplateDialoguesSchema = z.record(
+  z.string(), // templateKey
+  z.record(
+    z.string(), // sceneKey  
+    SceneSchema
+  )
+).default({});
+
+// 더 유연한 Import를 위한 대안 스키마
+export const FlexibleTemplateDialoguesSchema = z.record(
+  z.record(
+    z.record(
+      z.object({
+        nodeKey: z.string().optional(), // nodeKey를 optional로 처리
+        dialogue: DialogueSchema,
+        position: z.object({
+          x: z.number(),
+          y: z.number(),
+        }),
+      }).transform((data, ctx) => {
+        // nodeKey가 없으면 키값을 사용
+        const nodeKey = data.nodeKey || ctx.path[ctx.path.length - 1];
+        return {
+          ...data,
+          nodeKey: typeof nodeKey === 'string' ? nodeKey : `node_${Date.now()}`
+        };
+      })
+    )
+  )
+);
 
 // 에디터 상태 스키마
 export const EditorStateSchema = z.object({
@@ -122,4 +161,8 @@ export type DialogueSchemaType = z.infer<typeof DialogueSchema>;
 export type EditorNodeWrapperSchemaType = z.infer<typeof EditorNodeWrapperSchema>;
 export type SceneSchemaType = z.infer<typeof SceneSchema>;
 export type TemplateDialoguesSchemaType = z.infer<typeof TemplateDialoguesSchema>;
-export type EditorStateSchemaType = z.infer<typeof EditorStateSchema>; 
+export type EditorStateSchemaType = z.infer<typeof EditorStateSchema>;
+
+// 타입 추론을 위한 export
+export type ValidationError = z.infer<typeof ValidationResultSchema>['errors'][0];
+export type ValidationWarning = z.infer<typeof ValidationResultSchema>['warnings'][0]; 

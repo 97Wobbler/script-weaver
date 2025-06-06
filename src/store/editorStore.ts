@@ -8,9 +8,16 @@ import type {
   ChoiceDialogue,
   InputDialogue,
   Scene,
-  TemplateDialogues
+  TemplateDialogues,
+  ValidationResult
 } from '../types/dialogue';
 import { DialogueSpeed } from '../types/dialogue';
+import { 
+  exportToJSON as exportToJSONUtil, 
+  exportToCSV as exportToCSVUtil,
+  importFromJSON as importFromJSONUtil,
+  validateTemplateData
+} from '../utils/importExport';
 
 interface EditorStore extends EditorState {
   // 기본 액션들
@@ -49,6 +56,12 @@ interface EditorStore extends EditorState {
   
   // 검증
   validateCurrentScene: () => { isValid: boolean; errors: string[] };
+  validateAllData: () => ValidationResult;
+  
+  // Import/Export
+  exportToJSON: () => string;
+  exportToCSV: () => { dialogue: string; localization: string };
+  importFromJSON: (jsonString: string) => void;
   
   // 데이터 초기화/로드
   resetEditor: () => void;
@@ -103,6 +116,26 @@ const setNode = (scene: Scene, nodeKey: string, node: EditorNodeWrapper): Scene 
 const deleteNodeFromScene = (scene: Scene, nodeKey: string): Scene => {
   const newScene = { ...scene };
   delete newScene[nodeKey];
+  
+  // 댕글링 참조 정리: 삭제된 노드를 참조하는 모든 노드들의 참조를 제거
+  Object.values(newScene).forEach(nodeWrapper => {
+    const { dialogue } = nodeWrapper;
+    
+    // TextDialogue의 nextNodeKey 정리
+    if (dialogue.type === 'text' && dialogue.nextNodeKey === nodeKey) {
+      dialogue.nextNodeKey = undefined;
+    }
+    
+    // ChoiceDialogue의 선택지들 정리
+    if (dialogue.type === 'choice' && dialogue.choices) {
+      Object.keys(dialogue.choices).forEach(choiceKey => {
+        if (dialogue.choices[choiceKey].nextNodeKey === nodeKey) {
+          dialogue.choices[choiceKey].nextNodeKey = '';
+        }
+      });
+    }
+  });
+  
   return newScene;
 };
 
@@ -178,6 +211,33 @@ export const useEditorStore = create<EditorStore>()(
       deleteNode: (nodeKey) => set((state) => {
         const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
         if (!currentScene) return state;
+        
+        // 삭제할 노드를 참조하는 다른 노드들 찾기
+        const referencingNodes: string[] = [];
+        Object.entries(currentScene).forEach(([key, nodeWrapper]) => {
+          if (key === nodeKey) return; // 자기 자신은 제외
+          
+          const { dialogue } = nodeWrapper;
+          
+          // TextDialogue 참조 확인
+          if (dialogue.type === 'text' && dialogue.nextNodeKey === nodeKey) {
+            referencingNodes.push(`${key} (텍스트 노드)`);
+          }
+          
+          // ChoiceDialogue 참조 확인
+          if (dialogue.type === 'choice' && dialogue.choices) {
+            Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
+              if (choice.nextNodeKey === nodeKey) {
+                referencingNodes.push(`${key} (선택지 "${choice.textKey}")`);
+              }
+            });
+          }
+        });
+        
+        // 참조가 있는 경우 콘솔에 정보 출력 (개발자용)
+        if (referencingNodes.length > 0) {
+          console.warn(`노드 "${nodeKey}" 삭제: ${referencingNodes.length}개의 참조가 자동으로 정리됩니다.`, referencingNodes);
+        }
         
         const updatedScene = deleteNodeFromScene(currentScene, nodeKey);
         
@@ -506,6 +566,36 @@ export const useEditorStore = create<EditorStore>()(
           isValid: errors.length === 0,
           errors
         };
+      },
+      
+      validateAllData: () => {
+        const state = get();
+        return validateTemplateData(state.templateData);
+      },
+      
+      // Import/Export
+      exportToJSON: () => {
+        const state = get();
+        return exportToJSONUtil(state.templateData);
+      },
+      
+      exportToCSV: () => {
+        const state = get();
+        return exportToCSVUtil(state.templateData);
+      },
+      
+      importFromJSON: (jsonString: string) => {
+        try {
+          const importedData = importFromJSONUtil(jsonString);
+          set({
+            templateData: importedData,
+            currentTemplate: Object.keys(importedData)[0] || 'default',
+            currentScene: 'main',
+            selectedNodeKey: undefined
+          });
+        } catch (error) {
+          throw error; // 에러를 호출자에게 전파
+        }
       },
       
       // 데이터 초기화/로드

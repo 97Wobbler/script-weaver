@@ -1,7 +1,9 @@
 // React import removed as it's not needed with jsx transform
+import { useState } from 'react';
 import Canvas from './components/Canvas';
 import PropertyPanel from './components/PropertyPanel';
 import { useEditorStore } from './store/editorStore';
+import { downloadFile, uploadFile } from './utils/importExport';
 
 function App() {
   const { 
@@ -9,8 +11,14 @@ function App() {
     createChoiceNode, 
     templateData, 
     currentTemplate, 
-    currentScene 
+    currentScene,
+    exportToJSON,
+    exportToCSV,
+    importFromJSON,
+    validateAllData
   } = useEditorStore();
+
+  const [validationResult, setValidationResult] = useState<{ isValid: boolean; errors: string[] } | null>(null);
 
   // 현재 씬의 노드 수 계산
   const currentSceneData = templateData[currentTemplate]?.[currentScene];
@@ -25,6 +33,74 @@ function App() {
   const handleCreateChoiceNode = () => {
     const nodeKey = createChoiceNode("새 선택지", "speaker");
     console.log(`선택지 노드 생성됨: ${nodeKey}`);
+  };
+
+  // Export 핸들러들 (검증 포함)
+  const handleExportJSON = () => {
+    // 빈 프로젝트 체크
+    if (nodeCount === 0) {
+      alert('내보낼 노드가 없습니다. 먼저 노드를 추가해주세요.');
+      return;
+    }
+
+    // Export 시점 검증
+    const result = validateAllData();
+    if (!result.isValid) {
+      const errorMessages = result.errors.map(e => `${e.nodeKey} - ${e.field}: ${e.message}`);
+      const errorText = errorMessages.slice(0, 5).join('\n');
+      const remainingCount = errorMessages.length > 5 ? `\n... 외 ${errorMessages.length - 5}개` : '';
+      
+      alert(`데이터에 오류가 있어 내보낼 수 없습니다:\n\n${errorText}${remainingCount}`);
+      return;
+    }
+    
+    try {
+      const jsonContent = exportToJSON();
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+      downloadFile(jsonContent, `dialogue-${timestamp}.json`, 'application/json');
+    } catch (error) {
+      alert(`JSON 내보내기 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    }
+  };
+
+  const handleExportCSV = () => {
+    // 빈 프로젝트 체크
+    if (nodeCount === 0) {
+      alert('내보낼 노드가 없습니다. 먼저 노드를 추가해주세요.');
+      return;
+    }
+
+    // Export 시점 검증
+    const result = validateAllData();
+    if (!result.isValid) {
+      const errorMessages = result.errors.map(e => `${e.nodeKey} - ${e.field}: ${e.message}`);
+      const errorText = errorMessages.slice(0, 5).join('\n');
+      const remainingCount = errorMessages.length > 5 ? `\n... 외 ${errorMessages.length - 5}개` : '';
+      
+      alert(`데이터에 오류가 있어 내보낼 수 없습니다:\n\n${errorText}${remainingCount}`);
+      return;
+    }
+    
+    try {
+      const { dialogue, localization } = exportToCSV();
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+      
+      downloadFile(dialogue, `dialogue-${timestamp}.csv`, 'text/csv');
+      downloadFile(localization, `localization-${timestamp}.csv`, 'text/csv');
+    } catch (error) {
+      alert(`CSV 내보내기 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    }
+  };
+
+  // Import 핸들러
+  const handleImportJSON = async () => {
+    try {
+      const content = await uploadFile();
+      importFromJSON(content);
+      alert('JSON 파일을 성공적으로 가져왔습니다.');
+    } catch (error) {
+      alert(`JSON 가져오기 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    }
   };
 
   return (
@@ -76,11 +152,29 @@ function App() {
             <div>
               <h3 className="text-sm font-medium text-gray-900 mb-2">내보내기</h3>
               <div className="space-y-2">
-                <button className="w-full px-3 py-2 text-sm bg-gray-50 text-gray-700 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors">
+                <button 
+                  onClick={handleExportJSON}
+                  className="w-full px-3 py-2 text-sm bg-gray-50 text-gray-700 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors"
+                >
                   JSON 내보내기
                 </button>
-                <button className="w-full px-3 py-2 text-sm bg-gray-50 text-gray-700 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors">
+                <button 
+                  onClick={handleExportCSV}
+                  className="w-full px-3 py-2 text-sm bg-gray-50 text-gray-700 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors"
+                >
                   CSV 내보내기
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-sm font-medium text-gray-900 mb-2">가져오기</h3>
+              <div className="space-y-2">
+                <button 
+                  onClick={handleImportJSON}
+                  className="w-full px-3 py-2 text-sm bg-purple-50 text-purple-700 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors"
+                >
+                  JSON 가져오기
                 </button>
               </div>
             </div>
