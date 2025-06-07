@@ -15,7 +15,8 @@ function App() {
     exportToJSON,
     exportToCSV,
     importFromJSON,
-    validateAllData
+    validateAllData,
+    setSelectedNode
   } = useEditorStore();
 
   const [validationResult, setValidationResult] = useState<{ isValid: boolean; errors: string[] } | null>(null);
@@ -26,13 +27,13 @@ function App() {
 
   // 노드 생성 핸들러
   const handleCreateTextNode = () => {
-    const nodeKey = createTextNode("새 텍스트", "speaker");
-    console.log(`텍스트 노드 생성됨: ${nodeKey}`);
+    const nodeKey = createTextNode("", "");
+    setSelectedNode(nodeKey);
   };
 
   const handleCreateChoiceNode = () => {
-    const nodeKey = createChoiceNode("새 선택지", "speaker");
-    console.log(`선택지 노드 생성됨: ${nodeKey}`);
+    const nodeKey = createChoiceNode("", "");
+    setSelectedNode(nodeKey);
   };
 
   // Export 핸들러들 (검증 포함)
@@ -97,7 +98,13 @@ function App() {
     try {
       const content = await uploadFile();
       importFromJSON(content);
-      alert('JSON 파일을 성공적으로 가져왔습니다.');
+      
+      // 현재 노드 수와 템플릿 정보 확인
+      const newNodeCount = Object.values(templateData).reduce((sum, template) => 
+        sum + Object.values(template).reduce((sceneSum, scene) => 
+          sceneSum + Object.keys(scene).length, 0), 0);
+      
+      alert(`JSON 파일을 성공적으로 가져왔습니다!\n노드: ${newNodeCount}개\n템플릿: ${Object.keys(templateData).length}개`);
     } catch (error) {
       alert(`JSON 가져오기 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
     }

@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   ReactFlow,
   Background,
@@ -11,7 +11,14 @@ import {
   type Edge,
   type NodeChange,
   type EdgeChange,
-  type Connection
+  type Connection,
+  type OnConnect,
+  type OnNodesChange,
+  type OnEdgesChange,
+  type MarkerType,
+  type Handle,
+  type Position,
+  type NodeProps
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import TextNode from './nodes/TextNode';
@@ -67,7 +74,9 @@ const generateEdges = (nodeWrappers: EditorNodeWrapper[]): Edge[] => {
             target: choice.nextNodeKey,
             sourceHandle: `choice-${choiceKey}`, // ChoiceNode에서 정의한 핸들 ID와 일치
             style: { stroke: '#22c55e', strokeWidth: 2 },
-            label: choice.textKey.length > 20 ? `${choice.textKey.substring(0, 20)}...` : choice.textKey,
+            label: (choice.choiceText || choice.textKeyRef || choiceKey).length > 20 
+              ? `${(choice.choiceText || choice.textKeyRef || choiceKey).substring(0, 20)}...` 
+              : (choice.choiceText || choice.textKeyRef || choiceKey),
             labelStyle: { fontSize: 10, fill: '#22c55e' },
             labelBgStyle: { fill: '#f0fdf4', fillOpacity: 0.8 },
           });
@@ -92,6 +101,10 @@ export default function Canvas() {
     createTextNode,
     deleteNode
   } = useEditorStore();
+
+  // Canvas 영역 참조
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [isCanvasFocused, setIsCanvasFocused] = React.useState(false);
 
   // 현재 씬의 노드들을 React Flow 형식으로 변환
   const { nodes: reactFlowNodes, edges: reactFlowEdges } = useMemo(() => {
@@ -173,8 +186,21 @@ export default function Canvas() {
     }
   }, [connectNodes]);
 
-  // 키보드 이벤트 핸들러 (노드 삭제)
+  // 키보드 이벤트 핸들러 (노드 삭제) - 개선된 버전
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    // Canvas에 focus가 없거나 텍스트 입력 중이면 무시
+    if (!isCanvasFocused) return;
+    
+    // 텍스트 입력 요소에 focus가 있는지 확인
+    const activeElement = document.activeElement;
+    if (activeElement && (
+      activeElement.tagName === 'INPUT' || 
+      activeElement.tagName === 'TEXTAREA' ||
+      (activeElement as HTMLElement).contentEditable === 'true'
+    )) {
+      return; // 텍스트 입력 중이면 노드 삭제 동작 안 함
+    }
+
     if ((event.key === 'Delete' || event.key === 'Backspace') && selectedNodeKey) {
       event.preventDefault();
       
@@ -198,7 +224,7 @@ export default function Canvas() {
         if (dialogue.type === 'choice' && dialogue.choices) {
           Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
             if (choice.nextNodeKey === selectedNodeKey) {
-              referencingNodes.push(`${key} (선택지 "${choice.textKey}")`);
+              referencingNodes.push(`${key} (선택지 "${choice.choiceText || choice.textKeyRef || choiceKey}")`);
             }
           });
         }
@@ -215,10 +241,26 @@ export default function Canvas() {
         setSelectedNode(undefined);
       }
     }
-  }, [selectedNodeKey, deleteNode, setSelectedNode, templateData, currentTemplate, currentScene]);
+  }, [isCanvasFocused, selectedNodeKey, deleteNode, setSelectedNode, templateData, currentTemplate, currentScene]);
+
+  // Canvas focus 관리
+  const handleCanvasMouseDown = () => {
+    if (canvasRef.current) {
+      canvasRef.current.focus();
+      setIsCanvasFocused(true);
+    }
+  };
+
+  const handleCanvasFocus = () => {
+    setIsCanvasFocused(true);
+  };
+
+  const handleCanvasBlur = () => {
+    setIsCanvasFocused(false);
+  };
 
   // 키보드 이벤트 리스너 등록
-  React.useEffect(() => {
+  useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
@@ -226,7 +268,14 @@ export default function Canvas() {
   }, [handleKeyDown]);
 
   return (
-    <div className="h-full w-full">
+    <div 
+      ref={canvasRef}
+      className="h-full w-full outline-none" 
+      tabIndex={0}
+      onMouseDown={handleCanvasMouseDown}
+      onFocus={handleCanvasFocus}
+      onBlur={handleCanvasBlur}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}

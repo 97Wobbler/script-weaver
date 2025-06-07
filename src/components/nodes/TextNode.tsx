@@ -34,21 +34,21 @@ export default function TextNode({ data, selected }: NodeProps<TextNodeData>) {
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content - 실제 텍스트 표시 */}
       <div className="p-3 space-y-2">
-        {/* Speaker */}
+        {/* Speaker - 실제 텍스트 */}
         <div>
           <span className="text-xs text-gray-500 uppercase tracking-wide">화자</span>
           <p className="text-sm font-medium text-gray-900">
-            {dialogue.speakerKey || '(없음)'}
+            {dialogue.speakerText || '(없음)'}
           </p>
         </div>
 
-        {/* Text */}
+        {/* Content Text - 실제 텍스트 */}
         <div>
           <span className="text-xs text-gray-500 uppercase tracking-wide">내용</span>
           <p className="text-sm text-gray-700 leading-relaxed line-clamp-3">
-            {dialogue.textKey || '(내용 없음)'}
+            {dialogue.contentText || '(내용 없음)'}
           </p>
         </div>
 

@@ -13,11 +13,19 @@ export interface DialogueAction {
   callbackKey?: string;
 }
 
-// 기본 대화 구조 (모든 노드가 공유)
+// 기본 대화 구조 (모든 노드가 공유) - 컨텐츠-키 분리 아키텍처 적용
 export interface BaseDialogue {
   type: "text" | "choice" | "input";
-  speakerKey?: string;
-  textKey?: string;
+  
+  // 실제 텍스트 (사용자가 입력하는 내용)
+  speakerText?: string;
+  contentText?: string;
+  
+  // 키 참조 (LocalizationStore와 연동)
+  speakerKeyRef?: string;
+  textKeyRef?: string;
+  
+  // 기존 콜백 키들
   onEnterCallbackKey?: string;
   onExitCallbackKey?: string;
   isSkippable?: boolean;
@@ -30,12 +38,15 @@ export interface TextDialogue extends BaseDialogue {
   speed?: DialogueSpeed;
 }
 
-// 선택지 노드 (여러 선택지 제시 및 분기)
+// 선택지 노드 (여러 선택지 제시 및 분기) - 선택지에도 실제 텍스트 추가
 export interface ChoiceDialogue extends BaseDialogue {
   type: "choice";
   choices: {
     [choiceKey: string]: {
-      textKey: string;
+      // 실제 텍스트 (사용자가 입력하는 내용)
+      choiceText: string;
+      // 키 참조 (LocalizationStore와 연동)
+      textKeyRef?: string;
       nextNodeKey: string;
       onSelectedCallbackKey?: string;
     };
@@ -80,15 +91,19 @@ export interface EditorState {
   lastNodePosition: { x: number; y: number };
 }
 
-// CSV Export용 타입
+// CSV Export용 타입 - 실제 텍스트와 키 참조 모두 포함
 export interface DialogueCSVRow {
   templateKey: string;
   sceneKey: string;
   nodeKey: string;
   textKey: string;
   speakerKey: string;
+  // 실제 텍스트 필드 추가
+  speakerText: string;
+  contentText: string;
   type: string;
   choices_textKeys: string; // 세미콜론으로 구분
+  choices_texts: string; // 실제 선택지 텍스트들 (세미콜론으로 구분)
   choices_nextKeys: string; // 세미콜론으로 구분
 }
 
@@ -110,4 +125,11 @@ export interface ValidationResult {
     field: string;
     message: string;
   }>;
+}
+
+// 데이터 마이그레이션 관련 타입
+export interface MigrationResult {
+  success: boolean;
+  migratedNodes: number;
+  errors: string[];
 } 

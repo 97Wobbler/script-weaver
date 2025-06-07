@@ -35,38 +35,39 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content - 실제 텍스트 표시 */}
       <div className="p-3 space-y-3">
-        {/* Speaker */}
+        {/* Speaker - 실제 텍스트 */}
         <div>
           <span className="text-xs text-gray-500 uppercase tracking-wide">화자</span>
           <p className="text-sm font-medium text-gray-900">
-            {dialogue.speakerKey || '(없음)'}
+            {dialogue.speakerText || '(없음)'}
           </p>
         </div>
 
-        {/* Text */}
+        {/* Content Text - 실제 텍스트 */}
         <div>
-          <span className="text-xs text-gray-500 uppercase tracking-wide">내용</span>
+          <span className="text-xs text-gray-500 uppercase tracking-wide">질문</span>
           <p className="text-sm text-gray-700 leading-relaxed line-clamp-3">
-            {dialogue.textKey || '(내용 없음)'}
+            {dialogue.contentText || '(질문 없음)'}
           </p>
         </div>
 
-        {/* Choices */}
+        {/* Choices - 실제 텍스트 표시 */}
         <div>
           <span className="text-xs text-gray-500 uppercase tracking-wide">
             선택지 ({choiceEntries.length}개)
           </span>
           <div className="space-y-2 mt-1">
-                        {choiceEntries.map(([choiceKey, choice], index) => (
+            {choiceEntries.map(([choiceKey, choice], index) => (
               <div
                 key={choiceKey}
                 className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded text-xs relative"
                 onMouseEnter={() => setHoveredChoice(choiceKey)}
                 onMouseLeave={() => setHoveredChoice(null)}
               >
-                <span className="flex-1 truncate">{choice.textKey}</span>
+                {/* 실제 선택지 텍스트 표시 */}
+                <span className="flex-1 truncate">{choice.choiceText || '(선택지 텍스트 없음)'}</span>
                 
                 {/* Handle을 각 선택지 항목 내에 배치 */}
                 <Handle

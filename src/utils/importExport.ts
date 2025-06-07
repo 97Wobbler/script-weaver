@@ -6,35 +6,90 @@ import type {
   EditorNodeWrapper,
   Dialogue
 } from '../types/dialogue';
+import type { LocalizationData } from '../store/localizationStore';
 import { 
   TemplateDialoguesSchema, 
   FlexibleTemplateDialoguesSchema,
   ValidationResultSchema 
 } from '../schemas/dialogue';
 
-// JSON Export 함수
-export const exportToJSON = (templateData: TemplateDialogues): string => {
+// 새로운 통합 내보내기 형식
+export interface ScriptWeaverExport {
+  version: string;
+  templateData: TemplateDialogues;
+  localizationData: LocalizationData;
+  metadata: {
+    exportedAt: string;
+    totalNodes: number;
+    totalKeys: number;
+  };
+}
+
+// JSON Export 함수 (LocalizationStore 포함)
+export const exportToJSON = (
+  templateData: TemplateDialogues, 
+  localizationData?: LocalizationData
+): string => {
   try {
-    return JSON.stringify(templateData, null, 2);
+    // 노드 수 계산
+    const totalNodes = Object.values(templateData).reduce((sum, template) => 
+      sum + Object.values(template).reduce((sceneSum, scene) => 
+        sceneSum + Object.keys(scene).length, 0), 0);
+
+    const exportData: ScriptWeaverExport = {
+      version: '2.0.0', // 컨텐츠-키 분리 아키텍처 버전
+      templateData,
+      localizationData: localizationData || {},
+      metadata: {
+        exportedAt: new Date().toISOString(),
+        totalNodes,
+        totalKeys: Object.keys(localizationData || {}).length
+      }
+    };
+
+    return JSON.stringify(exportData, null, 2);
   } catch (error) {
     throw new Error(`JSON 내보내기 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
   }
 };
 
-// JSON Import 함수 - 더 유연한 파싱
-export const importFromJSON = (jsonString: string): TemplateDialogues => {
+// JSON Import 함수 - 새로운 형식과 레거시 형식 모두 지원
+export const importFromJSON = (jsonString: string): { 
+  templateData: TemplateDialogues; 
+  localizationData: LocalizationData;
+  needsMigration: boolean;
+} => {
   try {
     const parsed = JSON.parse(jsonString);
     
-    // 먼저 기본 스키마로 시도
+    // 새로운 형식인지 확인 (version과 localizationData 존재)
+    if (parsed.version && parsed.templateData && parsed.localizationData !== undefined) {
+      console.log(`Script Weaver v${parsed.version} 형식을 가져옵니다.`);
+      return {
+        templateData: parsed.templateData,
+        localizationData: parsed.localizationData,
+        needsMigration: false
+      };
+    }
+    
+    // 레거시 형식 처리
+    console.log('레거시 형식을 감지했습니다. 마이그레이션이 필요합니다.');
+    
     try {
       const validated = TemplateDialoguesSchema.parse(parsed);
-      return validated as unknown as TemplateDialogues;
+      return {
+        templateData: validated as unknown as TemplateDialogues,
+        localizationData: {},
+        needsMigration: true
+      };
     } catch (strictError) {
-      // 기본 스키마 실패 시 유연한 스키마로 시도
       console.log('기본 스키마 실패, 유연한 스키마로 재시도:', strictError);
       const flexibleValidated = FlexibleTemplateDialoguesSchema.parse(parsed);
-      return flexibleValidated as unknown as TemplateDialogues;
+      return {
+        templateData: flexibleValidated as unknown as TemplateDialogues,
+        localizationData: {},
+        needsMigration: true
+      };
     }
   } catch (error) {
     if (error instanceof SyntaxError) {
@@ -45,11 +100,13 @@ export const importFromJSON = (jsonString: string): TemplateDialogues => {
   }
 };
 
-// CSV Export 함수들
-export const exportToCSV = (templateData: TemplateDialogues): { dialogue: string; localization: string } => {
+// CSV Export 함수 - 새로운 데이터 구조 지원
+export const exportToCSV = (
+  templateData: TemplateDialogues, 
+  localizationData: LocalizationData = {}
+): { dialogue: string; localization: string } => {
   const dialogueRows: DialogueCSVRow[] = [];
   const localizationRows: LocalizationCSVRow[] = [];
-  const usedKeys = new Set<string>();
 
   // 모든 노드를 순회하여 CSV 행 생성
   Object.entries(templateData).forEach(([templateKey, scenes]) => {
@@ -57,66 +114,51 @@ export const exportToCSV = (templateData: TemplateDialogues): { dialogue: string
       Object.entries(scene).forEach(([nodeKey, nodeWrapper]) => {
         const { dialogue } = nodeWrapper;
         
-        // Dialogue CSV 행 생성
+        // Dialogue CSV 행 생성 (새로운 필드 포함)
         const dialogueRow: DialogueCSVRow = {
           templateKey,
           sceneKey,
           nodeKey,
-          textKey: dialogue.textKey || '',
-          speakerKey: dialogue.speakerKey || '',
+          textKey: dialogue.textKeyRef || '',
+          speakerKey: dialogue.speakerKeyRef || '',
+          // 실제 텍스트 필드 추가
+          speakerText: dialogue.speakerText || '',
+          contentText: dialogue.contentText || '',
           type: dialogue.type,
           choices_textKeys: '',
+          choices_texts: '', // 실제 선택지 텍스트
           choices_nextKeys: ''
         };
 
         // 선택지 정보 추가 (ChoiceDialogue인 경우)
         if (dialogue.type === 'choice') {
           const choices = dialogue.choices || {};
-          const textKeys = Object.values(choices).map(choice => choice.textKey);
+          const textKeys = Object.values(choices).map(choice => choice.textKeyRef || '');
+          const choiceTexts = Object.values(choices).map(choice => choice.choiceText || '');
           const nextKeys = Object.values(choices).map(choice => choice.nextNodeKey);
           
           dialogueRow.choices_textKeys = textKeys.join(';');
+          dialogueRow.choices_texts = choiceTexts.join(';');
           dialogueRow.choices_nextKeys = nextKeys.join(';');
         }
 
         dialogueRows.push(dialogueRow);
-
-        // Localization 키 수집
-        if (dialogue.textKey && !usedKeys.has(dialogue.textKey)) {
-          localizationRows.push({
-            key: dialogue.textKey,
-            ko: dialogue.textKey // 기본값으로 key와 동일하게 설정
-          });
-          usedKeys.add(dialogue.textKey);
-        }
-
-        if (dialogue.speakerKey && !usedKeys.has(dialogue.speakerKey)) {
-          localizationRows.push({
-            key: dialogue.speakerKey,
-            ko: dialogue.speakerKey
-          });
-          usedKeys.add(dialogue.speakerKey);
-        }
-
-        // 선택지 텍스트 키들도 추가
-        if (dialogue.type === 'choice') {
-          Object.values(dialogue.choices || {}).forEach(choice => {
-            if (choice.textKey && !usedKeys.has(choice.textKey)) {
-              localizationRows.push({
-                key: choice.textKey,
-                ko: choice.textKey
-              });
-              usedKeys.add(choice.textKey);
-            }
-          });
-        }
       });
+    });
+  });
+
+  // LocalizationData를 LocalizationCSVRow로 변환
+  Object.entries(localizationData).forEach(([key, text]) => {
+    localizationRows.push({
+      key,
+      ko: text
     });
   });
 
   // CSV 문자열 생성
   const dialogueCSV = convertToCSVString(dialogueRows, [
-    'templateKey', 'sceneKey', 'nodeKey', 'textKey', 'speakerKey', 'type', 'choices_textKeys', 'choices_nextKeys'
+    'templateKey', 'sceneKey', 'nodeKey', 'textKey', 'speakerKey', 
+    'speakerText', 'contentText', 'type', 'choices_textKeys', 'choices_texts', 'choices_nextKeys'
   ]);
 
   const localizationCSV = convertToCSVString(localizationRows, ['key', 'ko']);
@@ -146,13 +188,16 @@ const convertToCSVString = <T extends Record<string, any>>(data: T[], headers: (
 };
 
 // CSV Import 함수 (기본 구현)
-export const importFromCSV = (dialogueCSV: string, localizationCSV: string): TemplateDialogues => {
+export const importFromCSV = (dialogueCSV: string, localizationCSV: string): {
+  templateData: TemplateDialogues;
+  localizationData: LocalizationData;
+} => {
   // TODO: CSV 파싱 로직 구현
   // 현재는 기본 구조만 반환
   throw new Error('CSV 가져오기 기능은 아직 구현되지 않았습니다.');
 };
 
-// 검증 함수
+// 검증 함수 - 새로운 데이터 구조 지원
 export const validateTemplateData = (templateData: TemplateDialogues): ValidationResult => {
   const errors: ValidationResult['errors'] = [];
   const warnings: ValidationResult['warnings'] = [];
@@ -162,12 +207,12 @@ export const validateTemplateData = (templateData: TemplateDialogues): Validatio
       Object.entries(scene).forEach(([nodeKey, nodeWrapper]) => {
         const { dialogue } = nodeWrapper;
 
-        // 필수 필드 검증
-        if (!dialogue.textKey || dialogue.textKey.trim() === '') {
+        // 실제 텍스트 또는 키 참조 검증
+        if (!dialogue.contentText && !dialogue.textKeyRef) {
           errors.push({
             nodeKey,
-            field: 'textKey',
-            message: 'textKey는 필수이며 빈 값일 수 없습니다.'
+            field: 'contentText',
+            message: '실제 텍스트 또는 키 참조가 필요합니다.'
           });
         }
 
@@ -185,9 +230,8 @@ export const validateTemplateData = (templateData: TemplateDialogues): Validatio
           }
         }
 
-        // 선택지 nextNodeKey 댕글링 참조 검증
+        // 선택지 검증
         if (dialogue.type === 'choice') {
-          // 선택지가 하나도 없는 경우 오류
           if (!dialogue.choices || Object.keys(dialogue.choices).length === 0) {
             errors.push({
               nodeKey,
@@ -195,19 +239,24 @@ export const validateTemplateData = (templateData: TemplateDialogues): Validatio
               message: '선택지가 하나도 정의되지 않았습니다.'
             });
           } else {
-            // 각 선택지 검증
             Object.entries(dialogue.choices || {}).forEach(([choiceKey, choice]) => {
-              // 선택지 textKey 검증
-              if (!choice.textKey || choice.textKey.trim() === '') {
+              // 선택지 텍스트 검증
+              if (!choice.choiceText && !choice.textKeyRef) {
                 errors.push({
                   nodeKey,
-                  field: `choices.${choiceKey}.textKey`,
-                  message: `선택지 '${choiceKey}'의 textKey가 필요합니다.`
+                  field: `choices.${choiceKey}.choiceText`,
+                  message: '선택지 텍스트 또는 키 참조가 필요합니다.'
                 });
               }
 
-              // 선택지 nextNodeKey 검증 (빈 값은 대화 종료로 허용)
-              if (choice.nextNodeKey && choice.nextNodeKey.trim() !== '') {
+              // 선택지 nextNodeKey 검증
+              if (!choice.nextNodeKey) {
+                warnings.push({
+                  nodeKey,
+                  field: `choices.${choiceKey}.nextNodeKey`,
+                  message: '선택지의 다음 노드가 설정되지 않았습니다.'
+                });
+              } else {
                 const targetExists = Object.values(templateData).some(template =>
                   Object.values(template).some(s => s[choice.nextNodeKey])
                 );
@@ -215,11 +264,10 @@ export const validateTemplateData = (templateData: TemplateDialogues): Validatio
                   errors.push({
                     nodeKey,
                     field: `choices.${choiceKey}.nextNodeKey`,
-                    message: `선택지 '${choiceKey}'가 참조하는 노드 '${choice.nextNodeKey}'를 찾을 수 없습니다.`
+                    message: `참조하는 노드 '${choice.nextNodeKey}'를 찾을 수 없습니다.`
                   });
                 }
               }
-              // nextNodeKey가 비어있으면 대화 종료 분기로 허용 (검증하지 않음)
             });
           }
         }
@@ -254,8 +302,8 @@ export const uploadFile = (): Promise<string> => {
     input.type = 'file';
     input.accept = '.json,.csv';
     
-    input.onchange = (event) => {
-      const file = (event.target as HTMLInputElement).files?.[0];
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) {
         reject(new Error('파일이 선택되지 않았습니다.'));
         return;
@@ -266,9 +314,7 @@ export const uploadFile = (): Promise<string> => {
         const content = e.target?.result as string;
         resolve(content);
       };
-      reader.onerror = () => {
-        reject(new Error('파일 읽기에 실패했습니다.'));
-      };
+      reader.onerror = () => reject(new Error('파일 읽기 실패'));
       reader.readAsText(file);
     };
 
