@@ -10,15 +10,7 @@ import {
   type Node,
   type Edge,
   type NodeChange,
-  type EdgeChange,
-  type Connection,
-  type OnConnect,
-  type OnNodesChange,
-  type OnEdgesChange,
-  type MarkerType,
-  type Handle,
-  type Position,
-  type NodeProps
+  type Connection
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import TextNode from './nodes/TextNode';
@@ -96,9 +88,7 @@ export default function Canvas() {
     moveNode,
     setSelectedNode,
     selectedNodeKey,
-    disconnectNodes,
     connectNodes,
-    createTextNode,
     deleteNode
   } = useEditorStore();
 
@@ -141,7 +131,7 @@ export default function Canvas() {
   }, [moveNode, onNodesChange]);
 
   // 노드 클릭 핸들러 (더 직접적인 선택 처리)
-  const handleNodeClick = useCallback((event: any, node: any) => {
+  const handleNodeClick = useCallback((_event: any, node: any) => {
     console.log(`노드 클릭: ${node.id}`);
     setSelectedNode(node.id);
   }, [setSelectedNode]);
@@ -156,7 +146,7 @@ export default function Canvas() {
   }, [reactFlowEdges, setEdges]);
 
   // 노드 드래그 완료 핸들러 (더 확실한 위치 저장)
-  const handleNodeDragStop = useCallback((event: any, node: any) => {
+  const handleNodeDragStop = useCallback((_event: any, node: any) => {
     console.log(`노드 드래그 완료: ${node.id}`, node.position);
     moveNode(node.id, node.position);
   }, [moveNode]);

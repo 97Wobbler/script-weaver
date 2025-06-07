@@ -1,5 +1,5 @@
 // React import removed as it's not needed with jsx transform
-import { useState } from 'react';
+
 import Canvas from './components/Canvas';
 import PropertyPanel from './components/PropertyPanel';
 import { useEditorStore } from './store/editorStore';
@@ -19,7 +19,7 @@ function App() {
     setSelectedNode
   } = useEditorStore();
 
-  const [validationResult, setValidationResult] = useState<{ isValid: boolean; errors: string[] } | null>(null);
+
 
   // 현재 씬의 노드 수 계산
   const currentSceneData = templateData[currentTemplate]?.[currentScene];
