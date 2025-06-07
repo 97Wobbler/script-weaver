@@ -12,13 +12,19 @@ interface ChoiceNodeData {
 export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>) {
   const { dialogue, nodeKey } = data;
   const choiceEntries = Object.entries(dialogue.choices);
-  const { disconnectNodes } = useEditorStore();
+  const { disconnectNodes, createAndConnectChoiceNode } = useEditorStore();
   const [hoveredChoice, setHoveredChoice] = useState<string | null>(null);
 
   // 선택지 연결 제거 핸들러
   const handleDisconnectChoice = (choiceKey: string) => (e: React.MouseEvent) => {
     e.stopPropagation();
     disconnectNodes(nodeKey, choiceKey);
+  };
+
+  // AC-02: 선택지별 새 노드 생성 및 연결 핸들러
+  const handleCreateAndConnectNode = (choiceKey: string) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    createAndConnectChoiceNode(nodeKey, choiceKey, 'text'); // 기본으로 텍스트 노드 생성
   };
 
   return (
@@ -59,7 +65,7 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
             선택지 ({choiceEntries.length}개)
           </span>
           <div className="space-y-2 mt-1">
-            {choiceEntries.map(([choiceKey, choice], index) => (
+            {choiceEntries.map(([choiceKey, choice]) => (
               <div
                 key={choiceKey}
                 className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded text-xs relative"
@@ -68,6 +74,19 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
               >
                 {/* 실제 선택지 텍스트 표시 */}
                 <span className="flex-1 truncate">{choice.choiceText || '(선택지 텍스트 없음)'}</span>
+                
+                {/* AC-02: '+' 버튼 추가 - 연결이 없을 때만 표시 */}
+                <div className="ml-2 w-6 flex justify-center">
+                  {!choice.nextNodeKey && (
+                    <button
+                      onClick={handleCreateAndConnectNode(choiceKey)}
+                      className="px-1 py-0.5 text-xs bg-green-100 text-green-700 border border-green-200 rounded hover:bg-green-200 transition-colors"
+                      title="새 노드 생성 및 연결"
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
                 
                 {/* Handle을 각 선택지 항목 내에 배치 */}
                 <Handle

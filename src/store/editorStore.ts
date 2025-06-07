@@ -50,6 +50,9 @@ interface EditorStore extends EditorState {
   connectNodes: (fromNodeKey: string, toNodeKey: string, choiceKey?: string) => void;
   disconnectNodes: (fromNodeKey: string, choiceKey?: string) => void;
   
+  // AC-02: 선택지별 새 노드 자동 생성 및 연결
+  createAndConnectChoiceNode: (fromNodeKey: string, choiceKey: string, nodeType?: 'text' | 'choice') => string;
+  
   // 템플릿/씬 관리
   createTemplate: (templateKey: string) => void;
   createScene: (templateKey: string, sceneKey: string) => void;
@@ -746,6 +749,62 @@ export const useEditorStore = create<EditorStore>()(
             }
           };
         }),
+        
+        // AC-02: 선택지별 새 노드 자동 생성 및 연결
+        createAndConnectChoiceNode: (fromNodeKey, choiceKey, nodeType = 'text') => {
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return '';
+          
+          const fromNode = getNode(currentScene, fromNodeKey);
+          if (!fromNode || fromNode.dialogue.type !== 'choice') return '';
+          
+          const choice = fromNode.dialogue.choices[choiceKey];
+          if (!choice) return '';
+          
+          // 새 노드 생성
+          const newNodeKey = get().generateNodeKey();
+          const newNodePosition = get().getNextNodePosition();
+          
+          let newNode: EditorNodeWrapper;
+          
+          if (nodeType === 'text') {
+            const textDialogue: TextDialogue = {
+              type: 'text',
+              speakerText: '',
+              contentText: '',
+              speed: DialogueSpeed.NORMAL
+            };
+            
+            newNode = {
+              nodeKey: newNodeKey,
+              dialogue: textDialogue,
+              position: newNodePosition
+            };
+          } else {
+            const choiceDialogue: ChoiceDialogue = {
+              type: 'choice',
+              speakerText: '',
+              contentText: '',
+              choices: {},
+              speed: DialogueSpeed.NORMAL
+            };
+            
+            newNode = {
+              nodeKey: newNodeKey,
+              dialogue: choiceDialogue,
+              position: newNodePosition
+            };
+          }
+          
+          // 새 노드를 씬에 추가 (이때 lastNodePosition이 업데이트됨)
+          get().addNode(newNode);
+          
+          // 선택지를 새 노드에 연결
+          get().connectNodes(fromNodeKey, newNodeKey, choiceKey);
+          
+          return newNodeKey;
+        },
         
         // 템플릿/씬 관리
         createTemplate: (templateKey) => set((state) => ({
