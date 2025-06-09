@@ -12,7 +12,7 @@ interface ChoiceNodeData {
 export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>) {
   const { dialogue, nodeKey } = data;
   const choiceEntries = Object.entries(dialogue.choices);
-  const { disconnectNodes, createAndConnectChoiceNode } = useEditorStore();
+  const { disconnectNodes, createAndConnectChoiceNode, canCreateNewNode } = useEditorStore();
   const [hoveredChoice, setHoveredChoice] = useState<string | null>(null);
 
   // 선택지 연결 제거 핸들러
@@ -24,7 +24,11 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
   // AC-02: 선택지별 새 노드 생성 및 연결 핸들러
   const handleCreateAndConnectNode = (choiceKey: string) => (e: React.MouseEvent) => {
     e.stopPropagation();
-    createAndConnectChoiceNode(nodeKey, choiceKey, 'text'); // 기본으로 텍스트 노드 생성
+    try {
+      createAndConnectChoiceNode(nodeKey, choiceKey, 'text'); // 기본으로 텍스트 노드 생성
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '노드 생성에 실패했습니다.');
+    }
   };
 
   return (
@@ -80,8 +84,13 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
                   {!choice.nextNodeKey && (
                     <button
                       onClick={handleCreateAndConnectNode(choiceKey)}
-                      className="px-1 py-0.5 text-xs bg-green-100 text-green-700 border border-green-200 rounded hover:bg-green-200 transition-colors"
-                      title="새 노드 생성 및 연결"
+                      disabled={!canCreateNewNode()}
+                      className={`px-1 py-0.5 text-xs border rounded transition-colors ${
+                        canCreateNewNode()
+                          ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200'
+                          : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                      }`}
+                      title={canCreateNewNode() ? "새 노드 생성 및 연결" : "노드 개수 제한 도달"}
                     >
                       +
                     </button>

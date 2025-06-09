@@ -22,18 +22,11 @@ interface LocalTextState {
   choiceTexts: Record<string, string>;
 }
 
-// 중복 텍스트 확인 상태 타입
-interface DuplicateTextConfirmState {
-  isOpen: boolean;
-  newText: string;
-  existingKey: string;
-  fieldType: 'speaker' | 'content' | 'choice';
-  nodeKey: string;
-  choiceKey?: string;
-  onConfirm: (useExisting: boolean) => void;
+interface PropertyPanelProps {
+  showToast?: (message: string, type?: 'success' | 'info' | 'warning') => void;
 }
 
-export default function PropertyPanel() {
+export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   const { 
     selectedNodeKey, 
     templateData, 
@@ -70,8 +63,7 @@ export default function PropertyPanel() {
     choices: {} as Record<string, boolean>
   });
 
-  // 중복 텍스트 확인 상태
-  const [duplicateConfirmState, setDuplicateConfirmState] = useState<DuplicateTextConfirmState | null>(null);
+  // 전역 토스트 사용 (더 이상 로컬 토스트 상태 불필요)
 
   // 현재 선택된 노드 가져오기
   const currentSceneData = templateData[currentTemplate]?.[currentScene];
@@ -114,7 +106,7 @@ export default function PropertyPanel() {
     }));
   };
 
-  // 완료 시점에서 키 처리 (onBlur, onEnter 등)
+  // 완료 시점에서 키 처리 (onBlur, onEnter 등) - 중복 텍스트 자동 처리
   const commitSpeakerText = () => {
     if (!selectedNodeKey || isComposing.speaker) return;
     const trimmedText = localTextState.speakerText.trim();
@@ -122,40 +114,21 @@ export default function PropertyPanel() {
     const currentNode = selectedNode;
     const currentSpeakerKey = currentNode?.dialogue.speakerKeyRef;
     
-    // 1. 먼저 중복 텍스트 체크 (기존 키와 다른 키에 동일한 텍스트가 있는지)
+    // 중복 텍스트 체크 (기존 키와 다른 키에 동일한 텍스트가 있는지)
     if (trimmedText) {
       const existingKey = useLocalizationStore.getState().findExistingKey(trimmedText);
       if (existingKey && existingKey !== currentSpeakerKey) {
-        setDuplicateConfirmState({
-          isOpen: true,
-          newText: trimmedText,
-          existingKey,
-          fieldType: 'speaker',
-          nodeKey: selectedNodeKey,
-          onConfirm: (useExisting) => {
-            if (useExisting) {
-              // 기존 키 사용
-              updateNodeKeyReference(selectedNodeKey, 'speaker', existingKey);
-              setLocalTextState(prev => ({ ...prev, speakerText: trimmedText }));
-            } else {
-              // 새 키 생성
-              updateNodeText(selectedNodeKey, trimmedText, undefined);
-            }
-            setDuplicateConfirmState(null);
-            
-            // UI 동기화를 위해 selectedNode 재설정
-            setTimeout(() => {
-              setSelectedNode(undefined);
-              setTimeout(() => setSelectedNode(selectedNodeKey), 0);
-            }, 0);
-          }
-        });
+        // 기존 키 자동 사용
+        updateNodeKeyReference(selectedNodeKey, 'speaker', existingKey);
+        setLocalTextState(prev => ({ ...prev, speakerText: trimmedText }));
+        
+        // 토스트 알림 표시
+        showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, 'info');
         return;
       }
     }
     
-    // 2. 중복이 없는 경우, 단일 사용 키인지 확인하여 기존 키 재사용 결정
-    const currentUsageCount = currentSpeakerKey ? getKeyUsageCount(currentSpeakerKey) : 0;
+    // 중복이 없는 경우 기존 로직 실행
     updateNodeText(selectedNodeKey, trimmedText, undefined);
   };
 
@@ -166,40 +139,21 @@ export default function PropertyPanel() {
     const currentNode = selectedNode;
     const currentTextKey = currentNode?.dialogue.textKeyRef;
     
-    // 1. 먼저 중복 텍스트 체크 (기존 키와 다른 키에 동일한 텍스트가 있는지)
+    // 중복 텍스트 체크 (기존 키와 다른 키에 동일한 텍스트가 있는지)
     if (trimmedText) {
       const existingKey = useLocalizationStore.getState().findExistingKey(trimmedText);
       if (existingKey && existingKey !== currentTextKey) {
-        setDuplicateConfirmState({
-          isOpen: true,
-          newText: trimmedText,
-          existingKey,
-          fieldType: 'content',
-          nodeKey: selectedNodeKey,
-          onConfirm: (useExisting) => {
-            if (useExisting) {
-              // 기존 키 사용
-              updateNodeKeyReference(selectedNodeKey, 'text', existingKey);
-              setLocalTextState(prev => ({ ...prev, contentText: trimmedText }));
-            } else {
-              // 새 키 생성
-              updateNodeText(selectedNodeKey, undefined, trimmedText);
-            }
-            setDuplicateConfirmState(null);
-            
-            // UI 동기화를 위해 selectedNode 재설정
-            setTimeout(() => {
-              setSelectedNode(undefined);
-              setTimeout(() => setSelectedNode(selectedNodeKey), 0);
-            }, 0);
-          }
-        });
+        // 기존 키 자동 사용
+        updateNodeKeyReference(selectedNodeKey, 'text', existingKey);
+        setLocalTextState(prev => ({ ...prev, contentText: trimmedText }));
+        
+        // 토스트 알림 표시
+        showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, 'info');
         return;
       }
     }
     
-    // 2. 중복이 없는 경우, 단일 사용 키인지 확인하여 기존 키 재사용 결정
-    const currentUsageCount = currentTextKey ? getKeyUsageCount(currentTextKey) : 0;
+    // 중복이 없는 경우 기존 로직 실행
     updateNodeText(selectedNodeKey, undefined, trimmedText);
   };
 
@@ -211,44 +165,24 @@ export default function PropertyPanel() {
     const currentChoice = currentNode?.dialogue.type === 'choice' ? currentNode.dialogue.choices[choiceKey] : null;
     const currentChoiceKey = currentChoice?.textKeyRef;
     
-    // 1. 먼저 중복 텍스트 체크 (기존 키와 다른 키에 동일한 텍스트가 있는지)
+    // 중복 텍스트 체크 (기존 키와 다른 키에 동일한 텍스트가 있는지)
     if (trimmedText) {
       const existingKey = useLocalizationStore.getState().findExistingKey(trimmedText);
       if (existingKey && existingKey !== currentChoiceKey) {
-        setDuplicateConfirmState({
-          isOpen: true,
-          newText: trimmedText,
-          existingKey,
-          fieldType: 'choice',
-          nodeKey: selectedNodeKey,
-          choiceKey,
-          onConfirm: (useExisting) => {
-            if (useExisting) {
-              // 기존 키 사용
-              updateChoiceKeyReference(selectedNodeKey, choiceKey, existingKey);
-              setLocalTextState(prev => ({ 
-                ...prev, 
-                choiceTexts: { ...prev.choiceTexts, [choiceKey]: trimmedText }
-              }));
-            } else {
-              // 새 키 생성
-              updateChoiceText(selectedNodeKey, choiceKey, trimmedText);
-            }
-            setDuplicateConfirmState(null);
-            
-            // UI 동기화를 위해 selectedNode 재설정
-            setTimeout(() => {
-              setSelectedNode(undefined);
-              setTimeout(() => setSelectedNode(selectedNodeKey), 0);
-            }, 0);
-          }
-        });
+        // 기존 키 자동 사용
+        updateChoiceKeyReference(selectedNodeKey, choiceKey, existingKey);
+        setLocalTextState(prev => ({ 
+          ...prev, 
+          choiceTexts: { ...prev.choiceTexts, [choiceKey]: trimmedText }
+        }));
+        
+        // 토스트 알림 표시
+        showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, 'info');
         return;
       }
     }
     
-    // 2. 중복이 없는 경우, 단일 사용 키인지 확인하여 기존 키 재사용 결정
-    const currentUsageCount = currentChoiceKey ? getKeyUsageCount(currentChoiceKey) : 0;
+    // 중복이 없는 경우 기존 로직 실행
     updateChoiceText(selectedNodeKey, choiceKey, trimmedText);
   };
 
@@ -464,15 +398,6 @@ export default function PropertyPanel() {
     }
 
     setKeyEditState(null);
-    
-    // UI 동기화를 위해 selectedNode를 다시 설정하여 useEffect 트리거
-    if (selectedNodeKey) {
-      // 아주 짧은 딜레이 후 다시 선택하여 UI 갱신
-      setTimeout(() => {
-        setSelectedNode(undefined);
-        setTimeout(() => setSelectedNode(selectedNodeKey), 0);
-      }, 0);
-    }
   };
 
   // 키 편집 UI 렌더링
@@ -574,61 +499,6 @@ export default function PropertyPanel() {
             
             <button
               onClick={() => setKeyEditState(null)}
-              className="w-full px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
-            >
-              취소
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // 중복 텍스트 확인 모달 UI
-  const renderDuplicateConfirmModal = () => {
-    if (!duplicateConfirmState) return null;
-
-    const fieldName = {
-      speaker: '화자',
-      content: '내용',
-      choice: '선택지'
-    }[duplicateConfirmState.fieldType];
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-96 max-w-full">
-          <h3 className="text-lg font-semibold mb-4">중복 텍스트 발견</h3>
-          
-          <div className="mb-6">
-            <p className="text-gray-700 mb-3">
-              "{duplicateConfirmState.newText}" 텍스트가 이미 존재합니다.
-            </p>
-            <div className="bg-gray-50 p-3 rounded text-sm">
-              <div className="font-medium text-gray-600 mb-1">기존 키:</div>
-              <div className="font-mono text-blue-600">{duplicateConfirmState.existingKey}</div>
-              <div className="text-xs text-gray-500 mt-1">
-                ({getKeyUsageCount(duplicateConfirmState.existingKey)}개 위치에서 사용 중)
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <button
-              onClick={() => duplicateConfirmState.onConfirm(true)}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-            >
-              기존 키 사용하기 ({duplicateConfirmState.existingKey})
-            </button>
-            
-            <button
-              onClick={() => duplicateConfirmState.onConfirm(false)}
-              className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
-            >
-              새 키 생성하기
-            </button>
-            
-            <button
-              onClick={() => setDuplicateConfirmState(null)}
               className="w-full px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
             >
               취소
@@ -829,9 +699,6 @@ export default function PropertyPanel() {
 
       {/* 키 편집 모달 */}
       {renderKeyEditModal()}
-
-      {/* 중복 텍스트 확인 모달 */}
-      {renderDuplicateConfirmModal()}
     </aside>
   );
 } 

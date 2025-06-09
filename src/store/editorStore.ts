@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { 
   EditorState, 
   EditorNodeWrapper, 
@@ -20,12 +20,16 @@ import {
 } from '../utils/importExport';
 import { useLocalizationStore } from './localizationStore';
 import { migrateTemplateData, needsMigration } from '../utils/migration';
+import dagre from '@dagrejs/dagre';
 
 interface EditorStore extends EditorState {
   // 기본 액션들
   setCurrentTemplate: (templateKey: string) => void;
   setCurrentScene: (sceneKey: string) => void;
   setSelectedNode: (nodeKey?: string) => void;
+  
+  // 전역 토스트 함수
+  showToast?: (message: string, type?: 'success' | 'info' | 'warning') => void;
   
   // 노드 관리
   addNode: (node: EditorNodeWrapper) => void;
@@ -60,6 +64,13 @@ interface EditorStore extends EditorState {
   // 유틸리티
   getNextNodePosition: () => { x: number; y: number };
   generateNodeKey: () => string;
+  getCurrentNodeCount: () => number;
+  canCreateNewNode: () => boolean;
+  
+  // 노드 자동 정렬
+  arrangeChildNodesAsTree: (rootNodeKey: string) => void;
+  arrangeAllNodesAsTree: () => void;
+  arrangeNodesWithDagre: () => void;
   
   // 검증
   validateCurrentScene: () => { isValid: boolean; errors: string[] };
@@ -517,6 +528,11 @@ export const useEditorStore = create<EditorStore>()(
         
         // 자동 노드 생성 (실제 텍스트 기반)
         createTextNode: (contentText = "", speakerText = "") => {
+          // 노드 개수 제한 체크
+          if (!get().canCreateNewNode()) {
+            throw new Error(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`);
+          }
+          
           const nodeKey = get().generateNodeKey();
           const position = get().getNextNodePosition();
           const state = get();
@@ -559,6 +575,11 @@ export const useEditorStore = create<EditorStore>()(
         },
         
         createChoiceNode: (contentText = "", speakerText = "") => {
+          // 노드 개수 제한 체크
+          if (!get().canCreateNewNode()) {
+            throw new Error(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`);
+          }
+          
           const nodeKey = get().generateNodeKey();
           const position = get().getNextNodePosition();
           const state = get();
@@ -752,6 +773,11 @@ export const useEditorStore = create<EditorStore>()(
         
         // AC-02: 선택지별 새 노드 자동 생성 및 연결
         createAndConnectChoiceNode: (fromNodeKey, choiceKey, nodeType = 'text') => {
+          // 노드 개수 제한 체크
+          if (!get().canCreateNewNode()) {
+            throw new Error(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`);
+          }
+          
           const state = get();
           const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
           if (!currentScene) return '';
@@ -815,12 +841,86 @@ export const useEditorStore = create<EditorStore>()(
           templateData: ensureSceneExists(state.templateData, templateKey, sceneKey)
         })),
         
-        // 유틸리티
+        // 유틸리티 - 동적 노드 크기를 고려한 위치 계산
         getNextNodePosition: () => {
           const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          
+          if (!currentScene) {
+            return { x: 100, y: 100 };
+          }
+          
+          // 현재 씬의 모든 노드 위치 확인
+          const allNodes = Object.values(currentScene);
+          
+          // 동적 노드 크기 계산 (DOM에서 실제 크기 가져오기)
+          const getNodeDimensions = (nodeKey: string) => {
+            const nodeElement = document.querySelector(`[data-id="${nodeKey}"]`);
+            if (nodeElement) {
+              const rect = nodeElement.getBoundingClientRect();
+              return { width: rect.width, height: rect.height };
+            }
+            // 기본값 (DOM에서 찾을 수 없는 경우)
+            return { width: 200, height: 120 };
+          };
+          
+          // 기본 간격 설정
+          const SPACING_X = 60;
+          const SPACING_Y = 40;
+          
+          // 마지막 노드의 크기 계산
+          const lastNodeKey = Object.keys(currentScene).pop();
+          const lastNodeDimensions = lastNodeKey ? getNodeDimensions(lastNodeKey) : { width: 200, height: 120 };
+          
+          // 새 위치 후보 계산
+          let candidateX = state.lastNodePosition.x + lastNodeDimensions.width + SPACING_X;
+          let candidateY = state.lastNodePosition.y;
+          
+          // 겹치는 노드가 있는지 확인하는 함수 (더 정확한 계산)
+          const isPositionOccupied = (x: number, y: number, newNodeWidth: number, newNodeHeight: number) => {
+            return allNodes.some(node => {
+              const existingDimensions = getNodeDimensions(node.nodeKey);
+              
+              // AABB (Axis-Aligned Bounding Box) 충돌 감지
+              const overlap = !(
+                x + newNodeWidth + SPACING_X < node.position.x ||
+                x > node.position.x + existingDimensions.width + SPACING_X ||
+                y + newNodeHeight + SPACING_Y < node.position.y ||
+                y > node.position.y + existingDimensions.height + SPACING_Y
+              );
+              
+              return overlap;
+            });
+          };
+          
+          // 새 노드의 예상 크기 (타입에 따라 다름)
+          const estimatedNewNodeDimensions = { width: 200, height: 120 };
+          
+          // 겹치지 않는 위치 찾기
+          let attempts = 0;
+          const maxAttempts = 20;
+          
+          while (isPositionOccupied(candidateX, candidateY, estimatedNewNodeDimensions.width, estimatedNewNodeDimensions.height) && attempts < maxAttempts) {
+            candidateY += estimatedNewNodeDimensions.height + SPACING_Y;
+            
+            // Y가 너무 아래로 가면 다음 열로 이동
+            if (candidateY > state.lastNodePosition.y + (estimatedNewNodeDimensions.height + SPACING_Y) * 4) {
+              candidateX += estimatedNewNodeDimensions.width + SPACING_X;
+              candidateY = state.lastNodePosition.y;
+            }
+            
+            attempts++;
+          }
+          
+          // 최대 시도 횟수에 도달하면 강제로 위치 지정
+          if (attempts >= maxAttempts) {
+            candidateX = state.lastNodePosition.x + 250;
+            candidateY = state.lastNodePosition.y + 150;
+          }
+          
           return {
-            x: state.lastNodePosition.x,
-            y: state.lastNodePosition.y + 120 // 노드 높이 + 10px 간격
+            x: candidateX,
+            y: candidateY
           };
         },
         
@@ -828,6 +928,324 @@ export const useEditorStore = create<EditorStore>()(
           const timestamp = Date.now();
           const random = Math.random().toString(36).substr(2, 5);
           return `node_${timestamp}_${random}`;
+        },
+        
+        getCurrentNodeCount: () => {
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          return currentScene ? Object.keys(currentScene).length : 0;
+        },
+        
+        canCreateNewNode: () => {
+          const MAX_NODES = 100;
+          return get().getCurrentNodeCount() < MAX_NODES;
+        },
+        
+        // Dagre 기반 자동 정렬 (향상된 버전)
+        arrangeNodesWithDagre: () => {
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return;
+          
+          const allNodeKeys = Object.keys(currentScene);
+          if (allNodeKeys.length === 0) return;
+          
+          // Dagre 그래프 생성
+          const dagreGraph = new dagre.graphlib.Graph();
+          dagreGraph.setDefaultEdgeLabel(() => ({}));
+          dagreGraph.setGraph({ 
+            rankdir: 'LR', // 좌우 배치
+            nodesep: 20,   // 노드 간격
+            ranksep: 120,  // 레벨 간격
+            marginx: 50,
+            marginy: 50
+          });
+          
+          // 노드들을 Dagre에 추가
+          allNodeKeys.forEach(nodeKey => {
+            dagreGraph.setNode(nodeKey, { 
+              width: 200, 
+              height: 120 
+            });
+          });
+          
+          // 엣지들을 Dagre에 추가
+          allNodeKeys.forEach(nodeKey => {
+            const node = getNode(currentScene, nodeKey);
+            if (!node) return;
+            
+            if (node.dialogue.type === 'text' && node.dialogue.nextNodeKey) {
+              dagreGraph.setEdge(nodeKey, node.dialogue.nextNodeKey);
+            } else if (node.dialogue.type === 'choice') {
+              Object.values(node.dialogue.choices).forEach(choice => {
+                if (choice.nextNodeKey) {
+                  dagreGraph.setEdge(nodeKey, choice.nextNodeKey);
+                }
+              });
+            }
+          });
+          
+          // 레이아웃 계산
+          dagre.layout(dagreGraph);
+          
+          // 계산된 위치를 적용
+          allNodeKeys.forEach(nodeKey => {
+            const nodeWithPosition = dagreGraph.node(nodeKey);
+            if (nodeWithPosition) {
+              // Dagre는 중앙 좌표를 반환하므로 좌상단 좌표로 변환
+              const newPosition = {
+                x: nodeWithPosition.x - nodeWithPosition.width / 2,
+                y: nodeWithPosition.y - nodeWithPosition.height / 2
+              };
+              get().moveNode(nodeKey, newPosition);
+            }
+          });
+        },
+
+        // 노드 자동 정렬 - 선택된 노드를 루트로 하여 자식 노드들을 트리 형태로 배치
+        arrangeChildNodesAsTree: (rootNodeKey) => {
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return;
+          
+          const rootNode = getNode(currentScene, rootNodeKey);
+          if (!rootNode) return;
+          
+          // 트리 구조 분석을 위한 노드 관계 매핑
+          const childrenMap = new Map<string, string[]>();
+          const allNodeKeys = Object.keys(currentScene);
+          
+          // 각 노드의 자식 노드들을 찾아서 매핑
+          allNodeKeys.forEach(nodeKey => {
+            const node = getNode(currentScene, nodeKey);
+            if (!node) return;
+            
+            const children: string[] = [];
+            
+            if (node.dialogue.type === 'text' && node.dialogue.nextNodeKey) {
+              children.push(node.dialogue.nextNodeKey);
+            } else if (node.dialogue.type === 'choice') {
+              Object.values(node.dialogue.choices).forEach(choice => {
+                if (choice.nextNodeKey) {
+                  children.push(choice.nextNodeKey);
+                }
+              });
+            }
+            
+            if (children.length > 0) {
+              childrenMap.set(nodeKey, children);
+            }
+          });
+          
+          // 개선된 BFS: 다중 부모의 경우 더 높은 depth 우선
+          const nodeLevels = new Map<string, number>();
+          const levelMap = new Map<number, string[]>();
+          const queue: { nodeKey: string; level: number }[] = [{ nodeKey: rootNodeKey, level: 0 }];
+          
+          nodeLevels.set(rootNodeKey, 0);
+          
+          while (queue.length > 0) {
+            const { nodeKey, level } = queue.shift()!;
+            
+            // 이미 더 높은 레벨로 처리된 노드는 건너뜀
+            if (nodeLevels.has(nodeKey) && nodeLevels.get(nodeKey)! > level) {
+              continue;
+            }
+            
+            // 레벨 업데이트 (더 높은 레벨 우선)
+            const currentLevel = Math.max(nodeLevels.get(nodeKey) || 0, level);
+            nodeLevels.set(nodeKey, currentLevel);
+            
+            // 자식 노드들을 다음 레벨에 추가
+            const children = childrenMap.get(nodeKey) || [];
+            children.forEach(childKey => {
+              const childNextLevel = currentLevel + 1;
+              const existingLevel = nodeLevels.get(childKey);
+              
+              // 자식 노드가 더 높은 레벨로 갱신되거나 처음 방문하는 경우
+              if (!existingLevel || childNextLevel > existingLevel) {
+                nodeLevels.set(childKey, childNextLevel);
+                queue.push({ nodeKey: childKey, level: childNextLevel });
+              }
+            });
+          }
+          
+          // levelMap 구성
+          nodeLevels.forEach((level, nodeKey) => {
+            if (!levelMap.has(level)) {
+              levelMap.set(level, []);
+            }
+            levelMap.get(level)!.push(nodeKey);
+          });
+          
+          // 동적 노드 크기를 고려한 레벨별 위치 계산
+          const startX = rootNode.position.x;
+          const startY = rootNode.position.y;
+          const levelSpacing = 320; // 레벨 간 X축 간격
+          
+          // 동적 노드 크기 계산 함수
+          const getNodeDimensions = (nodeKey: string) => {
+            const nodeElement = document.querySelector(`[data-id="${nodeKey}"]`);
+            if (nodeElement) {
+              const rect = nodeElement.getBoundingClientRect();
+              return { width: rect.width, height: rect.height };
+            }
+            return { width: 200, height: 120 }; // 기본값
+          };
+          
+          levelMap.forEach((nodesInLevel, level) => {
+            const levelX = startX + (level * levelSpacing);
+            let cumulativeY = startY;
+            
+            nodesInLevel.forEach((nodeKey, index) => {
+              const nodeDimensions = getNodeDimensions(nodeKey);
+              const dynamicSpacing = nodeDimensions.height + 30; // 동적 간격
+              
+              const newY = index === 0 ? startY : cumulativeY;
+              
+              // 루트 노드가 아닌 경우에만 위치 업데이트
+              if (nodeKey !== rootNodeKey) {
+                get().moveNode(nodeKey, { x: levelX, y: newY });
+              }
+              
+              // 다음 노드를 위한 Y 위치 누적
+              if (index < nodesInLevel.length - 1) {
+                cumulativeY = newY + dynamicSpacing;
+              }
+            });
+          });
+        },
+        
+        // 전체 노드 자동 정렬 - 모든 노드를 계층적으로 배치
+        arrangeAllNodesAsTree: () => {
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return;
+          
+          const allNodeKeys = Object.keys(currentScene);
+          if (allNodeKeys.length === 0) return;
+          
+          // 트리 구조 분석을 위한 노드 관계 매핑
+          const childrenMap = new Map<string, string[]>();
+          const parentMap = new Map<string, string[]>();
+          
+          // 각 노드의 자식 노드들을 찾아서 매핑
+          allNodeKeys.forEach(nodeKey => {
+            const node = getNode(currentScene, nodeKey);
+            if (!node) return;
+            
+            const children: string[] = [];
+            
+            if (node.dialogue.type === 'text' && node.dialogue.nextNodeKey) {
+              children.push(node.dialogue.nextNodeKey);
+            } else if (node.dialogue.type === 'choice') {
+              Object.values(node.dialogue.choices).forEach(choice => {
+                if (choice.nextNodeKey) {
+                  children.push(choice.nextNodeKey);
+                }
+              });
+            }
+            
+            if (children.length > 0) {
+              childrenMap.set(nodeKey, children);
+              // 부모 관계도 매핑
+              children.forEach(childKey => {
+                if (!parentMap.has(childKey)) {
+                  parentMap.set(childKey, []);
+                }
+                parentMap.get(childKey)!.push(nodeKey);
+              });
+            }
+          });
+          
+          // 루트 노드들 찾기 (부모가 없는 노드들)
+          const rootNodes = allNodeKeys.filter(nodeKey => !parentMap.has(nodeKey));
+          
+          // 루트 노드가 없으면 첫 번째 노드를 루트로 사용
+          if (rootNodes.length === 0 && allNodeKeys.length > 0) {
+            rootNodes.push(allNodeKeys[0]);
+          }
+          
+          // 각 루트 노드별로 트리 배치
+          const startX = 100;
+          const startY = 100;
+          const rootSpacing = 400; // 루트 노드 간 수직 간격
+          
+          rootNodes.forEach((rootNodeKey, rootIndex) => {
+            const rootY = startY + (rootIndex * rootSpacing);
+            
+            // 개선된 BFS: 다중 부모의 경우 더 높은 depth 우선
+            const nodeLevels = new Map<string, number>();
+            const levelMap = new Map<number, string[]>();
+            const queue: { nodeKey: string; level: number }[] = [{ nodeKey: rootNodeKey, level: 0 }];
+            
+            nodeLevels.set(rootNodeKey, 0);
+            
+            while (queue.length > 0) {
+              const { nodeKey, level } = queue.shift()!;
+              
+              // 이미 더 높은 레벨로 처리된 노드는 건너뜀
+              if (nodeLevels.has(nodeKey) && nodeLevels.get(nodeKey)! > level) {
+                continue;
+              }
+              
+              // 레벨 업데이트 (더 높은 레벨 우선)
+              const currentLevel = Math.max(nodeLevels.get(nodeKey) || 0, level);
+              nodeLevels.set(nodeKey, currentLevel);
+              
+              // 자식 노드들을 다음 레벨에 추가
+              const children = childrenMap.get(nodeKey) || [];
+              children.forEach(childKey => {
+                const childNextLevel = currentLevel + 1;
+                const existingLevel = nodeLevels.get(childKey);
+                
+                // 자식 노드가 더 높은 레벨로 갱신되거나 처음 방문하는 경우
+                if (!existingLevel || childNextLevel > existingLevel) {
+                  nodeLevels.set(childKey, childNextLevel);
+                  queue.push({ nodeKey: childKey, level: childNextLevel });
+                }
+              });
+            }
+            
+            // levelMap 구성
+            nodeLevels.forEach((level, nodeKey) => {
+              if (!levelMap.has(level)) {
+                levelMap.set(level, []);
+              }
+              levelMap.get(level)!.push(nodeKey);
+            });
+            
+            // 동적 노드 크기를 고려한 레벨별 위치 계산
+            const levelSpacing = 320; // 레벨 간 X축 간격
+            
+            // 동적 노드 크기 계산 함수
+            const getNodeDimensions = (nodeKey: string) => {
+              const nodeElement = document.querySelector(`[data-id="${nodeKey}"]`);
+              if (nodeElement) {
+                const rect = nodeElement.getBoundingClientRect();
+                return { width: rect.width, height: rect.height };
+              }
+              return { width: 200, height: 120 }; // 기본값
+            };
+            
+            levelMap.forEach((nodesInLevel, level) => {
+              const levelX = startX + (level * levelSpacing);
+              let cumulativeY = rootY;
+              
+              nodesInLevel.forEach((nodeKey, index) => {
+                const nodeDimensions = getNodeDimensions(nodeKey);
+                const dynamicSpacing = nodeDimensions.height + 30; // 동적 간격
+                
+                const newY = index === 0 ? rootY : cumulativeY;
+                get().moveNode(nodeKey, { x: levelX, y: newY });
+                
+                // 다음 노드를 위한 Y 위치 누적
+                if (index < nodesInLevel.length - 1) {
+                  cumulativeY = newY + dynamicSpacing;
+                }
+              });
+            });
+          });
         },
         
         // 검증
