@@ -29,6 +29,7 @@ interface PropertyPanelProps {
 export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   const { 
     selectedNodeKey, 
+    selectedNodeKeys,
     templateData, 
     currentTemplate, 
     currentScene,
@@ -63,11 +64,34 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     choices: {} as Record<string, boolean>
   });
 
+  // 키 편집 모달 ESC 키 처리
+  useEffect(() => {
+    if (!keyEditState) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setKeyEditState(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [keyEditState]);
+
   // 전역 토스트 사용 (더 이상 로컬 토스트 상태 불필요)
 
   // 현재 선택된 노드 가져오기
   const currentSceneData = templateData[currentTemplate]?.[currentScene];
   const selectedNode = selectedNodeKey ? currentSceneData?.[selectedNodeKey] : undefined;
+  
+  // 다중 선택 상태 확인
+  const safeSelectedNodeKeys = selectedNodeKeys instanceof Set 
+    ? selectedNodeKeys 
+    : new Set(Array.isArray(selectedNodeKeys) ? selectedNodeKeys : []);
+  const isMultipleSelection = safeSelectedNodeKeys.size > 1;
 
   // 선택된 노드가 변경될 때 로컬 상태 초기화
   useEffect(() => {
@@ -533,6 +557,46 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <p className="text-sm">노드를 선택하면<br />속성을 편집할 수 있습니다</p>
+          </div>
+        </div>
+      </aside>
+    );
+  }
+
+  // 다중 선택된 경우
+  if (isMultipleSelection) {
+    return (
+      <aside className="w-80 bg-white border-l border-gray-200 flex flex-col">
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="text-center text-gray-500">
+            <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">다중 선택됨</p>
+              <p className="text-sm">{safeSelectedNodeKeys.size}개 노드가 선택되었습니다</p>
+              <p className="text-xs text-gray-400 mt-4">
+                단일 노드를 선택하면<br />속성을 편집할 수 있습니다
+              </p>
+            </div>
+            
+            {/* 선택된 노드 목록 */}
+            <div className="mt-4 p-3 bg-gray-50 rounded-md">
+              <p className="text-xs font-medium text-gray-600 mb-2">선택된 노드:</p>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {Array.from(safeSelectedNodeKeys).map(nodeKey => {
+                  const node = currentSceneData?.[nodeKey];
+                  return (
+                    <div key={nodeKey} className="text-xs text-gray-500 flex items-center justify-between">
+                      <span className="font-mono">{nodeKey}</span>
+                      <span className="text-gray-400">
+                        {node?.dialogue.type === 'text' ? '텍스트' : '선택지'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </aside>

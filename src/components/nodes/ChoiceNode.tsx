@@ -12,7 +12,7 @@ interface ChoiceNodeData {
 export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>) {
   const { dialogue, nodeKey } = data;
   const choiceEntries = Object.entries(dialogue.choices);
-  const { disconnectNodes, createAndConnectChoiceNode, canCreateNewNode } = useEditorStore();
+  const { disconnectNodes, createAndConnectChoiceNode, canCreateNewNode, showToast } = useEditorStore();
   const [hoveredChoice, setHoveredChoice] = useState<string | null>(null);
 
   // 선택지 연결 제거 핸들러
@@ -21,13 +21,25 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
     disconnectNodes(nodeKey, choiceKey);
   };
 
-  // AC-02: 선택지별 새 노드 생성 및 연결 핸들러
-  const handleCreateAndConnectNode = (choiceKey: string) => (e: React.MouseEvent) => {
+  // 빈 선택지 핸들 클릭 시 텍스트 노드 생성 및 연결
+  const handleCreateTextNode = (choiceKey: string) => (e: React.MouseEvent) => {
     e.stopPropagation();
+    
+    const choice = dialogue.choices[choiceKey];
+    if (choice?.nextNodeKey) {
+      return; // 이미 연결되어 있으면 리턴
+    }
+    
+    if (!canCreateNewNode()) {
+      showToast?.(`노드 개수가 최대 100개 제한에 도달했습니다.`, 'warning');
+      return;
+    }
+    
     try {
-      createAndConnectChoiceNode(nodeKey, choiceKey, 'text'); // 기본으로 텍스트 노드 생성
+      createAndConnectChoiceNode(nodeKey, choiceKey, 'text');
     } catch (error) {
-      alert(error instanceof Error ? error.message : '노드 생성에 실패했습니다.');
+      console.error('노드 생성 중 오류:', error);
+      showToast?.('노드 생성 중 오류가 발생했습니다.', 'warning');
     }
   };
 
@@ -79,35 +91,17 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
                 {/* 실제 선택지 텍스트 표시 */}
                 <span className="flex-1 truncate">{choice.choiceText || '(선택지 텍스트 없음)'}</span>
                 
-                {/* AC-02: '+' 버튼 추가 - 연결이 없을 때만 표시 */}
-                <div className="ml-2 w-6 flex justify-center">
-                  {!choice.nextNodeKey && (
-                    <button
-                      onClick={handleCreateAndConnectNode(choiceKey)}
-                      disabled={!canCreateNewNode()}
-                      className={`px-1 py-0.5 text-xs border rounded transition-colors ${
-                        canCreateNewNode()
-                          ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200'
-                          : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                      }`}
-                      title={canCreateNewNode() ? "새 노드 생성 및 연결" : "노드 개수 제한 도달"}
-                    >
-                      +
-                    </button>
-                  )}
-                </div>
-                
                 {/* Handle을 각 선택지 항목 내에 배치 */}
                 <Handle
                   type="source"
                   position={Position.Right}
                   id={`choice-${choiceKey}`}
                   className={`
-                    !w-4 !h-4 !border-2 !border-white !transition-all !duration-200 !absolute
+                    !w-4 !h-4 !border-2 !border-white !transition-all !duration-200 !absolute !cursor-pointer
                     ${choice.nextNodeKey 
-                      ? `!cursor-pointer ${hoveredChoice === choiceKey ? '!bg-red-500' : '!bg-green-500'}` 
+                      ? hoveredChoice === choiceKey ? '!bg-red-500' : '!bg-green-500'
                       : hoveredChoice === choiceKey 
-                        ? '!bg-green-500 !cursor-pointer' 
+                        ? '!bg-green-500' 
                         : '!bg-gray-300'
                     }
                   `}
@@ -116,7 +110,7 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
                     top: '50%',
                     transform: 'translateY(-50%)'
                   }}
-                  onClick={choice.nextNodeKey ? handleDisconnectChoice(choiceKey) : undefined}
+                  onClick={choice.nextNodeKey ? handleDisconnectChoice(choiceKey) : handleCreateTextNode(choiceKey)}
                 />
               </div>
             ))}
