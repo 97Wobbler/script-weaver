@@ -11,13 +11,34 @@ interface TextNodeData {
 
 export default function TextNode({ data, selected }: NodeProps<TextNodeData>) {
   const { dialogue, nodeKey } = data;
-  const { disconnectNodes } = useEditorStore();
+  const { disconnectNodes, createAndConnectTextNode, canCreateNewNode, showToast } = useEditorStore();
   const [isHovering, setIsHovering] = useState(false);
 
   // 연결 제거 핸들러
   const handleDisconnect = (e: React.MouseEvent) => {
     e.stopPropagation();
     disconnectNodes(nodeKey);
+  };
+
+  // 빈 핸들 클릭 시 텍스트 노드 생성 및 연결
+  const handleCreateTextNode = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (dialogue.nextNodeKey) {
+      return; // 이미 연결되어 있으면 리턴
+    }
+
+    if (!canCreateNewNode()) {
+      showToast?.(`노드 개수가 최대 100개 제한에 도달했습니다.`, 'warning');
+      return;
+    }
+
+    try {
+      createAndConnectTextNode(nodeKey, 'text');
+    } catch (error) {
+      console.error('노드 생성 중 오류:', error);
+      showToast?.('노드 생성 중 오류가 발생했습니다.', 'warning');
+    }
   };
 
   return (
@@ -58,6 +79,8 @@ export default function TextNode({ data, selected }: NodeProps<TextNodeData>) {
             <span>속도: {dialogue.speed}</span>
           </div>
         )}
+
+
       </div>
 
       {/* Connection handles */}
@@ -74,16 +97,16 @@ export default function TextNode({ data, selected }: NodeProps<TextNodeData>) {
         position={Position.Right}
         id="text-output"
         className={`
-          !w-4 !h-4 !border-2 !border-white !transition-all !duration-200
+          !w-4 !h-4 !border-2 !border-white !transition-all !duration-200 !cursor-pointer
           ${dialogue.nextNodeKey 
-            ? `!cursor-pointer ${isHovering ? '!bg-red-500' : '!bg-blue-500'}` 
+            ? isHovering ? '!bg-red-500' : '!bg-blue-500'
             : isHovering 
-              ? '!bg-blue-500 !cursor-pointer' 
+              ? '!bg-blue-500' 
               : '!bg-gray-300'
           }
         `}
         style={{ right: '-20px' }}
-        onClick={dialogue.nextNodeKey ? handleDisconnect : undefined}
+        onClick={dialogue.nextNodeKey ? handleDisconnect : handleCreateTextNode}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
       />

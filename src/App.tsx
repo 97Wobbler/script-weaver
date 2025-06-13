@@ -1,6 +1,6 @@
 // React import removed as it's not needed with jsx transform
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Canvas from './components/Canvas';
 import PropertyPanel from './components/PropertyPanel';
 import { useEditorStore } from './store/editorStore';
@@ -39,14 +39,39 @@ function App() {
     type: 'info'
   });
 
+  // 토스트 타이머 참조
+  const toastTimerRef = useRef<number | null>(null);
+
   // 전역 토스트 표시 함수
   const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'info') => {
+    // 이전 타이머가 있다면 취소
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    
     setToastState({ isVisible: true, message, type });
-    // 3초 후 자동 숨김
-    setTimeout(() => {
+    
+    // 새로운 타이머 설정
+    toastTimerRef.current = setTimeout(() => {
       setToastState(prev => ({ ...prev, isVisible: false }));
+      toastTimerRef.current = null;
     }, 3000);
   };
+
+  // editorStore에 showToast 함수 연결
+  React.useEffect(() => {
+    const editorStore = useEditorStore.getState();
+    editorStore.showToast = showToast;
+  }, []);
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  React.useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   // 현재 씬의 노드 수 계산
   const currentSceneData = templateData[currentTemplate]?.[currentScene];
@@ -158,6 +183,11 @@ function App() {
     }
   };
 
+  // Undo/Redo 핸들러들
+
+
+
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
       {/* Header */}
@@ -207,6 +237,8 @@ function App() {
                 </button>
               </div>
             </div>
+            
+
             
             <div>
               <h3 className="text-sm font-medium text-gray-900 mb-2">노드 정렬</h3>

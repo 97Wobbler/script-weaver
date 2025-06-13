@@ -89,14 +89,31 @@ export default function Canvas() {
     setSelectedNode,
     selectedNodeKey,
     connectNodes,
-    deleteNode
+    deleteNode,
+    selectedNodeKeys,
+    toggleNodeSelection,
+    clearSelection,
+    selectMultipleNodes,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    copySelectedNodes,
+    pasteNodes,
+    deleteSelectedNodes,
+    duplicateNode
   } = useEditorStore();
 
   // Canvas 영역 참조
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isCanvasFocused, setIsCanvasFocused] = React.useState(false);
 
-  // 현재 씬의 노드들을 React Flow 형식으로 변환
+  // 드래그 선택을 위한 상태
+  const [isDragSelecting, setIsDragSelecting] = React.useState(false);
+  const [dragStart, setDragStart] = React.useState<{ x: number; y: number } | null>(null);
+  const [dragEnd, setDragEnd] = React.useState<{ x: number; y: number } | null>(null);
+
+  // 현재 씬의 노드들을 React Flow 형식으로 변환 (다중 선택 지원)
   const { nodes: reactFlowNodes, edges: reactFlowEdges } = useMemo(() => {
     const currentSceneData = templateData[currentTemplate]?.[currentScene];
     
@@ -104,12 +121,26 @@ export default function Canvas() {
       return { nodes: [], edges: [] };
     }
     
+    // selectedNodeKeys가 Set이 아닌 경우 안전하게 처리
+    const safeSelectedNodeKeys = selectedNodeKeys instanceof Set 
+      ? selectedNodeKeys 
+      : new Set(Array.isArray(selectedNodeKeys) ? selectedNodeKeys : []);
+    
     const nodeWrappers = Object.values(currentSceneData);
-    const nodes = nodeWrappers.map(wrapper => convertToReactFlowNode(wrapper, selectedNodeKey));
+    const nodes = nodeWrappers.map(wrapper => {
+      // 다중 선택이 있는 경우 selectedNodeKeys만 사용, 없으면 selectedNodeKey 사용
+      const isSelected = safeSelectedNodeKeys.size > 0 
+        ? safeSelectedNodeKeys.has(wrapper.nodeKey)
+        : wrapper.nodeKey === selectedNodeKey;
+      return {
+        ...convertToReactFlowNode(wrapper, selectedNodeKey),
+        selected: isSelected
+      };
+    });
     const edges = generateEdges(nodeWrappers);
     
     return { nodes, edges };
-  }, [templateData, currentTemplate, currentScene, selectedNodeKey]);
+  }, [templateData, currentTemplate, currentScene, selectedNodeKey, selectedNodeKeys]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(reactFlowNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(reactFlowEdges);
@@ -130,11 +161,43 @@ export default function Canvas() {
     onNodesChange(changes);
   }, [moveNode, onNodesChange]);
 
-  // 노드 클릭 핸들러 (더 직접적인 선택 처리)
-  const handleNodeClick = useCallback((_event: any, node: any) => {
+  // 노드 클릭 핸들러 (다중 선택 지원)
+  const handleNodeClick = useCallback((event: any, node: any) => {
     console.log(`노드 클릭: ${node.id}`);
-    setSelectedNode(node.id);
-  }, [setSelectedNode]);
+    
+    if (event.ctrlKey || event.metaKey) {
+      // Ctrl+클릭: 다중 선택 토글
+      const wasSelected = selectedNodeKeys instanceof Set 
+        ? selectedNodeKeys.has(node.id)
+        : false;
+      
+      toggleNodeSelection(node.id);
+      
+      // 토글 후 노드가 선택된 상태라면 selectedNodeKey로 설정 (PropertyPanel 표시용)
+      // 노드가 선택 해제된 상태라면 다른 선택된 노드 중 하나를 selectedNodeKey로 설정
+      if (!wasSelected) {
+        // 노드가 새로 선택됨
+        setSelectedNode(node.id);
+      } else {
+        // 노드가 선택 해제됨 - 다른 선택된 노드가 있으면 그 중 하나를 selectedNodeKey로 설정
+        // toggleNodeSelection 후의 상태를 확인하기 위해 setTimeout 사용
+        setTimeout(() => {
+          const currentSelectedKeys = useEditorStore.getState().selectedNodeKeys;
+          if (currentSelectedKeys instanceof Set && currentSelectedKeys.size > 0) {
+            // 첫 번째 선택된 노드를 selectedNodeKey로 설정
+            const firstSelectedKey = Array.from(currentSelectedKeys)[0];
+            setSelectedNode(firstSelectedKey);
+          } else {
+            setSelectedNode(undefined);
+          }
+        }, 0);
+      }
+    } else {
+      // 일반 클릭: 단일 선택
+      clearSelection();
+      setSelectedNode(node.id);
+    }
+  }, [setSelectedNode, toggleNodeSelection, clearSelection, selectedNodeKeys]);
 
   // React Flow nodes와 edges를 실시간으로 동기화
   React.useEffect(() => {
@@ -151,10 +214,11 @@ export default function Canvas() {
     moveNode(node.id, node.position);
   }, [moveNode]);
 
-  // 패널 클릭 핸들러 (배경 클릭 시 선택 해제)
+  // 패널 클릭 핸들러 (배경 클릭 시 모든 선택 해제)
   const handlePaneClick = useCallback(() => {
     setSelectedNode(undefined);
-  }, [setSelectedNode]);
+    clearSelection();
+  }, [setSelectedNode, clearSelection]);
 
   // React Flow 드래그 연결 핸들러
   const handleConnect = useCallback((connection: Connection) => {
@@ -176,62 +240,170 @@ export default function Canvas() {
     }
   }, [connectNodes]);
 
-  // 키보드 이벤트 핸들러 (노드 삭제) - 개선된 버전
+  // 키보드 이벤트 핸들러 (단축키 지원) - 개선된 버전
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    // Canvas에 focus가 없거나 텍스트 입력 중이면 무시
-    if (!isCanvasFocused) return;
-    
     // 텍스트 입력 요소에 focus가 있는지 확인
     const activeElement = document.activeElement;
-    if (activeElement && (
+    const isInputting = activeElement && (
       activeElement.tagName === 'INPUT' || 
       activeElement.tagName === 'TEXTAREA' ||
       (activeElement as HTMLElement).contentEditable === 'true'
-    )) {
-      return; // 텍스트 입력 중이면 노드 삭제 동작 안 함
+    );
+
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const cmdKey = isMac ? event.metaKey : event.ctrlKey;
+
+    // Undo/Redo는 텍스트 입력 중이 아닐 때 전역적으로 작동
+    if (cmdKey && event.key === 'z' && !event.shiftKey) {
+      if (!isInputting) {
+        event.preventDefault();
+        if (canUndo()) {
+          undo();
+        }
+      }
+      return;
     }
 
-    if ((event.key === 'Delete' || event.key === 'Backspace') && selectedNodeKey) {
-      event.preventDefault();
-      
-      // 현재 씬 데이터 가져오기
-      const currentSceneData = templateData[currentTemplate]?.[currentScene];
-      if (!currentSceneData) return;
-      
-      // 삭제할 노드를 참조하는 다른 노드들 찾기
-      const referencingNodes: string[] = [];
-      Object.entries(currentSceneData).forEach(([key, nodeWrapper]) => {
-        if (key === selectedNodeKey) return; // 자기 자신은 제외
-        
-        const { dialogue } = nodeWrapper;
-        
-        // TextDialogue 참조 확인
-        if (dialogue.type === 'text' && dialogue.nextNodeKey === selectedNodeKey) {
-          referencingNodes.push(`${key} (텍스트 노드)`);
+    if (cmdKey && (event.key === 'y' || (event.key === 'z' && event.shiftKey))) {
+      if (!isInputting) {
+        event.preventDefault();
+        if (canRedo()) {
+          redo();
         }
-        
-        // ChoiceDialogue 참조 확인
-        if (dialogue.type === 'choice' && dialogue.choices) {
-          Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
-            if (choice.nextNodeKey === selectedNodeKey) {
-              referencingNodes.push(`${key} (선택지 "${choice.choiceText || choice.textKeyRef || choiceKey}")`);
-            }
-          });
-        }
-      });
-      
-      // 확인 메시지 구성
-      let confirmMessage = `노드 "${selectedNodeKey}"를 삭제하시겠습니까?`;
-      if (referencingNodes.length > 0) {
-        confirmMessage += `\n\n⚠️ 이 노드를 참조하는 ${referencingNodes.length}개의 연결이 함께 제거됩니다:\n• ${referencingNodes.join('\n• ')}`;
       }
-      
-      if (confirm(confirmMessage)) {
-        deleteNode(selectedNodeKey);
-        setSelectedNode(undefined);
-      }
+      return;
     }
-  }, [isCanvasFocused, selectedNodeKey, deleteNode, setSelectedNode, templateData, currentTemplate, currentScene]);
+
+    // 전체 선택 (Ctrl+A)는 텍스트 입력 중이 아닐 때 전역적으로 작동
+    if (cmdKey && event.key === 'a') {
+      if (!isInputting) {
+        event.preventDefault();
+        const currentSceneData = templateData[currentTemplate]?.[currentScene];
+        if (currentSceneData) {
+          const allNodeKeys = Object.keys(currentSceneData);
+          if (allNodeKeys.length > 0) {
+            selectMultipleNodes(allNodeKeys);
+            // 다중 선택 시에도 PropertyPanel 표시를 위해 첫 번째 노드를 selectedNodeKey로 설정
+            setSelectedNode(allNodeKeys[0]);
+          }
+        }
+      }
+      return;
+    }
+
+    // 선택 해제 (Escape)는 텍스트 입력 중이 아닐 때 전역적으로 작동
+    if (event.key === 'Escape') {
+      if (!isInputting) {
+        event.preventDefault();
+        setSelectedNode(undefined);
+        clearSelection();
+      }
+      return;
+    }
+
+    // 노드 삭제 (Delete/Backspace)는 텍스트 입력 중이 아닐 때 전역적으로 작동
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      if (!isInputting) {
+        event.preventDefault();
+        
+        const safeSelectedNodeKeys = selectedNodeKeys instanceof Set 
+          ? selectedNodeKeys 
+          : new Set(Array.isArray(selectedNodeKeys) ? selectedNodeKeys : []);
+        const targetKeys = safeSelectedNodeKeys.size > 0 
+          ? Array.from(safeSelectedNodeKeys)
+          : selectedNodeKey ? [selectedNodeKey] : [];
+        
+        if (targetKeys.length === 0) return;
+        
+        // 현재 씬 데이터 가져오기
+        const currentSceneData = templateData[currentTemplate]?.[currentScene];
+        if (!currentSceneData) return;
+        
+        // 삭제할 노드들을 참조하는 다른 노드들 찾기
+        const referencingNodes: string[] = [];
+        targetKeys.forEach(nodeKey => {
+        Object.entries(currentSceneData).forEach(([key, nodeWrapper]) => {
+            if (targetKeys.includes(key)) return; // 삭제 대상은 제외
+          
+          const { dialogue } = nodeWrapper;
+          
+          // TextDialogue 참조 확인
+            if (dialogue.type === 'text' && dialogue.nextNodeKey === nodeKey) {
+              referencingNodes.push(`${key} → ${nodeKey} (텍스트 연결)`);
+          }
+          
+          // ChoiceDialogue 참조 확인
+          if (dialogue.type === 'choice' && dialogue.choices) {
+            Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
+                if (choice.nextNodeKey === nodeKey) {
+                  referencingNodes.push(`${key} → ${nodeKey} (선택지 "${choice.choiceText || choice.textKeyRef || choiceKey}")`);
+              }
+            });
+          }
+          });
+        });
+        
+        // 확인 메시지 구성
+        let confirmMessage = `${targetKeys.length}개 노드를 삭제하시겠습니까?\n삭제 대상: ${targetKeys.join(', ')}`;
+        if (referencingNodes.length > 0) {
+          confirmMessage += `\n\n⚠️ ${referencingNodes.length}개의 연결이 함께 제거됩니다:\n• ${referencingNodes.slice(0, 10).join('\n• ')}`;
+          if (referencingNodes.length > 10) {
+            confirmMessage += `\n• ... 외 ${referencingNodes.length - 10}개`;
+          }
+        }
+        
+        if (confirm(confirmMessage)) {
+          deleteSelectedNodes();
+        }
+      }
+      return;
+    }
+
+    // 복사는 텍스트 입력 중이 아닐 때 전역적으로 작동
+    if (cmdKey && event.key === 'c') {
+      if (!isInputting) {
+        event.preventDefault();
+        const safeSelectedNodeKeys = selectedNodeKeys instanceof Set 
+          ? selectedNodeKeys 
+          : new Set(Array.isArray(selectedNodeKeys) ? selectedNodeKeys : []);
+        const hasSelection = safeSelectedNodeKeys.size > 0 || selectedNodeKey;
+        if (hasSelection) {
+          copySelectedNodes();
+        }
+      }
+      return;
+    }
+
+    // 붙여넣기는 텍스트 입력 중이 아닐 때 전역적으로 작동
+    if (cmdKey && event.key === 'v') {
+      if (!isInputting) {
+        event.preventDefault();
+        // 마우스 위치 또는 기본 위치에 붙여넣기
+        pasteNodes();
+      }
+      return;
+    }
+
+    // 복제는 텍스트 입력 중이 아닐 때 전역적으로 작동
+    if (cmdKey && event.key === 'd') {
+      if (!isInputting) {
+        event.preventDefault();
+        if (selectedNodeKey) {
+          duplicateNode(selectedNodeKey);
+        }
+      }
+      return;
+    }
+
+    // 나머지 단축키들은 Canvas에 focus가 있거나 텍스트 입력 중이 아닐 때만 작동
+    if (!isCanvasFocused || isInputting) return;
+
+
+  }, [
+    isCanvasFocused, selectedNodeKey, selectedNodeKeys, deleteSelectedNodes, setSelectedNode, clearSelection,
+    templateData, currentTemplate, currentScene, undo, redo, canUndo, canRedo,
+    copySelectedNodes, pasteNodes, duplicateNode, selectMultipleNodes
+  ]);
 
   // Canvas focus 관리
   const handleCanvasMouseDown = () => {

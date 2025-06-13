@@ -22,11 +22,47 @@ import { useLocalizationStore } from './localizationStore';
 import { migrateTemplateData, needsMigration } from '../utils/migration';
 import dagre from '@dagrejs/dagre';
 
+// Undo/Redo를 위한 히스토리 상태 타입
+interface HistoryState {
+  templateData: TemplateDialogues;
+  timestamp: number;
+  action: string;
+}
+
 interface EditorStore extends EditorState {
+  // Undo/Redo 상태
+  history: HistoryState[];
+  historyIndex: number;
+  isUndoRedoInProgress: boolean;
+  
+  // 다중 선택 상태
+  selectedNodeKeys: Set<string>;
+  
   // 기본 액션들
   setCurrentTemplate: (templateKey: string) => void;
   setCurrentScene: (sceneKey: string) => void;
   setSelectedNode: (nodeKey?: string) => void;
+  
+  // 다중 선택 액션들
+  toggleNodeSelection: (nodeKey: string) => void;
+  clearSelection: () => void;
+  selectMultipleNodes: (nodeKeys: string[]) => void;
+  
+  // Undo/Redo 액션들
+  pushToHistory: (action: string) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  
+  // 복사/붙여넣기
+  copySelectedNodes: () => void;
+  pasteNodes: (position?: { x: number; y: number }) => void;
+  duplicateNode: (nodeKey: string) => string;
+  
+  // 다중 조작
+  deleteSelectedNodes: () => void;
+  moveSelectedNodes: (deltaX: number, deltaY: number) => void;
   
   // 전역 토스트 함수
   showToast?: (message: string, type?: 'success' | 'info' | 'warning') => void;
@@ -56,6 +92,9 @@ interface EditorStore extends EditorState {
   
   // AC-02: 선택지별 새 노드 자동 생성 및 연결
   createAndConnectChoiceNode: (fromNodeKey: string, choiceKey: string, nodeType?: 'text' | 'choice') => string;
+  
+  // 텍스트 노드에서 새 노드 자동 생성 및 연결
+  createAndConnectTextNode: (fromNodeKey: string, nodeType?: 'text' | 'choice') => string;
   
   // 템플릿/씬 관리
   createTemplate: (templateKey: string) => void;
@@ -171,6 +210,9 @@ const initialState: EditorState = {
   lastNodePosition: { x: 250, y: 100 }
 };
 
+// 클립보드 저장소 (메모리에만 저장)
+let clipboardData: EditorNodeWrapper[] = [];
+
 export const useEditorStore = create<EditorStore>()(
   persist(
     (set, get) => {
@@ -182,6 +224,18 @@ export const useEditorStore = create<EditorStore>()(
 
       return {
         ...initialState,
+        
+        // Undo/Redo 상태 초기화 - 초기 상태를 히스토리에 포함
+        history: [{
+          templateData: JSON.parse(JSON.stringify(initialState.templateData)),
+          timestamp: Date.now(),
+          action: '초기 상태'
+        }],
+        historyIndex: 0,
+        isUndoRedoInProgress: false,
+        
+        // 다중 선택 상태 초기화
+        selectedNodeKeys: new Set<string>(),
         
         // 기본 설정
         setCurrentTemplate: (templateKey) => {
@@ -197,6 +251,383 @@ export const useEditorStore = create<EditorStore>()(
         setSelectedNode: (nodeKey) => {
           set(() => ({ selectedNodeKey: nodeKey }));
           updateLocalizationStoreRef();
+        },
+
+        // 다중 선택 액션들
+        toggleNodeSelection: (nodeKey) => {
+          set((state) => {
+            const newSelection = new Set(state.selectedNodeKeys);
+            
+            // 현재 단일 선택된 노드가 있지만 다중 선택에 없는 경우, 먼저 추가
+            if (state.selectedNodeKey && !newSelection.has(state.selectedNodeKey)) {
+              newSelection.add(state.selectedNodeKey);
+            }
+            
+            if (newSelection.has(nodeKey)) {
+              newSelection.delete(nodeKey);
+            } else {
+              newSelection.add(nodeKey);
+            }
+            return { selectedNodeKeys: newSelection };
+          });
+        },
+
+        clearSelection: () => {
+          set(() => ({ selectedNodeKeys: new Set<string>() }));
+        },
+
+        selectMultipleNodes: (nodeKeys) => {
+          set(() => ({ selectedNodeKeys: new Set(nodeKeys) }));
+        },
+
+        // Undo/Redo 액션들
+        pushToHistory: (action) => {
+          const state = get();
+          if (state.isUndoRedoInProgress) return;
+          
+          set((currentState) => {
+            const newHistory = currentState.history.slice(0, currentState.historyIndex + 1);
+            newHistory.push({
+              templateData: JSON.parse(JSON.stringify(currentState.templateData)),
+              timestamp: Date.now(),
+              action
+            });
+            
+            // 히스토리는 최대 50개까지만 유지
+            if (newHistory.length > 50) {
+              newHistory.shift();
+            }
+            
+            return {
+              history: newHistory,
+              historyIndex: newHistory.length - 1
+            };
+          });
+        },
+
+        undo: () => {
+          const state = get();
+          if (!get().canUndo()) return;
+          
+          set(() => ({ isUndoRedoInProgress: true }));
+          
+          const previousState = state.history[state.historyIndex - 1];
+          if (previousState) {
+            set(() => ({
+              templateData: JSON.parse(JSON.stringify(previousState.templateData)),
+              historyIndex: state.historyIndex - 1,
+              isUndoRedoInProgress: false
+            }));
+            
+            if (state.showToast) {
+              state.showToast(`되돌리기: ${previousState.action}`, 'info');
+            }
+          } else {
+            set(() => ({ isUndoRedoInProgress: false }));
+          }
+          
+          updateLocalizationStoreRef();
+        },
+
+        redo: () => {
+          const state = get();
+          if (!get().canRedo()) return;
+          
+          set(() => ({ isUndoRedoInProgress: true }));
+          
+          const nextState = state.history[state.historyIndex + 1];
+          if (nextState) {
+            set(() => ({
+              templateData: JSON.parse(JSON.stringify(nextState.templateData)),
+              historyIndex: state.historyIndex + 1,
+              isUndoRedoInProgress: false
+            }));
+            
+            if (state.showToast) {
+              state.showToast(`다시실행: ${nextState.action}`, 'info');
+            }
+          } else {
+            set(() => ({ isUndoRedoInProgress: false }));
+          }
+          
+          updateLocalizationStoreRef();
+        },
+
+        canUndo: () => {
+          const state = get();
+          return state.historyIndex > 0;
+        },
+
+        canRedo: () => {
+          const state = get();
+          return state.historyIndex < state.history.length - 1;
+        },
+
+        // 복사/붙여넣기
+        copySelectedNodes: () => {
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return;
+          
+          const nodesToCopy: EditorNodeWrapper[] = [];
+          
+          // 선택된 노드가 있으면 선택된 노드들을, 없으면 현재 선택된 단일 노드를 복사
+          const targetKeys = state.selectedNodeKeys.size > 0 
+            ? Array.from(state.selectedNodeKeys)
+            : state.selectedNodeKey ? [state.selectedNodeKey] : [];
+          
+          targetKeys.forEach(nodeKey => {
+            const node = getNode(currentScene, nodeKey);
+            if (node) {
+              nodesToCopy.push(JSON.parse(JSON.stringify(node)));
+            }
+          });
+          
+          clipboardData = nodesToCopy;
+          
+          if (state.showToast && nodesToCopy.length > 0) {
+            state.showToast(`${nodesToCopy.length}개 노드를 복사했습니다.`, 'success');
+          }
+        },
+
+        pasteNodes: (position) => {
+          if (clipboardData.length === 0) return;
+          
+          const state = get();
+          
+          // 현재 노드 수 + 붙여넣을 노드 수가 100개를 초과하는지 체크
+          const currentNodeCount = get().getCurrentNodeCount();
+          const nodesToPaste = clipboardData.length;
+          const totalAfterPaste = currentNodeCount + nodesToPaste;
+          
+          if (totalAfterPaste > 100) {
+            if (state.showToast) {
+              state.showToast(
+                `노드 개수 제한 초과: 현재 ${currentNodeCount}개 + 붙여넣기 ${nodesToPaste}개 = ${totalAfterPaste}개 (최대 100개)`, 
+                'warning'
+              );
+            }
+            return;
+          }
+          
+          const startX = position?.x ?? state.lastNodePosition.x + 50;
+          const startY = position?.y ?? state.lastNodePosition.y + 50;
+          
+          const newNodeKeys: string[] = [];
+          const newNodes: EditorNodeWrapper[] = [];
+          
+          // 새 노드들을 준비
+          clipboardData.forEach((originalNode, index) => {
+            const newNodeKey = get().generateNodeKey();
+            const newNode: EditorNodeWrapper = {
+              ...JSON.parse(JSON.stringify(originalNode)),
+              nodeKey: newNodeKey,
+              position: {
+                x: startX + (index * 20),
+                y: startY + (index * 20)
+              }
+            };
+            
+            // 새로운 localization 키 생성
+            const localizationStore = useLocalizationStore.getState();
+             
+            if (newNode.dialogue.type === 'text' || newNode.dialogue.type === 'choice') {
+              // 화자 텍스트가 있으면 새 키 생성
+              if (newNode.dialogue.speakerText) {
+                const result = localizationStore.generateSpeakerKey(newNode.dialogue.speakerText);
+                localizationStore.setText(result.key, newNode.dialogue.speakerText);
+                newNode.dialogue.speakerKeyRef = result.key;
+              }
+              
+              // 내용 텍스트가 있으면 새 키 생성
+              if (newNode.dialogue.contentText) {
+                const result = localizationStore.generateTextKey(newNode.dialogue.contentText);
+                localizationStore.setText(result.key, newNode.dialogue.contentText);
+                newNode.dialogue.textKeyRef = result.key;
+              }
+            }
+            
+            // 선택지 텍스트들도 새 키 생성
+            if (newNode.dialogue.type === 'choice' && newNode.dialogue.choices) {
+              Object.entries(newNode.dialogue.choices).forEach(([choiceKey, choice]) => {
+                if (choice.choiceText) {
+                  const result = localizationStore.generateChoiceKey(choice.choiceText);
+                  localizationStore.setText(result.key, choice.choiceText);
+                  choice.textKeyRef = result.key;
+                }
+                // 연결된 노드 참조는 제거 (복사된 노드는 연결 없음)
+                choice.nextNodeKey = '';
+              });
+            }
+           
+           // 텍스트 노드의 연결도 제거
+           if (newNode.dialogue.type === 'text') {
+             newNode.dialogue.nextNodeKey = undefined;
+           }
+           
+           newNodes.push(newNode);
+           newNodeKeys.push(newNodeKey);
+          });
+          
+          // 모든 노드를 한 번에 추가
+          set((currentState) => {
+            let updatedState = { ...currentState };
+            
+            newNodes.forEach(node => {
+              const newTemplateData = ensureSceneExists(
+                updatedState.templateData,
+                updatedState.currentTemplate,
+                updatedState.currentScene
+              );
+              
+              const currentScene = newTemplateData[updatedState.currentTemplate][updatedState.currentScene];
+              const updatedScene = setNode(currentScene, node.nodeKey, node);
+              
+              updatedState = {
+                ...updatedState,
+                templateData: {
+                  ...newTemplateData,
+                  [updatedState.currentTemplate]: {
+                    ...newTemplateData[updatedState.currentTemplate],
+                    [updatedState.currentScene]: updatedScene
+                  }
+                },
+                lastNodePosition: node.position,
+                selectedNodeKey: node.nodeKey
+              };
+            });
+            
+            return {
+              ...updatedState,
+              selectedNodeKeys: new Set(newNodeKeys)
+            };
+          });
+          
+          // 상태 변경 후에 히스토리에 추가
+          get().pushToHistory('노드 붙여넣기');
+          updateLocalizationStoreRef();
+          
+          if (state.showToast) {
+            state.showToast(`${clipboardData.length}개 노드를 붙여넣었습니다.`, 'success');
+          }
+        },
+
+        duplicateNode: (nodeKey) => {
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return '';
+          
+          const originalNode = getNode(currentScene, nodeKey);
+          if (!originalNode) return '';
+          
+          // 임시로 클립보드에 저장하고 붙여넣기
+          const originalClipboard = [...clipboardData];
+          clipboardData = [originalNode];
+          
+          get().pasteNodes({
+            x: originalNode.position.x + 50,
+            y: originalNode.position.y + 50
+          });
+          
+          // 클립보드 복원
+          clipboardData = originalClipboard;
+          
+          return state.selectedNodeKeys.size > 0 ? Array.from(state.selectedNodeKeys)[0] : '';
+        },
+
+        // 다중 조작
+        deleteSelectedNodes: () => {
+          const state = get();
+          const targetKeys = state.selectedNodeKeys.size > 0 
+            ? Array.from(state.selectedNodeKeys)
+            : state.selectedNodeKey ? [state.selectedNodeKey] : [];
+          
+          if (targetKeys.length === 0) return;
+          
+          // 여러 노드를 한 번에 삭제하는 로직
+          set((currentState) => {
+            let updatedState = { ...currentState };
+            
+            targetKeys.forEach(nodeKey => {
+              const currentScene = updatedState.templateData[updatedState.currentTemplate]?.[updatedState.currentScene];
+              if (!currentScene) return;
+              
+              // 삭제할 노드를 참조하는 다른 노드들 찾기
+              const referencingNodes: string[] = [];
+              Object.entries(currentScene).forEach(([key, nodeWrapper]) => {
+                if (key === nodeKey) return; // 자기 자신은 제외
+                
+                const { dialogue } = nodeWrapper;
+                
+                // TextDialogue 참조 확인
+                if (dialogue.type === 'text' && dialogue.nextNodeKey === nodeKey) {
+                  referencingNodes.push(`${key} (텍스트 노드)`);
+                }
+                
+                // ChoiceDialogue 참조 확인
+                if (dialogue.type === 'choice' && dialogue.choices) {
+                  Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
+                    if (choice.nextNodeKey === nodeKey) {
+                      referencingNodes.push(`${key} (선택지 "${choice.choiceText || choice.textKeyRef || choiceKey}")`);
+                    }
+                  });
+                }
+              });
+              
+              // 참조가 있는 경우 콘솔에 정보 출력 (개발자용)
+              if (referencingNodes.length > 0) {
+                console.warn(`노드 "${nodeKey}" 삭제: ${referencingNodes.length}개의 참조가 자동으로 정리됩니다.`, referencingNodes);
+              }
+              
+              const updatedScene = deleteNodeFromScene(currentScene, nodeKey);
+              
+              updatedState = {
+                ...updatedState,
+                templateData: {
+                  ...updatedState.templateData,
+                  [updatedState.currentTemplate]: {
+                    ...updatedState.templateData[updatedState.currentTemplate],
+                    [updatedState.currentScene]: updatedScene
+                  }
+                },
+                selectedNodeKey: updatedState.selectedNodeKey === nodeKey ? undefined : updatedState.selectedNodeKey
+              };
+            });
+            
+            return {
+              ...updatedState,
+              selectedNodeKeys: new Set<string>()
+            };
+          });
+          
+          // 상태 변경 후에 히스토리에 추가
+          get().pushToHistory(`${targetKeys.length}개 노드 삭제`);
+          
+          if (state.showToast) {
+            state.showToast(`${targetKeys.length}개 노드를 삭제했습니다.`, 'success');
+          }
+        },
+
+        moveSelectedNodes: (deltaX, deltaY) => {
+          const state = get();
+          const targetKeys = state.selectedNodeKeys.size > 0 
+            ? Array.from(state.selectedNodeKeys)
+            : state.selectedNodeKey ? [state.selectedNodeKey] : [];
+          
+          if (targetKeys.length === 0) return;
+          
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return;
+          
+          targetKeys.forEach(nodeKey => {
+            const node = getNode(currentScene, nodeKey);
+            if (node) {
+              get().moveNode(nodeKey, {
+                x: node.position.x + deltaX,
+                y: node.position.y + deltaY
+              });
+            }
+          });
         },
         
         // 노드 관리
@@ -223,6 +654,9 @@ export const useEditorStore = create<EditorStore>()(
               selectedNodeKey: node.nodeKey
             };
           });
+          
+          // 상태 변경 후에 히스토리에 추가
+          get().pushToHistory('노드 추가');
           updateLocalizationStoreRef();
         },
         
@@ -250,7 +684,8 @@ export const useEditorStore = create<EditorStore>()(
           updateLocalizationStoreRef();
         },
         
-        deleteNode: (nodeKey) => set((state) => {
+        deleteNode: (nodeKey) => {
+          set((state) => {
           const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
           if (!currentScene) return state;
           
@@ -293,7 +728,11 @@ export const useEditorStore = create<EditorStore>()(
             },
             selectedNodeKey: state.selectedNodeKey === nodeKey ? undefined : state.selectedNodeKey
           };
-        }),
+          });
+          
+          // 상태 변경 후에 히스토리에 추가
+          get().pushToHistory('노드 삭제');
+        },
         
         moveNode: (nodeKey, position) => set((state) => {
           const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
@@ -530,7 +969,11 @@ export const useEditorStore = create<EditorStore>()(
         createTextNode: (contentText = "", speakerText = "") => {
           // 노드 개수 제한 체크
           if (!get().canCreateNewNode()) {
-            throw new Error(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`);
+            const state = get();
+            if (state.showToast) {
+              state.showToast(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`, 'warning');
+            }
+            return '';
           }
           
           const nodeKey = get().generateNodeKey();
@@ -577,7 +1020,11 @@ export const useEditorStore = create<EditorStore>()(
         createChoiceNode: (contentText = "", speakerText = "") => {
           // 노드 개수 제한 체크
           if (!get().canCreateNewNode()) {
-            throw new Error(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`);
+            const state = get();
+            if (state.showToast) {
+              state.showToast(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`, 'warning');
+            }
+            return '';
           }
           
           const nodeKey = get().generateNodeKey();
@@ -775,7 +1222,11 @@ export const useEditorStore = create<EditorStore>()(
         createAndConnectChoiceNode: (fromNodeKey, choiceKey, nodeType = 'text') => {
           // 노드 개수 제한 체크
           if (!get().canCreateNewNode()) {
-            throw new Error(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`);
+            const state = get();
+            if (state.showToast) {
+              state.showToast(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`, 'warning');
+            }
+            return '';
           }
           
           const state = get();
@@ -828,6 +1279,71 @@ export const useEditorStore = create<EditorStore>()(
           
           // 선택지를 새 노드에 연결
           get().connectNodes(fromNodeKey, newNodeKey, choiceKey);
+          
+          return newNodeKey;
+        },
+
+        // 텍스트 노드에서 새 노드 자동 생성 및 연결
+        createAndConnectTextNode: (fromNodeKey, nodeType = 'text') => {
+          // 노드 개수 제한 체크
+          if (!get().canCreateNewNode()) {
+            const state = get();
+            if (state.showToast) {
+              state.showToast(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`, 'warning');
+            }
+            return '';
+          }
+          
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return '';
+          
+          const fromNode = getNode(currentScene, fromNodeKey);
+          if (!fromNode || fromNode.dialogue.type !== 'text') return '';
+          
+          // 이미 연결된 노드가 있으면 생성하지 않음
+          if (fromNode.dialogue.nextNodeKey) return '';
+          
+          // 새 노드 생성
+          const newNodeKey = get().generateNodeKey();
+          const newNodePosition = get().getNextNodePosition();
+          
+          let newNode: EditorNodeWrapper;
+          
+          if (nodeType === 'text') {
+            const textDialogue: TextDialogue = {
+              type: 'text',
+              speakerText: '',
+              contentText: '',
+              speed: DialogueSpeed.NORMAL
+            };
+            
+            newNode = {
+              nodeKey: newNodeKey,
+              dialogue: textDialogue,
+              position: newNodePosition
+            };
+          } else {
+            const choiceDialogue: ChoiceDialogue = {
+              type: 'choice',
+              speakerText: '',
+              contentText: '',
+              choices: {},
+              speed: DialogueSpeed.NORMAL
+            };
+            
+            newNode = {
+              nodeKey: newNodeKey,
+              dialogue: choiceDialogue,
+              position: newNodePosition
+            };
+          }
+          
+          // 새 노드를 씬에 추가
+          get().addNode(newNode);
+          
+          // 텍스트 노드를 새 노드에 연결
+          get().connectNodes(fromNodeKey, newNodeKey);
           
           return newNodeKey;
         },
@@ -1320,12 +1836,21 @@ export const useEditorStore = create<EditorStore>()(
           try {
             const importResult = importFromJSONUtil(jsonString);
             
-            // EditorStore 업데이트
+            // EditorStore 업데이트 및 히스토리 초기화
             set({
               templateData: importResult.templateData,
               currentTemplate: Object.keys(importResult.templateData)[0] || 'default',
               currentScene: 'main',
-              selectedNodeKey: undefined
+              selectedNodeKey: undefined,
+              selectedNodeKeys: new Set<string>(),
+              // 히스토리 초기화 - 새로운 프로젝트 시작점 설정
+              history: [{
+                templateData: JSON.parse(JSON.stringify(importResult.templateData)),
+                timestamp: Date.now(),
+                action: 'JSON 파일 Import'
+              }],
+              historyIndex: 0,
+              isUndoRedoInProgress: false
             });
             
             // LocalizationStore 업데이트
@@ -1457,6 +1982,13 @@ export const useEditorStore = create<EditorStore>()(
       onRehydrateStorage: () => (state) => {
         // LocalizationStore에 EditorStore 참조 설정
         if (state) {
+          // selectedNodeKeys가 Set이 아닌 경우 안전하게 변환
+          if (!(state.selectedNodeKeys instanceof Set)) {
+            state.selectedNodeKeys = new Set(
+              Array.isArray(state.selectedNodeKeys) ? state.selectedNodeKeys : []
+            );
+          }
+          
           const localizationStore = useLocalizationStore.getState();
           localizationStore._setEditorStore(state);
         }
