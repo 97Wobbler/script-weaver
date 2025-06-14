@@ -29,6 +29,9 @@ function App() {
     arrangeChildNodesAsTree,
     arrangeAllNodesAsTree,
     arrangeNodesWithDagre,
+    arrangeAllNodes,
+    arrangeSelectedNodeChildren,
+    arrangeSelectedNodeDescendants,
     canCreateNewNode
   } = useEditorStore();
 
@@ -98,7 +101,7 @@ function App() {
     }
   };
 
-  // 노드 정렬 핸들러
+  // 노드 정렬 핸들러 (기존)
   const handleArrangeNodes = () => {
     if (selectedNodeKey) {
       // 선택된 노드가 있으면 그 자식 노드들을 정렬
@@ -106,6 +109,47 @@ function App() {
     } else {
       // 선택된 노드가 없으면 모든 노드를 정렬
       arrangeAllNodesAsTree();
+    }
+  };
+
+  // 새로운 레이아웃 시스템 핸들러들
+  const handleNewLayoutAll = async () => {
+    try {
+      showToast('전체 캔버스 정렬 중...', 'info');
+      await arrangeAllNodes();
+      showToast('전체 캔버스 정렬이 완료되었습니다!', 'success');
+    } catch (error) {
+      showToast(`정렬 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`, 'warning');
+    }
+  };
+
+  const handleNewLayoutChildren = async () => {
+    if (!selectedNodeKey) {
+      showToast('노드를 선택한 후 자식 정렬을 실행해주세요.', 'warning');
+      return;
+    }
+    
+    try {
+      showToast('선택된 노드의 자식들을 정렬 중...', 'info');
+      await arrangeSelectedNodeChildren(selectedNodeKey);
+      showToast('자식 노드 정렬이 완료되었습니다!', 'success');
+    } catch (error) {
+      showToast(`정렬 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`, 'warning');
+    }
+  };
+
+  const handleNewLayoutDescendants = async () => {
+    if (!selectedNodeKey) {
+      showToast('노드를 선택한 후 후손 정렬을 실행해주세요.', 'warning');
+      return;
+    }
+    
+    try {
+      showToast('선택된 노드의 모든 후손들을 정렬 중...', 'info');
+      await arrangeSelectedNodeDescendants(selectedNodeKey);
+      showToast('후손 노드 정렬이 완료되었습니다!', 'success');
+    } catch (error) {
+      showToast(`정렬 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`, 'warning');
     }
   };
 
@@ -241,22 +285,60 @@ function App() {
 
             
             <div>
-              <h3 className="text-sm font-medium text-gray-900 mb-2">노드 정렬</h3>
+              <h3 className="text-sm font-medium text-gray-900 mb-2">스마트 정렬 🚀</h3>
               <div className="space-y-2">
                 <button 
-                  onClick={handleArrangeNodes}
-                  className="w-full px-3 py-2 text-sm bg-orange-50 text-orange-700 border border-orange-200 rounded-md hover:bg-orange-100 transition-colors"
-                  title={selectedNodeKey ? `선택된 노드 "${selectedNodeKey}"의 자식 노드들을 정렬합니다` : "모든 노드를 계층적으로 정렬합니다"}
+                  onClick={handleNewLayoutAll}
+                  className="w-full px-3 py-2 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+                  title="전체 캔버스의 모든 노드를 최적 배치합니다 (3단계 해결 방식)"
                 >
-                  {selectedNodeKey ? '🔗 자식 노드 정렬' : '📐 전체 정렬'}
+                  🌐 전체 캔버스 정렬
                 </button>
                 <button 
-                  onClick={arrangeNodesWithDagre}
-                  className="w-full px-3 py-2 text-sm bg-purple-50 text-purple-700 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors"
-                  title="Dagre 라이브러리를 사용한 향상된 자동 정렬"
+                  onClick={handleNewLayoutChildren}
+                  disabled={!selectedNodeKey}
+                  className={`w-full px-3 py-2 text-sm border rounded-md transition-colors ${
+                    selectedNodeKey 
+                      ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' 
+                      : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  }`}
+                  title={selectedNodeKey ? `선택된 노드의 직접 자식들만 정렬합니다` : "노드를 선택해주세요"}
                 >
-                  ✨ Dagre 정렬
+                  🔗 자식 노드 정렬
                 </button>
+                <button 
+                  onClick={handleNewLayoutDescendants}
+                  disabled={!selectedNodeKey}
+                  className={`w-full px-3 py-2 text-sm border rounded-md transition-colors ${
+                    selectedNodeKey 
+                      ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100' 
+                      : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  }`}
+                  title={selectedNodeKey ? `선택된 노드의 모든 후손들을 정렬합니다` : "노드를 선택해주세요"}
+                >
+                  🌳 후손 전체 정렬
+                </button>
+              </div>
+              
+              {/* 기존 정렬 (호환성) */}
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <h4 className="text-xs font-medium text-gray-500 mb-2">기존 정렬 (호환성)</h4>
+                <div className="space-y-1">
+                  <button 
+                    onClick={handleArrangeNodes}
+                    className="w-full px-2 py-1 text-xs bg-orange-50 text-orange-600 border border-orange-200 rounded hover:bg-orange-100 transition-colors"
+                    title={selectedNodeKey ? `기존 방식: 자식 노드 정렬` : "기존 방식: 전체 정렬"}
+                  >
+                    {selectedNodeKey ? '🔗 기존 자식 정렬' : '📐 기존 전체 정렬'}
+                  </button>
+                  <button 
+                    onClick={arrangeNodesWithDagre}
+                    className="w-full px-2 py-1 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded hover:bg-gray-100 transition-colors"
+                    title="기존 Dagre 정렬"
+                  >
+                    ✨ 기존 Dagre
+                  </button>
+                </div>
               </div>
             </div>
             

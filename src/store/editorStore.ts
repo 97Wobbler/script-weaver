@@ -102,14 +102,20 @@ interface EditorStore extends EditorState {
   
   // 유틸리티
   getNextNodePosition: () => { x: number; y: number };
+  calculateChildNodePosition: (parentNodeKey: string, choiceKey?: string) => { x: number; y: number };
   generateNodeKey: () => string;
   getCurrentNodeCount: () => number;
   canCreateNewNode: () => boolean;
   
-  // 노드 자동 정렬
+  // 노드 자동 정렬 (기존)
   arrangeChildNodesAsTree: (rootNodeKey: string) => void;
   arrangeAllNodesAsTree: () => void;
   arrangeNodesWithDagre: () => void;
+  
+  // 새로운 레이아웃 시스템 (즉시 배치)
+  arrangeAllNodes: () => Promise<void>;
+  arrangeSelectedNodeChildren: (nodeKey: string) => Promise<void>;
+  arrangeSelectedNodeDescendants: (nodeKey: string) => Promise<void>;
   
   // 검증
   validateCurrentScene: () => { isValid: boolean; errors: string[] };
@@ -544,6 +550,46 @@ export const useEditorStore = create<EditorStore>()(
           
           if (targetKeys.length === 0) return;
           
+          // 삭제 전에 모든 대상 노드의 단독 사용 키들 수집
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return;
+          
+          const localizationStore = useLocalizationStore.getState();
+          const allKeysToCleanup: string[] = [];
+          
+          targetKeys.forEach(nodeKey => {
+            const nodeToDelete = getNode(currentScene, nodeKey);
+            if (!nodeToDelete) return;
+            
+            // 삭제될 노드에서 단독으로 사용하는 키들 수집
+            if (nodeToDelete.dialogue.speakerKeyRef) {
+              const usageCount = localizationStore.getKeyUsageCount(nodeToDelete.dialogue.speakerKeyRef);
+              if (usageCount === 1) {
+                allKeysToCleanup.push(nodeToDelete.dialogue.speakerKeyRef);
+              }
+            }
+            
+            if (nodeToDelete.dialogue.textKeyRef) {
+              const usageCount = localizationStore.getKeyUsageCount(nodeToDelete.dialogue.textKeyRef);
+              if (usageCount === 1) {
+                allKeysToCleanup.push(nodeToDelete.dialogue.textKeyRef);
+              }
+            }
+            
+            // ChoiceNode인 경우 선택지 키들도 확인
+            if (nodeToDelete.dialogue.type === 'choice') {
+              const choiceDialogue = nodeToDelete.dialogue as ChoiceDialogue;
+              Object.values(choiceDialogue.choices).forEach(choice => {
+                if (choice.textKeyRef) {
+                  const usageCount = localizationStore.getKeyUsageCount(choice.textKeyRef);
+                  if (usageCount === 1) {
+                    allKeysToCleanup.push(choice.textKeyRef);
+                  }
+                }
+              });
+            }
+          });
+          
           // 여러 노드를 한 번에 삭제하는 로직
           set((currentState) => {
             let updatedState = { ...currentState };
@@ -598,6 +644,12 @@ export const useEditorStore = create<EditorStore>()(
               ...updatedState,
               selectedNodeKeys: new Set<string>()
             };
+          });
+          
+          // 노드 삭제 성공 후 단독 사용 키들 정리
+          allKeysToCleanup.forEach(key => {
+            localizationStore.deleteKey(key);
+            console.log(`키 "${key}" 자동 삭제됨 (단독 사용)`);
           });
           
           // 상태 변경 후에 히스토리에 추가
@@ -685,9 +737,48 @@ export const useEditorStore = create<EditorStore>()(
         },
         
         deleteNode: (nodeKey) => {
-          set((state) => {
+          // 노드 삭제 전에 해당 노드의 키들을 먼저 수집하고 사용 개수 확인
+          const state = get();
           const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          if (!currentScene) return state;
+          if (!currentScene) return;
+          
+          const nodeToDelete = getNode(currentScene, nodeKey);
+          if (!nodeToDelete) return;
+          
+          const localizationStore = useLocalizationStore.getState();
+          const keysToCleanup: string[] = [];
+          
+          // 삭제될 노드에서 단독으로 사용하는 키들 수집
+          if (nodeToDelete.dialogue.speakerKeyRef) {
+            const usageCount = localizationStore.getKeyUsageCount(nodeToDelete.dialogue.speakerKeyRef);
+            if (usageCount === 1) {
+              keysToCleanup.push(nodeToDelete.dialogue.speakerKeyRef);
+            }
+          }
+          
+          if (nodeToDelete.dialogue.textKeyRef) {
+            const usageCount = localizationStore.getKeyUsageCount(nodeToDelete.dialogue.textKeyRef);
+            if (usageCount === 1) {
+              keysToCleanup.push(nodeToDelete.dialogue.textKeyRef);
+            }
+          }
+          
+          // ChoiceNode인 경우 선택지 키들도 확인
+          if (nodeToDelete.dialogue.type === 'choice') {
+            const choiceDialogue = nodeToDelete.dialogue as ChoiceDialogue;
+            Object.values(choiceDialogue.choices).forEach(choice => {
+              if (choice.textKeyRef) {
+                const usageCount = localizationStore.getKeyUsageCount(choice.textKeyRef);
+                if (usageCount === 1) {
+                  keysToCleanup.push(choice.textKeyRef);
+                }
+              }
+            });
+          }
+          
+          set((currentState) => {
+          const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
+          if (!currentScene) return currentState;
           
           // 삭제할 노드를 참조하는 다른 노드들 찾기
           const referencingNodes: string[] = [];
@@ -720,14 +811,20 @@ export const useEditorStore = create<EditorStore>()(
           
           return {
             templateData: {
-              ...state.templateData,
-              [state.currentTemplate]: {
-                ...state.templateData[state.currentTemplate],
-                [state.currentScene]: updatedScene
+              ...currentState.templateData,
+              [currentState.currentTemplate]: {
+                ...currentState.templateData[currentState.currentTemplate],
+                [currentState.currentScene]: updatedScene
               }
             },
-            selectedNodeKey: state.selectedNodeKey === nodeKey ? undefined : state.selectedNodeKey
+            selectedNodeKey: currentState.selectedNodeKey === nodeKey ? undefined : currentState.selectedNodeKey
           };
+          });
+          
+          // 노드 삭제 성공 후 단독 사용 키들 정리
+          keysToCleanup.forEach(key => {
+            localizationStore.deleteKey(key);
+            console.log(`키 "${key}" 자동 삭제됨 (단독 사용)`);
           });
           
           // 상태 변경 후에 히스토리에 추가
@@ -980,6 +1077,9 @@ export const useEditorStore = create<EditorStore>()(
           const position = get().getNextNodePosition();
           const state = get();
           
+          // QA용 위치 로그
+          console.log(`[QA] 일반 TextNode 생성 - 노드키: ${nodeKey}, 위치: x=${position.x}, y=${position.y}`);
+          
           // LocalizationStore와 연동하여 키 생성 및 텍스트 저장
           const localizationStore = useLocalizationStore.getState();
           
@@ -1030,6 +1130,9 @@ export const useEditorStore = create<EditorStore>()(
           const nodeKey = get().generateNodeKey();
           const position = get().getNextNodePosition();
           const state = get();
+          
+          // QA용 위치 로그
+          console.log(`[QA] 일반 ChoiceNode 생성 - 노드키: ${nodeKey}, 위치: x=${position.x}, y=${position.y}`);
           
           // LocalizationStore와 연동하여 키 생성 및 텍스트 저장
           const localizationStore = useLocalizationStore.getState();
@@ -1241,15 +1344,25 @@ export const useEditorStore = create<EditorStore>()(
           
           // 새 노드 생성
           const newNodeKey = get().generateNodeKey();
-          const newNodePosition = get().getNextNodePosition();
+          
+          // 개선된 위치 계산: 부모 노드 기준으로 정확한 위치에 배치
+          const newNodePosition = get().calculateChildNodePosition(fromNodeKey, choiceKey);
+          
+          // QA용 위치 로그
+          console.log(`[QA] ChoiceNode 생성 - 노드키: ${newNodeKey}, 부모: ${fromNodeKey}, 선택지: ${choiceKey}, 위치: x=${newNodePosition.x}, y=${newNodePosition.y}`);
+          
+          // 화자 자동 복사: 부모 노드에 화자가 있으면 자동으로 복사
+          const parentSpeakerText = fromNode.dialogue.speakerText || '';
+          const parentSpeakerKeyRef = fromNode.dialogue.speakerKeyRef;
           
           let newNode: EditorNodeWrapper;
           
           if (nodeType === 'text') {
             const textDialogue: TextDialogue = {
               type: 'text',
-              speakerText: '',
+              speakerText: parentSpeakerText,
               contentText: '',
+              speakerKeyRef: parentSpeakerKeyRef,
               speed: DialogueSpeed.NORMAL
             };
             
@@ -1261,8 +1374,9 @@ export const useEditorStore = create<EditorStore>()(
           } else {
             const choiceDialogue: ChoiceDialogue = {
               type: 'choice',
-              speakerText: '',
+              speakerText: parentSpeakerText,
               contentText: '',
+              speakerKeyRef: parentSpeakerKeyRef,
               choices: {},
               speed: DialogueSpeed.NORMAL
             };
@@ -1279,6 +1393,52 @@ export const useEditorStore = create<EditorStore>()(
           
           // 선택지를 새 노드에 연결
           get().connectNodes(fromNodeKey, newNodeKey, choiceKey);
+          
+          // 노드 생성 후 실제 크기를 측정하여 위치 재조정 (중앙 정렬 보정)
+          setTimeout(() => {
+            const state = get();
+            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+            if (!currentScene) return;
+            
+            const parentNode = getNode(currentScene, fromNodeKey);
+            const childNode = getNode(currentScene, newNodeKey);
+            if (!parentNode || !childNode) return;
+            
+            // 부모와 자식 노드의 실제 크기 측정
+            const getNodeDimensions = (nodeKey: string) => {
+              const nodeElement = document.querySelector(`.react-flow__node[data-id="${nodeKey}"]`) as HTMLElement;
+              if (nodeElement) {
+                return {
+                  width: nodeElement.offsetWidth,
+                  height: nodeElement.offsetHeight
+                };
+              }
+              return null;
+            };
+            
+            const parentDimensions = getNodeDimensions(fromNodeKey);
+            const childDimensions = getNodeDimensions(newNodeKey);
+            
+            if (parentDimensions && childDimensions) {
+              // 부모 중앙과 자식 중앙이 일치하도록 Y 위치 재계산
+              const parentCenterY = parentNode.position.y + parentDimensions.height / 2;
+              const correctedY = parentCenterY - childDimensions.height / 2;
+              
+              console.log('[QA] ChoiceNode 위치 보정:', {
+                부모높이: parentDimensions.height,
+                자식높이: childDimensions.height,
+                부모중앙Y: parentCenterY,
+                기존Y: childNode.position.y,
+                보정Y: correctedY,
+                차이: Math.abs(correctedY - childNode.position.y)
+              });
+              
+              // 위치가 5px 이상 차이나면 보정
+              if (Math.abs(correctedY - childNode.position.y) > 5) {
+                get().moveNode(newNodeKey, { x: childNode.position.x, y: correctedY });
+              }
+            }
+          }, 100); // DOM 렌더링 후 측정하기 위한 지연
           
           return newNodeKey;
         },
@@ -1306,15 +1466,25 @@ export const useEditorStore = create<EditorStore>()(
           
           // 새 노드 생성
           const newNodeKey = get().generateNodeKey();
-          const newNodePosition = get().getNextNodePosition();
+          
+          // 개선된 위치 계산: 부모 노드 기준으로 정확한 위치에 배치 (TextNode는 단일 자식)
+          const newNodePosition = get().calculateChildNodePosition(fromNodeKey);
+          
+          // QA용 위치 로그
+          console.log(`[QA] TextNode 생성 - 노드키: ${newNodeKey}, 부모: ${fromNodeKey}, 위치: x=${newNodePosition.x}, y=${newNodePosition.y}`);
+          
+          // 화자 자동 복사: 부모 노드에 화자가 있으면 자동으로 복사
+          const parentSpeakerText = fromNode.dialogue.speakerText || '';
+          const parentSpeakerKeyRef = fromNode.dialogue.speakerKeyRef;
           
           let newNode: EditorNodeWrapper;
           
           if (nodeType === 'text') {
             const textDialogue: TextDialogue = {
               type: 'text',
-              speakerText: '',
+              speakerText: parentSpeakerText,
               contentText: '',
+              speakerKeyRef: parentSpeakerKeyRef,
               speed: DialogueSpeed.NORMAL
             };
             
@@ -1326,8 +1496,9 @@ export const useEditorStore = create<EditorStore>()(
           } else {
             const choiceDialogue: ChoiceDialogue = {
               type: 'choice',
-              speakerText: '',
+              speakerText: parentSpeakerText,
               contentText: '',
+              speakerKeyRef: parentSpeakerKeyRef,
               choices: {},
               speed: DialogueSpeed.NORMAL
             };
@@ -1345,6 +1516,52 @@ export const useEditorStore = create<EditorStore>()(
           // 텍스트 노드를 새 노드에 연결
           get().connectNodes(fromNodeKey, newNodeKey);
           
+          // 노드 생성 후 실제 크기를 측정하여 위치 재조정 (중앙 정렬 보정)
+          setTimeout(() => {
+            const state = get();
+            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+            if (!currentScene) return;
+            
+            const parentNode = getNode(currentScene, fromNodeKey);
+            const childNode = getNode(currentScene, newNodeKey);
+            if (!parentNode || !childNode) return;
+            
+            // 부모와 자식 노드의 실제 크기 측정
+            const getNodeDimensions = (nodeKey: string) => {
+              const nodeElement = document.querySelector(`.react-flow__node[data-id="${nodeKey}"]`) as HTMLElement;
+              if (nodeElement) {
+                return {
+                  width: nodeElement.offsetWidth,
+                  height: nodeElement.offsetHeight
+                };
+              }
+              return null;
+            };
+            
+            const parentDimensions = getNodeDimensions(fromNodeKey);
+            const childDimensions = getNodeDimensions(newNodeKey);
+            
+            if (parentDimensions && childDimensions) {
+              // 부모 중앙과 자식 중앙이 일치하도록 Y 위치 재계산
+              const parentCenterY = parentNode.position.y + parentDimensions.height / 2;
+              const correctedY = parentCenterY - childDimensions.height / 2;
+              
+              console.log('[QA] TextNode 위치 보정:', {
+                부모높이: parentDimensions.height,
+                자식높이: childDimensions.height,
+                부모중앙Y: parentCenterY,
+                기존Y: childNode.position.y,
+                보정Y: correctedY,
+                차이: Math.abs(correctedY - childNode.position.y)
+              });
+              
+              // 위치가 5px 이상 차이나면 보정
+              if (Math.abs(correctedY - childNode.position.y) > 5) {
+                get().moveNode(newNodeKey, { x: childNode.position.x, y: correctedY });
+              }
+            }
+          }, 100); // DOM 렌더링 후 측정하기 위한 지연
+          
           return newNodeKey;
         },
         
@@ -1357,45 +1574,38 @@ export const useEditorStore = create<EditorStore>()(
           templateData: ensureSceneExists(state.templateData, templateKey, sceneKey)
         })),
         
-        // 유틸리티 - 동적 노드 크기를 고려한 위치 계산
+        // 유틸리티 - 안정적인 노드 위치 계산
         getNextNodePosition: () => {
           const state = get();
           const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
           
           if (!currentScene) {
+            console.log('[QA] getNextNodePosition: currentScene이 없음');
             return { x: 100, y: 100 };
           }
           
           // 현재 씬의 모든 노드 위치 확인
           const allNodes = Object.values(currentScene);
           
-          // 동적 노드 크기 계산 (DOM에서 실제 크기 가져오기)
-          const getNodeDimensions = (nodeKey: string) => {
-            const nodeElement = document.querySelector(`[data-id="${nodeKey}"]`);
-            if (nodeElement) {
-              const rect = nodeElement.getBoundingClientRect();
-              return { width: rect.width, height: rect.height };
-            }
-            // 기본값 (DOM에서 찾을 수 없는 경우)
-            return { width: 200, height: 120 };
-          };
+          // 기본 노드 크기 (더 안정적인 고정값 사용)
+          const DEFAULT_NODE_WIDTH = 200;
+          const DEFAULT_NODE_HEIGHT = 120;
           
           // 기본 간격 설정
           const SPACING_X = 60;
           const SPACING_Y = 40;
           
-          // 마지막 노드의 크기 계산
-          const lastNodeKey = Object.keys(currentScene).pop();
-          const lastNodeDimensions = lastNodeKey ? getNodeDimensions(lastNodeKey) : { width: 200, height: 120 };
+          console.log('[QA] getNextNodePosition: lastNodePosition =', state.lastNodePosition);
           
-          // 새 위치 후보 계산
-          let candidateX = state.lastNodePosition.x + lastNodeDimensions.width + SPACING_X;
+          // 새 위치 후보 계산 (이전 노드 기준)
+          let candidateX = state.lastNodePosition.x + DEFAULT_NODE_WIDTH + SPACING_X;
           let candidateY = state.lastNodePosition.y;
           
-          // 겹치는 노드가 있는지 확인하는 함수 (더 정확한 계산)
+          // 겹치는 노드가 있는지 확인하는 함수 (고정 크기 기반)
           const isPositionOccupied = (x: number, y: number, newNodeWidth: number, newNodeHeight: number) => {
             return allNodes.some(node => {
-              const existingDimensions = getNodeDimensions(node.nodeKey);
+              // 기본 노드 크기 사용 (더 안정적)
+              const existingDimensions = { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT };
               
               // AABB (Axis-Aligned Bounding Box) 충돌 감지
               const overlap = !(
@@ -1438,6 +1648,191 @@ export const useEditorStore = create<EditorStore>()(
             x: candidateX,
             y: candidateY
           };
+        },
+        
+        // 개선된 자식 노드 위치 계산 - 실제 동적 크기 기반
+        calculateChildNodePosition: (parentNodeKey, choiceKey) => {
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          
+          if (!currentScene) {
+            console.log('[QA] calculateChildNodePosition: currentScene이 없음');
+            return { x: 100, y: 100 };
+          }
+          
+          const parentNode = getNode(currentScene, parentNodeKey);
+          if (!parentNode) {
+            console.log('[QA] calculateChildNodePosition: 부모 노드를 찾을 수 없음', parentNodeKey);
+            return { x: 100, y: 100 };
+          }
+          
+          // 실제 노드 크기 가져오기 (여러 측정 방법 시도)
+          const getRealNodeDimensions = (nodeKey: string) => {
+            // React Flow는 노드를 .react-flow__node 클래스로 감싸고, data-id 속성을 설정
+            const nodeElement = document.querySelector(`.react-flow__node[data-id="${nodeKey}"]`) as HTMLElement;
+            
+            if (nodeElement) {
+              // 방법 1: getBoundingClientRect (현재 화면상 크기 - 확대/축소 영향받음)
+              const rect = nodeElement.getBoundingClientRect();
+              
+              // 방법 2: offsetWidth/Height (실제 CSS 크기 - 확대/축소 영향 안받음)
+              const offsetDimensions = {
+                width: nodeElement.offsetWidth,
+                height: nodeElement.offsetHeight
+              };
+              
+              // 방법 3: computedStyle (CSS에서 계산된 크기)
+              const computedStyle = window.getComputedStyle(nodeElement);
+              const computedDimensions = {
+                width: parseFloat(computedStyle.width),
+                height: parseFloat(computedStyle.height)
+              };
+              
+              console.log('[QA] 다중 측정 방법 비교:', {
+                nodeKey,
+                boundingClientRect: { width: rect.width, height: rect.height },
+                offsetDimensions,
+                computedDimensions,
+                element: nodeElement
+              });
+              
+              // offsetWidth가 가장 정확할 가능성이 높음 (CSS 기준, 확대/축소 무관)
+              if (offsetDimensions.width > 0 && offsetDimensions.height > 0) {
+                console.log('[QA] offset 크기 사용:', offsetDimensions);
+                return offsetDimensions;
+              }
+              
+              // 폴백: boundingClientRect
+              if (rect.width > 0 && rect.height > 0) {
+                console.log('[QA] bounding rect 크기 사용:', { width: rect.width, height: rect.height });
+                return { width: rect.width, height: rect.height };
+              }
+            }
+            
+            // DOM에서 측정할 수 없는 경우 폴백 (예상 크기)
+            console.log('[QA] DOM 측정 실패, 폴백 크기 사용:', nodeKey);
+            return getEstimatedNodeDimensions();
+          };
+          
+          // 폴백용 예상 크기 계산 함수 (CSS 기반)
+          const getEstimatedNodeDimensions = () => {
+            // TextNode CSS: min-w-[200px] max-w-[300px]
+            // 실제 측정이 불가능한 경우 CSS 최대값 + 여유공간 사용
+            return { width: 300, height: 120 }; // CSS 최대값 기준
+          };
+          
+          const parentDimensions = getRealNodeDimensions(parentNodeKey);
+          const parentPosition = parentNode.position;
+          
+          console.log('[QA] 부모 노드 정보:', {
+            nodeKey: parentNodeKey,
+            position: parentPosition,
+            dimensions: parentDimensions,
+            type: parentNode.dialogue.type,
+            speakerText: parentNode.dialogue.speakerText,
+            contentText: parentNode.dialogue.contentText
+          });
+          
+          // 가로 간격 (사용자 요구사항: 30px)
+          const HORIZONTAL_SPACING = 50; // 30px → 50px로 변경
+          const VERTICAL_SPACING = 30;
+          
+          // 새 노드 X 위치: 부모 노드 우측 끝 + 50px
+          const newNodeX = parentPosition.x + parentDimensions.width + HORIZONTAL_SPACING;
+          
+          console.log('[QA] X 좌표 계산:', {
+            부모X: parentPosition.x,
+            부모너비: parentDimensions.width,
+            간격: HORIZONTAL_SPACING,
+            계산식: `${parentPosition.x} + ${parentDimensions.width} + ${HORIZONTAL_SPACING}`,
+            결과X: newNodeX
+          });
+          
+          if (parentNode.dialogue.type === 'text' || !choiceKey) {
+            // TextNode의 경우 (단일 자식): 부모 중앙과 자식 중앙의 Y 좌표가 동일하도록 배치
+            const parentCenterY = parentPosition.y + parentDimensions.height / 2;
+            const newNodeDimensions = { width: 200, height: 120 }; // 새 노드 예상 크기
+            const newNodeY = parentCenterY - newNodeDimensions.height / 2;
+            
+            console.log('[QA] TextNode 단일 자식 배치:', {
+              부모Y: parentPosition.y,
+              부모높이: parentDimensions.height,
+              부모중앙Y: parentCenterY,
+              새노드높이: newNodeDimensions.height,
+              새노드Y: newNodeY,
+              최종위치: { x: newNodeX, y: newNodeY }
+            });
+            
+            return { x: newNodeX, y: newNodeY };
+          } else {
+            // ChoiceNode의 경우 (다중 자식): 선택지별 개별 배치
+            if (parentNode.dialogue.type !== 'choice') {
+              console.log('[QA] ChoiceNode가 아닌데 choiceKey가 있음');
+              return { x: newNodeX, y: parentPosition.y };
+            }
+            
+            const choiceDialogue = parentNode.dialogue as ChoiceDialogue;
+            const choices = Object.keys(choiceDialogue.choices);
+            const choiceIndex = choices.indexOf(choiceKey);
+            
+            console.log('[QA] ChoiceNode 정보:', {
+              choices,
+              choiceKey,
+              choiceIndex,
+              총선택지수: choices.length
+            });
+            
+            if (choiceIndex === -1) {
+              console.log('[QA] 선택지를 찾을 수 없음:', choiceKey);
+              return { x: newNodeX, y: parentPosition.y };
+            }
+            
+            // 이미 연결된 자식 노드들의 위치 확인
+            const connectedChildren = choices
+              .map(key => choiceDialogue.choices[key].nextNodeKey)
+              .filter(Boolean)
+              .map(nodeKey => getNode(currentScene, nodeKey!))
+              .filter(Boolean);
+            
+            console.log('[QA] 기존 연결된 자식들:', {
+              connectedChildren: connectedChildren.map(child => ({
+                nodeKey: child!.nodeKey,
+                position: child!.position
+              }))
+            });
+            
+            if (connectedChildren.length === 0) {
+              // 첫 번째 자식인 경우: 부모 중앙과 자식 중앙의 Y 좌표가 동일하도록 배치
+              const parentCenterY = parentPosition.y + parentDimensions.height / 2;
+              const newNodeDimensions = { width: 200, height: 120 }; // 새 노드 예상 크기
+              const newNodeY = parentCenterY - newNodeDimensions.height / 2;
+              
+              console.log('[QA] ChoiceNode 첫 번째 자식 배치:', {
+                부모Y: parentPosition.y,
+                부모높이: parentDimensions.height,
+                부모중앙Y: parentCenterY,
+                새노드높이: newNodeDimensions.height,
+                새노드Y: newNodeY,
+                최종위치: { x: newNodeX, y: newNodeY }
+              });
+              
+              return { x: newNodeX, y: newNodeY };
+            } else {
+              // 기존 자식들이 있는 경우: 가장 아래 자식 아래에 배치
+              const existingYPositions = connectedChildren.map(child => child!.position.y);
+              const lowestY = Math.max(...existingYPositions);
+              const newNodeY = lowestY + 120 + VERTICAL_SPACING; // 120은 예상 노드 높이
+              
+              console.log('[QA] ChoiceNode 추가 자식 배치:', {
+                existingYPositions,
+                lowestY,
+                계산된_Y위치: newNodeY,
+                최종위치: { x: newNodeX, y: newNodeY }
+              });
+              
+              return { x: newNodeX, y: newNodeY };
+            }
+          }
         },
         
         generateNodeKey: () => {
@@ -1973,7 +2368,136 @@ export const useEditorStore = create<EditorStore>()(
               }
             }
           };
-        })
+        }),
+
+        // 새로운 레이아웃 시스템 (즉시 배치)
+        arrangeAllNodes: async () => {
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return;
+
+          const allNodeKeys = Object.keys(currentScene);
+          if (allNodeKeys.length === 0) return;
+
+          // 그래프 구조 분석을 통한 올바른 루트 노드 찾기
+          const parentMap = new Map<string, string[]>();
+          
+          // 각 노드의 부모-자식 관계 매핑
+          allNodeKeys.forEach(nodeKey => {
+            const node = getNode(currentScene, nodeKey);
+            if (!node) return;
+            
+            const children: string[] = [];
+            
+            if (node.dialogue.type === 'text' && node.dialogue.nextNodeKey) {
+              children.push(node.dialogue.nextNodeKey);
+            } else if (node.dialogue.type === 'choice') {
+              Object.values(node.dialogue.choices).forEach(choice => {
+                if (choice.nextNodeKey) {
+                  children.push(choice.nextNodeKey);
+                }
+              });
+            }
+            
+            // 부모 관계 매핑
+            children.forEach(childKey => {
+              if (!parentMap.has(childKey)) {
+                parentMap.set(childKey, []);
+              }
+              parentMap.get(childKey)!.push(nodeKey);
+            });
+          });
+          
+          // 루트 노드들 찾기 (부모가 없는 노드들)
+          const rootNodes = allNodeKeys.filter(nodeKey => !parentMap.has(nodeKey));
+          
+          // 루트 노드가 없으면 첫 번째 노드를 루트로 사용
+          const rootNodeKey = rootNodes.length > 0 ? rootNodes[0] : allNodeKeys[0];
+
+          console.log('[LayoutSystem] 전체 캔버스 정렬 시작:', { 
+            rootNodeKey, 
+            총노드수: allNodeKeys.length,
+            루트노드들: rootNodes,
+            구조분석완료: true
+          });
+
+          const { globalLayoutSystem } = await import('../utils/layoutEngine');
+          
+          await globalLayoutSystem.runLayout(
+            currentScene,
+            {
+              rootNodeId: rootNodeKey,
+              depth: null, // 무제한 깊이
+              includeRoot: true,
+              direction: 'LR',
+              nodeSpacing: 50,
+              rankSpacing: 100,
+              // 전체 정렬에서는 앵커 없음 (모든 노드 자유롭게 배치)
+              anchorNodeId: undefined
+            },
+            (nodeId, position) => {
+              get().moveNode(nodeId, position);
+            }
+          );
+        },
+
+        arrangeSelectedNodeChildren: async (nodeKey) => {
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return;
+
+          const parentNode = getNode(currentScene, nodeKey);
+          if (!parentNode) return;
+
+          console.log('[LayoutSystem] 선택 노드 자식 정렬 시작:', { nodeKey });
+
+          const { globalLayoutSystem } = await import('../utils/layoutEngine');
+          
+          await globalLayoutSystem.runLayout(
+            currentScene,
+            {
+              rootNodeId: nodeKey,
+              depth: 1, // 직접 자식만
+              includeRoot: true,
+              direction: 'LR',
+              nodeSpacing: 50,
+              rankSpacing: 100,
+              anchorNodeId: nodeKey // 선택된 노드를 앵커로 고정
+            },
+            (nodeId, position) => {
+              get().moveNode(nodeId, position);
+            }
+          );
+        },
+
+        arrangeSelectedNodeDescendants: async (nodeKey) => {
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return;
+
+          const parentNode = getNode(currentScene, nodeKey);
+          if (!parentNode) return;
+
+          console.log('[LayoutSystem] 선택 노드 후손 전체 정렬 시작:', { nodeKey });
+
+          const { globalLayoutSystem } = await import('../utils/layoutEngine');
+          
+          await globalLayoutSystem.runLayout(
+            currentScene,
+            {
+              rootNodeId: nodeKey,
+              depth: null, // 무제한 깊이
+              includeRoot: true,
+              direction: 'LR',
+              nodeSpacing: 50,
+              rankSpacing: 100,
+              anchorNodeId: nodeKey // 선택된 노드를 앵커로 고정
+            },
+            (nodeId, position) => {
+              get().moveNode(nodeId, position);
+            }
+          );
+        }
       };
     },
     {
