@@ -45,7 +45,6 @@ export default function TextNode({ data, selected }: NodeProps<TextNodeData>) {
     <div className={`
       bg-white border-2 rounded-lg shadow-sm min-w-[200px] max-w-[300px]
       ${selected ? 'border-blue-500 shadow-md' : 'border-gray-300 hover:border-gray-400'}
-      transition-colors
     `}>
       {/* Header */}
       <div className="bg-blue-50 px-3 py-2 border-b border-gray-200 rounded-t-lg">
@@ -97,7 +96,7 @@ export default function TextNode({ data, selected }: NodeProps<TextNodeData>) {
         position={Position.Right}
         id="text-output"
         className={`
-          !w-4 !h-4 !border-2 !border-white !transition-all !duration-200 !cursor-pointer
+          !w-4 !h-4 !border-2 !border-white !cursor-pointer
           ${dialogue.nextNodeKey 
             ? isHovering ? '!bg-red-500' : '!bg-blue-500'
             : isHovering 

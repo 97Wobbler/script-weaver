@@ -127,17 +127,38 @@ export default function Canvas() {
       : new Set(Array.isArray(selectedNodeKeys) ? selectedNodeKeys : []);
     
     const nodeWrappers = Object.values(currentSceneData);
+    
+    // 모든 노드를 렌더링하되, hidden 노드는 CSS로 숨김 처리
     const nodes = nodeWrappers.map(wrapper => {
       // 다중 선택이 있는 경우 selectedNodeKeys만 사용, 없으면 selectedNodeKey 사용
       const isSelected = safeSelectedNodeKeys.size > 0 
         ? safeSelectedNodeKeys.has(wrapper.nodeKey)
         : wrapper.nodeKey === selectedNodeKey;
-      return {
+      
+      const reactFlowNode = {
         ...convertToReactFlowNode(wrapper, selectedNodeKey),
         selected: isSelected
       };
+      
+      // hidden 노드의 경우 CSS로 숨김 처리
+      if (wrapper.hidden) {
+        reactFlowNode.style = {
+          ...reactFlowNode.style,
+          opacity: 0,
+          pointerEvents: 'none'
+        };
+      }
+      
+      return reactFlowNode;
     });
-    const edges = generateEdges(nodeWrappers);
+    
+    // visible 노드들만으로 연결선 생성
+    const visibleNodeWrappers = nodeWrappers.filter(wrapper => !wrapper.hidden);
+    const allEdges = generateEdges(nodeWrappers);
+    const visibleNodeKeys = new Set(visibleNodeWrappers.map(w => w.nodeKey));
+    const edges = allEdges.filter(edge => 
+      visibleNodeKeys.has(edge.source) && visibleNodeKeys.has(edge.target)
+    );
     
     return { nodes, edges };
   }, [templateData, currentTemplate, currentScene, selectedNodeKey, selectedNodeKeys]);

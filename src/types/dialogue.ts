@@ -74,6 +74,7 @@ export interface EditorNodeWrapper {
   nodeKey: string;
   dialogue: Dialogue;
   position: { x: number; y: number };
+  hidden?: boolean;  // 노드 숨김 상태
 }
 
 // 씬 타입 (노드들의 집합) - 빈 객체도 허용

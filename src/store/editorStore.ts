@@ -134,6 +134,12 @@ interface EditorStore extends EditorState {
   // 키 참조 업데이트
   updateNodeKeyReference: (nodeKey: string, keyType: 'speaker' | 'text', newKeyRef: string) => void;
   updateChoiceKeyReference: (nodeKey: string, choiceKey: string, newKeyRef: string) => void;
+
+  // 노드 숨김 상태 업데이트 함수 추가
+  updateNodeVisibility: (nodeKey: string, hidden: boolean) => void;
+
+  // 노드 위치와 숨김 상태 동시 업데이트 함수 추가
+  updateNodePositionAndVisibility: (nodeKey: string, position: { x: number; y: number }, hidden: boolean) => void;
 }
 
 // 타입 안전한 헬퍼 함수들
@@ -1345,11 +1351,11 @@ export const useEditorStore = create<EditorStore>()(
           // 새 노드 생성
           const newNodeKey = get().generateNodeKey();
           
-          // 개선된 위치 계산: 부모 노드 기준으로 정확한 위치에 배치
-          const newNodePosition = get().calculateChildNodePosition(fromNodeKey, choiceKey);
+          // 임시 위치 계산 (정확한 위치는 나중에 계산)
+          const tempPosition = get().calculateChildNodePosition(fromNodeKey, choiceKey);
           
           // QA용 위치 로그
-          console.log(`[QA] ChoiceNode 생성 - 노드키: ${newNodeKey}, 부모: ${fromNodeKey}, 선택지: ${choiceKey}, 위치: x=${newNodePosition.x}, y=${newNodePosition.y}`);
+          console.log(`[QA] ChoiceNode 생성 (Measuring) - 노드키: ${newNodeKey}, 부모: ${fromNodeKey}, 선택지: ${choiceKey}, 임시위치: x=${tempPosition.x}, y=${tempPosition.y}`);
           
           // 화자 자동 복사: 부모 노드에 화자가 있으면 자동으로 복사
           const parentSpeakerText = fromNode.dialogue.speakerText || '';
@@ -1357,88 +1363,96 @@ export const useEditorStore = create<EditorStore>()(
           
           let newNode: EditorNodeWrapper;
           
-          if (nodeType === 'text') {
-            const textDialogue: TextDialogue = {
-              type: 'text',
-              speakerText: parentSpeakerText,
-              contentText: '',
-              speakerKeyRef: parentSpeakerKeyRef,
-              speed: DialogueSpeed.NORMAL
-            };
-            
+          if (nodeType === 'choice') {
+            // 선택지 노드 생성
             newNode = {
               nodeKey: newNodeKey,
-              dialogue: textDialogue,
-              position: newNodePosition
+              dialogue: {
+                type: 'choice',
+                speakerText: parentSpeakerText,
+                speakerKeyRef: parentSpeakerKeyRef,
+                contentText: '',
+                choices: {
+                  'choice_1': { choiceText: '선택지 1', nextNodeKey: '' },
+                  'choice_2': { choiceText: '선택지 2', nextNodeKey: '' },
+                },
+                speed: DialogueSpeed.NORMAL
+              },
+              position: tempPosition,
+              hidden: true  // 측정용 숨김 상태로 생성
             };
           } else {
-            const choiceDialogue: ChoiceDialogue = {
-              type: 'choice',
-              speakerText: parentSpeakerText,
-              contentText: '',
-              speakerKeyRef: parentSpeakerKeyRef,
-              choices: {},
-              speed: DialogueSpeed.NORMAL
-            };
-            
+            // 텍스트 노드 생성 (기본값)
             newNode = {
               nodeKey: newNodeKey,
-              dialogue: choiceDialogue,
-              position: newNodePosition
+              dialogue: {
+                type: 'text',
+                speakerText: parentSpeakerText,
+                speakerKeyRef: parentSpeakerKeyRef,
+                contentText: '',
+                speed: DialogueSpeed.NORMAL
+              },
+              position: tempPosition,
+              hidden: true  // 측정용 숨김 상태로 생성
             };
           }
           
-          // 새 노드를 씬에 추가 (이때 lastNodePosition이 업데이트됨)
-          get().addNode(newNode);
+          // 부모 노드의 선택지 연결 업데이트
+          const updatedFromNode = { ...fromNode };
+          (updatedFromNode.dialogue as ChoiceDialogue).choices[choiceKey] = {
+            ...choice,
+            nextNodeKey: newNodeKey
+          };
           
-          // 선택지를 새 노드에 연결
-          get().connectNodes(fromNodeKey, newNodeKey, choiceKey);
-          
-          // 노드 생성 후 실제 크기를 측정하여 위치 재조정 (중앙 정렬 보정)
-          setTimeout(() => {
-            const state = get();
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return;
+          // 스토어 업데이트
+          set((currentState) => {
+            const newTemplateData = ensureSceneExists(
+              currentState.templateData,
+              currentState.currentTemplate,
+              currentState.currentScene
+            );
             
-            const parentNode = getNode(currentScene, fromNodeKey);
-            const childNode = getNode(currentScene, newNodeKey);
-            if (!parentNode || !childNode) return;
+            const currentScene = newTemplateData[currentState.currentTemplate][currentState.currentScene];
+            const updatedSceneWithNew = setNode(currentScene, newNodeKey, newNode);
+            const updatedSceneWithParent = setNode(updatedSceneWithNew, fromNodeKey, updatedFromNode);
             
-            // 부모와 자식 노드의 실제 크기 측정
-            const getNodeDimensions = (nodeKey: string) => {
-              const nodeElement = document.querySelector(`.react-flow__node[data-id="${nodeKey}"]`) as HTMLElement;
-              if (nodeElement) {
-                return {
-                  width: nodeElement.offsetWidth,
-                  height: nodeElement.offsetHeight
-                };
-              }
-              return null;
+            return {
+              ...currentState,
+              templateData: {
+                ...newTemplateData,
+                [currentState.currentTemplate]: {
+                  ...newTemplateData[currentState.currentTemplate],
+                  [currentState.currentScene]: updatedSceneWithParent
+                }
+              },
+              lastNodePosition: tempPosition,
+              selectedNodeKey: newNodeKey
             };
-            
-            const parentDimensions = getNodeDimensions(fromNodeKey);
-            const childDimensions = getNodeDimensions(newNodeKey);
-            
-            if (parentDimensions && childDimensions) {
-              // 부모 중앙과 자식 중앙이 일치하도록 Y 위치 재계산
-              const parentCenterY = parentNode.position.y + parentDimensions.height / 2;
-              const correctedY = parentCenterY - childDimensions.height / 2;
+          });
+          
+          // 히스토리에 추가
+          get().pushToHistory('선택지 노드 생성 및 연결');
+          updateLocalizationStoreRef();
+          
+          // Dagre 레이아웃을 사용하여 정확한 위치 계산 및 배치 (DOM 렌더링 후)
+          setTimeout(async () => {
+            try {
+              // 부모 노드의 자식들을 정렬 (새로 생성된 노드 포함)
+              await get().arrangeSelectedNodeChildren(fromNodeKey);
               
-              console.log('[QA] ChoiceNode 위치 보정:', {
-                부모높이: parentDimensions.height,
-                자식높이: childDimensions.height,
-                부모중앙Y: parentCenterY,
-                기존Y: childNode.position.y,
-                보정Y: correctedY,
-                차이: Math.abs(correctedY - childNode.position.y)
+              // 정렬 완료 후 숨김 해제
+              get().updateNodeVisibility(newNodeKey, false);
+              
+              console.log('[QA] ChoiceNode Dagre 정렬 완료:', {
+                부모노드: fromNodeKey,
+                생성된노드: newNodeKey,
+                정렬방식: 'Dagre 레이아웃 엔진'
               });
-              
-              // 위치가 5px 이상 차이나면 보정
-              if (Math.abs(correctedY - childNode.position.y) > 5) {
-                get().moveNode(newNodeKey, { x: childNode.position.x, y: correctedY });
-              }
+            } catch (error) {
+              console.warn('[QA] ChoiceNode Dagre 정렬 실패, 숨김만 해제:', error);
+              get().updateNodeVisibility(newNodeKey, false);
             }
-          }, 100); // DOM 렌더링 후 측정하기 위한 지연
+          }, 100); // DOM 렌더링 후 정렬하기 위한 지연
           
           return newNodeKey;
         },
@@ -1467,11 +1481,11 @@ export const useEditorStore = create<EditorStore>()(
           // 새 노드 생성
           const newNodeKey = get().generateNodeKey();
           
-          // 개선된 위치 계산: 부모 노드 기준으로 정확한 위치에 배치 (TextNode는 단일 자식)
-          const newNodePosition = get().calculateChildNodePosition(fromNodeKey);
+          // 임시 위치 계산 (정확한 위치는 나중에 계산)
+          const tempPosition = get().calculateChildNodePosition(fromNodeKey);
           
           // QA용 위치 로그
-          console.log(`[QA] TextNode 생성 - 노드키: ${newNodeKey}, 부모: ${fromNodeKey}, 위치: x=${newNodePosition.x}, y=${newNodePosition.y}`);
+          console.log(`[QA] TextNode 생성 (Measuring) - 노드키: ${newNodeKey}, 부모: ${fromNodeKey}, 임시위치: x=${tempPosition.x}, y=${tempPosition.y}`);
           
           // 화자 자동 복사: 부모 노드에 화자가 있으면 자동으로 복사
           const parentSpeakerText = fromNode.dialogue.speakerText || '';
@@ -1479,88 +1493,93 @@ export const useEditorStore = create<EditorStore>()(
           
           let newNode: EditorNodeWrapper;
           
-          if (nodeType === 'text') {
-            const textDialogue: TextDialogue = {
-              type: 'text',
-              speakerText: parentSpeakerText,
-              contentText: '',
-              speakerKeyRef: parentSpeakerKeyRef,
-              speed: DialogueSpeed.NORMAL
-            };
-            
+          if (nodeType === 'choice') {
+            // 선택지 노드 생성
             newNode = {
               nodeKey: newNodeKey,
-              dialogue: textDialogue,
-              position: newNodePosition
+              dialogue: {
+                type: 'choice',
+                speakerText: parentSpeakerText,
+                speakerKeyRef: parentSpeakerKeyRef,
+                contentText: '',
+                choices: {
+                  'choice_1': { choiceText: '선택지 1', nextNodeKey: '' },
+                  'choice_2': { choiceText: '선택지 2', nextNodeKey: '' },
+                },
+                speed: DialogueSpeed.NORMAL
+              },
+              position: tempPosition,
+              hidden: true  // 측정용 숨김 상태로 생성
             };
           } else {
-            const choiceDialogue: ChoiceDialogue = {
-              type: 'choice',
-              speakerText: parentSpeakerText,
-              contentText: '',
-              speakerKeyRef: parentSpeakerKeyRef,
-              choices: {},
-              speed: DialogueSpeed.NORMAL
-            };
-            
+            // 텍스트 노드 생성 (기본값)
             newNode = {
               nodeKey: newNodeKey,
-              dialogue: choiceDialogue,
-              position: newNodePosition
+              dialogue: {
+                type: 'text',
+                speakerText: parentSpeakerText,
+                speakerKeyRef: parentSpeakerKeyRef,
+                contentText: '',
+                speed: DialogueSpeed.NORMAL
+              },
+              position: tempPosition,
+              hidden: true  // 측정용 숨김 상태로 생성
             };
           }
           
-          // 새 노드를 씬에 추가
-          get().addNode(newNode);
+          // 부모 노드의 nextNodeKey 업데이트
+          const updatedFromNode = { ...fromNode };
+          (updatedFromNode.dialogue as TextDialogue).nextNodeKey = newNodeKey;
           
-          // 텍스트 노드를 새 노드에 연결
-          get().connectNodes(fromNodeKey, newNodeKey);
-          
-          // 노드 생성 후 실제 크기를 측정하여 위치 재조정 (중앙 정렬 보정)
-          setTimeout(() => {
-            const state = get();
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return;
+          // 스토어 업데이트
+          set((currentState) => {
+            const newTemplateData = ensureSceneExists(
+              currentState.templateData,
+              currentState.currentTemplate,
+              currentState.currentScene
+            );
             
-            const parentNode = getNode(currentScene, fromNodeKey);
-            const childNode = getNode(currentScene, newNodeKey);
-            if (!parentNode || !childNode) return;
+            const currentScene = newTemplateData[currentState.currentTemplate][currentState.currentScene];
+            const updatedSceneWithNew = setNode(currentScene, newNodeKey, newNode);
+            const updatedSceneWithParent = setNode(updatedSceneWithNew, fromNodeKey, updatedFromNode);
             
-            // 부모와 자식 노드의 실제 크기 측정
-            const getNodeDimensions = (nodeKey: string) => {
-              const nodeElement = document.querySelector(`.react-flow__node[data-id="${nodeKey}"]`) as HTMLElement;
-              if (nodeElement) {
-                return {
-                  width: nodeElement.offsetWidth,
-                  height: nodeElement.offsetHeight
-                };
-              }
-              return null;
+            return {
+              ...currentState,
+              templateData: {
+                ...newTemplateData,
+                [currentState.currentTemplate]: {
+                  ...newTemplateData[currentState.currentTemplate],
+                  [currentState.currentScene]: updatedSceneWithParent
+                }
+              },
+              lastNodePosition: tempPosition,
+              selectedNodeKey: newNodeKey
             };
-            
-            const parentDimensions = getNodeDimensions(fromNodeKey);
-            const childDimensions = getNodeDimensions(newNodeKey);
-            
-            if (parentDimensions && childDimensions) {
-              // 부모 중앙과 자식 중앙이 일치하도록 Y 위치 재계산
-              const parentCenterY = parentNode.position.y + parentDimensions.height / 2;
-              const correctedY = parentCenterY - childDimensions.height / 2;
+          });
+          
+          // 히스토리에 추가
+          get().pushToHistory('텍스트 노드 생성 및 연결');
+          updateLocalizationStoreRef();
+          
+          // Dagre 레이아웃을 사용하여 정확한 위치 계산 및 배치 (DOM 렌더링 후)
+          setTimeout(async () => {
+            try {
+              // 부모 노드의 자식들을 정렬 (새로 생성된 노드 포함)
+              await get().arrangeSelectedNodeChildren(fromNodeKey);
               
-              console.log('[QA] TextNode 위치 보정:', {
-                부모높이: parentDimensions.height,
-                자식높이: childDimensions.height,
-                부모중앙Y: parentCenterY,
-                기존Y: childNode.position.y,
-                보정Y: correctedY,
-                차이: Math.abs(correctedY - childNode.position.y)
+              // 정렬 완료 후 숨김 해제
+              get().updateNodeVisibility(newNodeKey, false);
+              
+              console.log('[QA] TextNode Dagre 정렬 완료:', {
+                부모노드: fromNodeKey,
+                생성된노드: newNodeKey,
+                정렬방식: 'Dagre 레이아웃 엔진'
               });
-              
-              // 위치가 5px 이상 차이나면 보정
-              if (Math.abs(correctedY - childNode.position.y) > 5) {
-                get().moveNode(newNodeKey, { x: childNode.position.x, y: correctedY });
-              }
+            } catch (error) {
+              console.warn('[QA] TextNode Dagre 정렬 실패, 숨김만 해제:', error);
+              get().updateNodeVisibility(newNodeKey, false);
             }
-          }, 100); // DOM 렌더링 후 측정하기 위한 지연
+          }, 100); // DOM 렌더링 후 정렬하기 위한 지연
           
           return newNodeKey;
         },
@@ -2497,7 +2516,53 @@ export const useEditorStore = create<EditorStore>()(
               get().moveNode(nodeId, position);
             }
           );
-        }
+        },
+
+        // 노드 숨김 상태 업데이트 함수 추가
+        updateNodeVisibility: (nodeKey: string, hidden: boolean) => set((state) => {
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return state;
+          
+          const currentNode = getNode(currentScene, nodeKey);
+          if (!currentNode) return state;
+          
+          const updatedNode = { ...currentNode, hidden };
+          const updatedScene = setNode(currentScene, nodeKey, updatedNode);
+          
+          return {
+            ...state,
+            templateData: {
+              ...state.templateData,
+              [state.currentTemplate]: {
+                ...state.templateData[state.currentTemplate],
+                [state.currentScene]: updatedScene
+              }
+            }
+          };
+        }),
+
+        // 노드 위치와 숨김 상태 동시 업데이트 함수 추가
+        updateNodePositionAndVisibility: (nodeKey: string, position: { x: number; y: number }, hidden: boolean) => set((state) => {
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return state;
+          
+          const currentNode = getNode(currentScene, nodeKey);
+          if (!currentNode) return state;
+          
+          const updatedNode = { ...currentNode, position, hidden };
+          const updatedScene = setNode(currentScene, nodeKey, updatedNode);
+          
+          return {
+            ...state,
+            templateData: {
+              ...state.templateData,
+              [state.currentTemplate]: {
+                ...state.templateData[state.currentTemplate],
+                [state.currentScene]: updatedScene
+              }
+            }
+          };
+        }),
       };
     },
     {

@@ -47,7 +47,6 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
     <div className={`
       bg-white border-2 rounded-lg shadow-sm min-w-[250px] max-w-[350px]
       ${selected ? 'border-green-500 shadow-md' : 'border-gray-300 hover:border-gray-400'}
-      transition-colors
     `}>
       {/* Header */}
       <div className="bg-green-50 px-3 py-2 border-b border-gray-200 rounded-t-lg">
@@ -97,7 +96,7 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
                   position={Position.Right}
                   id={`choice-${choiceKey}`}
                   className={`
-                    !w-4 !h-4 !border-2 !border-white !transition-all !duration-200 !absolute !cursor-pointer
+                    !w-4 !h-4 !border-2 !border-white !absolute !cursor-pointer
                     ${choice.nextNodeKey 
                       ? hoveredChoice === choiceKey ? '!bg-red-500' : '!bg-green-500'
                       : hoveredChoice === choiceKey 
