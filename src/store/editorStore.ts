@@ -222,6 +222,57 @@ const initialState: EditorState = {
   lastNodePosition: { x: 250, y: 100 }
 };
 
+// 노드 생성 공통 함수들
+const createBaseTextDialogue = (
+  speakerText: string = '',
+  contentText: string = '',
+  speakerKeyRef?: string,
+  textKeyRef?: string,
+  nextNodeKey?: string
+): TextDialogue => ({
+  type: 'text' as const,
+  speakerText,
+  contentText,
+  speakerKeyRef,
+  textKeyRef,
+  nextNodeKey,
+  speed: DialogueSpeed.NORMAL
+});
+
+const createBaseChoiceDialogue = (
+  speakerText: string = '',
+  contentText: string = '',
+  speakerKeyRef?: string,
+  textKeyRef?: string,
+  choices: ChoiceDialogue['choices'] = {}
+): ChoiceDialogue => ({
+  type: 'choice' as const,
+  speakerText,
+  contentText,
+  speakerKeyRef,
+  textKeyRef,
+  choices,
+  speed: DialogueSpeed.NORMAL,
+  shuffle: false
+});
+
+const createNodeWrapper = (
+  nodeKey: string,
+  dialogue: Dialogue,
+  position: { x: number; y: number },
+  hidden: boolean = false
+): EditorNodeWrapper => ({
+  nodeKey,
+  dialogue,
+  position,
+  hidden
+});
+
+const getDefaultChoices = (): ChoiceDialogue['choices'] => ({
+  'choice_1': { choiceText: '', nextNodeKey: '' },
+  'choice_2': { choiceText: '', nextNodeKey: '' }
+});
+
 // 클립보드 저장소 (메모리에만 저장)
 let clipboardData: EditorNodeWrapper[] = [];
 
@@ -1081,7 +1132,6 @@ export const useEditorStore = create<EditorStore>()(
           
           const nodeKey = get().generateNodeKey();
           const position = get().getNextNodePosition();
-          const state = get();
           
           // QA용 위치 로그
           console.log(`[QA] 일반 TextNode 생성 - 노드키: ${nodeKey}, 위치: x=${position.x}, y=${position.y}`);
@@ -1104,20 +1154,8 @@ export const useEditorStore = create<EditorStore>()(
             localizationStore.setText(textKeyResult.key, contentText);
           }
           
-          const textDialogue: TextDialogue = {
-            type: "text",
-            speakerText,
-            contentText,
-            speakerKeyRef,
-            textKeyRef,
-            speed: DialogueSpeed.NORMAL
-          };
-          
-          const node: EditorNodeWrapper = {
-            nodeKey,
-            dialogue: textDialogue,
-            position
-          };
+          const dialogue = createBaseTextDialogue(speakerText, contentText, speakerKeyRef, textKeyRef);
+          const node = createNodeWrapper(nodeKey, dialogue, position);
           
           get().addNode(node);
           return nodeKey;
@@ -1135,7 +1173,6 @@ export const useEditorStore = create<EditorStore>()(
           
           const nodeKey = get().generateNodeKey();
           const position = get().getNextNodePosition();
-          const state = get();
           
           // QA용 위치 로그
           console.log(`[QA] 일반 ChoiceNode 생성 - 노드키: ${nodeKey}, 위치: x=${position.x}, y=${position.y}`);
@@ -1158,21 +1195,8 @@ export const useEditorStore = create<EditorStore>()(
             localizationStore.setText(textKeyResult.key, contentText);
           }
           
-          const choiceDialogue: ChoiceDialogue = {
-            type: "choice",
-            speakerText,
-            contentText,
-            speakerKeyRef,
-            textKeyRef,
-            choices: {},
-            speed: DialogueSpeed.NORMAL
-          };
-          
-          const node: EditorNodeWrapper = {
-            nodeKey,
-            dialogue: choiceDialogue,
-            position
-          };
+          const dialogue = createBaseChoiceDialogue(speakerText, contentText, speakerKeyRef, textKeyRef, getDefaultChoices());
+          const node = createNodeWrapper(nodeKey, dialogue, position);
           
           get().addNode(node);
           return nodeKey;
@@ -1365,36 +1389,12 @@ export const useEditorStore = create<EditorStore>()(
           
           if (nodeType === 'choice') {
             // 선택지 노드 생성
-            newNode = {
-              nodeKey: newNodeKey,
-              dialogue: {
-                type: 'choice',
-                speakerText: parentSpeakerText,
-                speakerKeyRef: parentSpeakerKeyRef,
-                contentText: '',
-                choices: {
-                  'choice_1': { choiceText: '선택지 1', nextNodeKey: '' },
-                  'choice_2': { choiceText: '선택지 2', nextNodeKey: '' },
-                },
-                speed: DialogueSpeed.NORMAL
-              },
-              position: tempPosition,
-              hidden: true  // 측정용 숨김 상태로 생성
-            };
+            const dialogue = createBaseChoiceDialogue(parentSpeakerText, '', parentSpeakerKeyRef, undefined, getDefaultChoices());
+            newNode = createNodeWrapper(newNodeKey, dialogue, tempPosition, true);
           } else {
             // 텍스트 노드 생성 (기본값)
-            newNode = {
-              nodeKey: newNodeKey,
-              dialogue: {
-                type: 'text',
-                speakerText: parentSpeakerText,
-                speakerKeyRef: parentSpeakerKeyRef,
-                contentText: '',
-                speed: DialogueSpeed.NORMAL
-              },
-              position: tempPosition,
-              hidden: true  // 측정용 숨김 상태로 생성
-            };
+            const dialogue = createBaseTextDialogue(parentSpeakerText, '', parentSpeakerKeyRef);
+            newNode = createNodeWrapper(newNodeKey, dialogue, tempPosition, true);
           }
           
           // 부모 노드의 선택지 연결 업데이트
@@ -1495,36 +1495,12 @@ export const useEditorStore = create<EditorStore>()(
           
           if (nodeType === 'choice') {
             // 선택지 노드 생성
-            newNode = {
-              nodeKey: newNodeKey,
-              dialogue: {
-                type: 'choice',
-                speakerText: parentSpeakerText,
-                speakerKeyRef: parentSpeakerKeyRef,
-                contentText: '',
-                choices: {
-                  'choice_1': { choiceText: '선택지 1', nextNodeKey: '' },
-                  'choice_2': { choiceText: '선택지 2', nextNodeKey: '' },
-                },
-                speed: DialogueSpeed.NORMAL
-              },
-              position: tempPosition,
-              hidden: true  // 측정용 숨김 상태로 생성
-            };
+            const dialogue = createBaseChoiceDialogue(parentSpeakerText, '', parentSpeakerKeyRef, undefined, getDefaultChoices());
+            newNode = createNodeWrapper(newNodeKey, dialogue, tempPosition, true);
           } else {
             // 텍스트 노드 생성 (기본값)
-            newNode = {
-              nodeKey: newNodeKey,
-              dialogue: {
-                type: 'text',
-                speakerText: parentSpeakerText,
-                speakerKeyRef: parentSpeakerKeyRef,
-                contentText: '',
-                speed: DialogueSpeed.NORMAL
-              },
-              position: tempPosition,
-              hidden: true  // 측정용 숨김 상태로 생성
-            };
+            const dialogue = createBaseTextDialogue(parentSpeakerText, '', parentSpeakerKeyRef);
+            newNode = createNodeWrapper(newNodeKey, dialogue, tempPosition, true);
           }
           
           // 부모 노드의 nextNodeKey 업데이트
