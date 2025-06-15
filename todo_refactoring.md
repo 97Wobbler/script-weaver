@@ -110,62 +110,98 @@ src/
 
 ### 📋 구체적인 작업 지시사항
 
-#### 1단계: 기존 editorStore.ts 분석 및 도메인 식별
+#### 1단계: 기존 editorStore.ts 분석 및 도메인 식별 ✅
 **목표**: 현재 editorStore의 책임들을 도메인별로 분류
 **작업**:
-- [ ] 1. editorStore.ts의 모든 상태와 메서드를 나열
-- [ ] 2. 다음 도메인으로 분류:
-   - [ ] **Node Domain**: 노드 CRUD, 선택, 이동
-   - [ ] **History Domain**: Undo/Redo, 상태 스냅샷
-   - [ ] **Layout Domain**: 정렬, 위치 계산
-   - [ ] **UI Domain**: 토스트, 모달, 로딩 상태
-   - [ ] **Project Domain**: 템플릿, 씬, Import/Export
-- [ ] 3. 각 도메인별 예상 라인 수 계산
+- [x] 1. editorStore.ts의 모든 상태와 메서드를 나열
+- [x] 2. 다음 도메인으로 분류:
+   - [x] **Node Domain**: 노드 CRUD, 선택, 이동 (25개 메서드, ~1,200줄)
+   - [x] **History Domain**: Undo/Redo, 상태 스냅샷 (8개 메서드, ~450줄)
+   - [x] **Layout Domain**: 정렬, 위치 계산 (11개 메서드, ~800줄)
+   - [x] **UI Domain**: 토스트, 모달, 로딩 상태 (1개 상태, ~50줄 + AsyncOperationManager 통합 필요)
+   - [x] **Project Domain**: 템플릿, 씬, Import/Export (10개 메서드, ~300줄)
+- [x] 3. 각 도메인별 예상 라인 수 계산
 
-#### 2단계: 도메인별 Store 생성
-**목표**: 각 도메인마다 독립적인 Zustand Store 생성
+**📊 분석 결과 요약:**
+- [./todo_refactoring_phase1_result.md](./todo_refactoring_phase1_result.md)에 정리되어 있음
+- **총 상태**: 15개 (templateData, currentTemplate, selectedNodeKeys 등)
+- **총 메서드**: 66개 
+- **현재 총 라인 수**: 2,941줄
+- **핵심 문제**: 단순 Store 분리만으로는 83% 라인 축소 불가능 → **3단계 분리 전략** 필요
+
+#### 2단계: 3단계 분리 전략 적용 (수정됨)
+**목표**: Store + Service + Hook 3단계 아키텍처로 책임 분리
 **작업**:
+
+**2-1. Store 레이어 (상태 관리만)**
 - [ ] 1. `src/stores/nodeStore.ts` 생성
    - [ ] 노드 상태: `nodes`, `selectedNodeKey`, `selectedNodeKeys`
-   - [ ] 노드 액션: `addNode`, `updateNode`, `deleteNode`, `selectNode`
-   - [ ] 예상 크기: ~200줄
+   - [ ] 기본 CRUD: `addNode`, `updateNode`, `deleteNode`, `selectNode`
+   - [ ] 예상 크기: ~150줄
 
 - [ ] 2. `src/stores/historyStore.ts` 생성
    - [ ] 히스토리 상태: `history`, `historyIndex`, `isUndoRedoInProgress`
-   - [ ] 히스토리 액션: `pushToHistory`, `undo`, `redo`
-   - [ ] 예상 크기: ~150줄
+   - [ ] 기본 액션: `pushToHistory`, `undo`, `redo`, `canUndo`, `canRedo`
+   - [ ] 예상 크기: ~120줄
 
 - [ ] 3. `src/stores/layoutStore.ts` 생성
    - [ ] 레이아웃 상태: `lastNodePosition`, `layoutInProgress`
-   - [ ] 레이아웃 액션: `arrangeNodes`, `updateNodePosition`
-   - [ ] 예상 크기: ~150줄
+   - [ ] 기본 액션: `updateNodePosition`, `setLayoutInProgress`
+   - [ ] 예상 크기: ~100줄
 
-- [ ] 4. `src/stores/uiStore.ts` 생성
-   - [ ] UI 상태: `toastMessage`, `isLoading`, `modals`
-   - [ ] UI 액션: `showToast`, `setLoading`, `openModal`
+- [ ] 4. `src/stores/uiStore.ts` 생성 (확장됨)
+   - [ ] UI 상태: `toastMessage`, `isLoading`, `modals`, `errors`
+   - [ ] UI 액션: `showToast`, `setLoading`, `openModal`, `showError`
+   - [ ] AsyncOperationManager 기능 통합
    - [ ] 예상 크기: ~100줄
 
 - [ ] 5. `src/stores/projectStore.ts` 생성
    - [ ] 프로젝트 상태: `templateData`, `currentTemplate`, `currentScene`
-   - [ ] 프로젝트 액션: `setTemplate`, `setScene`, `importData`
-   - [ ] 예상 크기: ~100줄
+   - [ ] 기본 액션: `setTemplate`, `setScene`, `updateTemplateData`
+   - [ ] 예상 크기: ~130줄
 
-#### 3단계: 서비스 레이어 정리
-**목표**: Store에 의존하지 않는 순수 함수로 비즈니스 로직 분리
+**2-2. Service 레이어 (비즈니스 로직)**
+- [ ] 1. `src/services/nodeService.ts` 생성
+   - [ ] 복잡한 노드 생성 로직: `createTextNode`, `createChoiceNode`
+   - [ ] 연결 관리: `connectNodes`, `disconnectNodes`, `createAndConnect*`
+   - [ ] 복사/붙여넣기: `copyNodes`, `pasteNodes`, `duplicateNode`
+   - [ ] 대화 수정: `updateDialogue`, `updateNodeText`, `updateChoiceText`
+   - [ ] 예상 크기: ~400줄
+
+- [ ] 2. `src/services/layoutService.ts` 생성  
+   - [ ] 정렬 알고리즘: `arrangeNodes`, `calculatePositions`
+   - [ ] 위치 계산: `getNextNodePosition`, `calculateChildNodePosition`
+   - [ ] 기존 layoutEngine.ts 통합 및 확장
+   - [ ] 예상 크기: ~300줄
+
+- [ ] 3. `src/services/historyService.ts` 생성
+   - [ ] 복합 액션 관리: `startCompoundAction`, `endCompoundAction`
+   - [ ] 특수 히스토리: `pushToHistoryWithTextEdit`
+   - [ ] 예상 크기: ~200줄
+
+- [ ] 4. `src/services/projectService.ts` 생성
+   - [ ] Import/Export: `exportToJSON`, `exportToCSV`, `importFromJSON`
+   - [ ] 검증: `validateCurrentScene`, `validateAllData`
+   - [ ] 템플릿/씬 관리: `createTemplate`, `createScene`
+   - [ ] 마이그레이션: `migrateToNewArchitecture`
+   - [ ] 예상 크기: ~250줄
+
+**2-3. Hook 레이어 (컴포넌트 인터페이스)**
+- [ ] 1. `src/hooks/useNodes.ts`: Store + Service 조합 인터페이스 (~100줄)
+- [ ] 2. `src/hooks/useHistory.ts`: 히스토리 관련 통합 인터페이스 (~80줄)
+- [ ] 3. `src/hooks/useLayout.ts`: 레이아웃 관련 통합 인터페이스 (~100줄)
+- [ ] 4. `src/hooks/useProject.ts`: 프로젝트 관련 통합 인터페이스 (~80줄)
+
+#### 3단계: 의존성 해결 및 점진적 마이그레이션
+**목표**: 순환 의존성 제거 및 안전한 전환
 **작업**:
-- [ ] 1. 기존 서비스들을 순수 함수로 변경
-- [ ] 2. Store 참조 제거, 매개변수로 필요한 데이터만 받기
-- [ ] 3. 각 서비스가 해당 도메인의 Store와만 연결되도록 설계
+- [ ] 1. 의존성 계층 설계: Hook → Service → Store (단방향)
+- [ ] 2. 복잡한 메서드 분해 (예: `arrangeAllNodes` → layoutService + historyService + nodeService 조합)
+- [ ] 3. 기존 editorStore와 병행 운영하며 점진적 컴포넌트 마이그레이션
+- [ ] 4. 타입 안전성 확보
 
-#### 4단계: React 훅 레이어 생성
-**목표**: 컴포넌트와 Store 사이의 중간 레이어 제공
-**작업**:
-- [ ] 1. `src/hooks/useNodes.ts`: 노드 관련 모든 로직 캡슐화
-- [ ] 2. `src/hooks/useHistory.ts`: 히스토리 관련 로직 캡슐화
-- [ ] 3. `src/hooks/useLayout.ts`: 레이아웃 관련 로직 캡슐화
-
-#### 5단계: 기존 컴포넌트 마이그레이션
-**목표**: 기존 컴포넌트들이 새로운 훅을 사용하도록 변경
+#### 4단계: 기존 컴포넌트 마이그레이션
+**목표**: 기존 컴포넌트들이 새로운 Hook을 사용하도록 변경
 **작업**:
 - [ ] `useEditorStore` 사용 부분을 새로운 훅들로 교체
 - [ ] 점진적 마이그레이션으로 안정성 확보
@@ -173,16 +209,25 @@ src/
 - [ ] App.tsx 분리: 루트 컴포넌트 책임 분리
 - [ ] Canvas.tsx 분리: 캔버스 로직 세분화
 
-#### 6단계: 기타 작업
-- [ ] 목표 아키텍처에 맞게 파일 이름 및 디렉토리 구조 변경
+#### 5단계: 정리 및 최적화
+- [ ] 기존 editorStore.ts 완전 제거
+- [ ] 목표 아키텍처에 맞게 파일 이름 및 디렉토리 구조 최종 정리
+- [ ] 성능 최적화 및 타입 정의 완성
 
 ## 🎯 성공 기준
 
-- **라인 수**: 총 ~700줄 (5개 store × 140줄 평균)
-- **복잡도**: 각 파일이 단일 책임만 가짐
-- **테스트 용이성**: 각 도메인별 독립 테스트 가능
-- **확장성**: 새 기능 추가 시 해당 도메인만 수정
-- **의존성**: 순환 의존성 완전 제거
+### **라인 수 목표 (현실적 추정)**
+- **Store 레이어**: 총 ~600줄 (nodeStore 150 + historyStore 120 + layoutStore 100 + uiStore 100 + projectStore 130)
+- **Service 레이어**: 총 ~1,150줄 (nodeService 400 + layoutService 300 + historyService 200 + projectService 250)
+- **Hook 레이어**: 총 ~360줄 (4개 hook × 90줄 평균)
+- **전체 합계**: ~2,110줄 (기존 2,941줄 대비 **28% 축소**)
+
+### **품질 목표**
+- **복잡도**: 각 파일이 단일 책임만 가짐 (평균 파일 크기 150줄 이하)
+- **테스트 용이성**: 각 도메인별 독립 테스트 가능 (Service 레이어 순수 함수화)
+- **확장성**: 새 기능 추가 시 해당 도메인만 수정 (계층별 책임 분리)
+- **의존성**: 순환 의존성 완전 제거 (Hook → Service → Store 단방향)
+- **유지보수성**: 코드 가독성 및 수정 용이성 대폭 향상
 
 ---
 
@@ -196,4 +241,10 @@ src/
 ---
 
 **최종 목표**: Phase 3 폴리싱 & Post-MVP 확장 준비를 위한 코드베이스 안정화
-**기대 효과**: 전체 코드베이스 ~20% 축소, 유지보수성 300% 향상, 확장성 확보
+
+**기대 효과**: 
+- **코드 축소**: editorStore 2,941줄 → 3계층 분리 2,110줄 (28% 축소)
+- **유지보수성**: 단일 책임 원칙 적용으로 버그 수정 및 기능 추가 용이성 대폭 향상
+- **확장성**: 도메인별 독립적 확장 가능, 새 기능 추가 시 영향 범위 최소화
+- **테스트**: 순수 함수 기반 Service 레이어로 단위 테스트 작성 용이성 확보
+- **협업**: 도메인별 분리로 여러 개발자 동시 작업 시 충돌 최소화
