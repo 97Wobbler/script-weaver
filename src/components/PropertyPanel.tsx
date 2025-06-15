@@ -40,7 +40,8 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     updateDialogue,
     updateNodeKeyReference,
     updateChoiceKeyReference,
-    setSelectedNode
+    setSelectedNode,
+    pushToHistoryWithTextEdit
   } = useEditorStore();
 
   const { 
@@ -137,6 +138,10 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     
     const currentNode = selectedNode;
     const currentSpeakerKey = currentNode?.dialogue.speakerKeyRef;
+    const currentSpeakerText = currentNode?.dialogue.speakerText || '';
+    
+    // 변경사항이 없으면 히스토리 추가하지 않음
+    if (trimmedText === currentSpeakerText) return;
     
     // 중복 텍스트 체크 (기존 키와 다른 키에 동일한 텍스트가 있는지)
     if (trimmedText) {
@@ -146,6 +151,9 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
         updateNodeKeyReference(selectedNodeKey, 'speaker', existingKey);
         setLocalTextState(prev => ({ ...prev, speakerText: trimmedText }));
         
+        // 히스토리 추가
+        pushToHistoryWithTextEdit(`화자 텍스트 수정: "${trimmedText}"`);
+        
         // 토스트 알림 표시
         showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, 'info');
         return;
@@ -154,6 +162,9 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     
     // 중복이 없는 경우 기존 로직 실행
     updateNodeText(selectedNodeKey, trimmedText, undefined);
+    
+    // 히스토리 추가
+    pushToHistoryWithTextEdit(`화자 텍스트 수정: "${trimmedText}"`);
   };
 
   const commitContentText = () => {
@@ -162,6 +173,10 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     
     const currentNode = selectedNode;
     const currentTextKey = currentNode?.dialogue.textKeyRef;
+    const currentContentText = currentNode?.dialogue.contentText || '';
+    
+    // 변경사항이 없으면 히스토리 추가하지 않음
+    if (trimmedText === currentContentText) return;
     
     // 중복 텍스트 체크 (기존 키와 다른 키에 동일한 텍스트가 있는지)
     if (trimmedText) {
@@ -171,6 +186,9 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
         updateNodeKeyReference(selectedNodeKey, 'text', existingKey);
         setLocalTextState(prev => ({ ...prev, contentText: trimmedText }));
         
+        // 히스토리 추가
+        pushToHistoryWithTextEdit(`대사 텍스트 수정: "${trimmedText}"`);
+        
         // 토스트 알림 표시
         showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, 'info');
         return;
@@ -179,6 +197,9 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     
     // 중복이 없는 경우 기존 로직 실행
     updateNodeText(selectedNodeKey, undefined, trimmedText);
+    
+    // 히스토리 추가
+    pushToHistoryWithTextEdit(`대사 텍스트 수정: "${trimmedText}"`);
   };
 
   const commitChoiceText = (choiceKey: string) => {
@@ -188,6 +209,10 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     const currentNode = selectedNode;
     const currentChoice = currentNode?.dialogue.type === 'choice' ? currentNode.dialogue.choices[choiceKey] : null;
     const currentChoiceKey = currentChoice?.textKeyRef;
+    const currentChoiceText = currentChoice?.choiceText || '';
+    
+    // 변경사항이 없으면 히스토리 추가하지 않음
+    if (trimmedText === currentChoiceText) return;
     
     // 중복 텍스트 체크 (기존 키와 다른 키에 동일한 텍스트가 있는지)
     if (trimmedText) {
@@ -200,6 +225,9 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
           choiceTexts: { ...prev.choiceTexts, [choiceKey]: trimmedText }
         }));
         
+        // 히스토리 추가
+        pushToHistoryWithTextEdit(`선택지 텍스트 수정: "${trimmedText}"`);
+        
         // 토스트 알림 표시
         showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, 'info');
         return;
@@ -208,6 +236,9 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     
     // 중복이 없는 경우 기존 로직 실행
     updateChoiceText(selectedNodeKey, choiceKey, trimmedText);
+    
+    // 히스토리 추가 (한 번만)
+    pushToHistoryWithTextEdit(`선택지 텍스트 수정: "${trimmedText}"`);
   };
 
   // IME 이벤트 핸들러들
@@ -379,6 +410,11 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
         // 기존 키 삭제
         localizationStore.deleteKey(keyEditState.originalKey);
       }
+      
+      // 키 편집 시 히스토리 추가 (모든 위치 함께 변경)
+      const actionName = keyEditState.keyType === 'speaker' ? '화자 텍스트' : 
+                        keyEditState.keyType === 'text' ? '대화 텍스트' : '선택지 텍스트';
+      pushToHistoryWithTextEdit(`${actionName} 일괄 수정: "${keyEditState.newText}"`);
     } else {
       // 현재 노드만 변경 (새 키로 분리)
       if (isTextChanged || isKeyChanged) {
@@ -418,7 +454,24 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
           updateChoiceKeyReference(selectedNodeKey, keyEditState.choiceKey, targetKey);
           updateChoiceText(selectedNodeKey, keyEditState.choiceKey, keyEditState.newText);
         }
+        
+        // 키 편집 시 히스토리 추가 (현재 노드만 변경)
+        const actionName = keyEditState.keyType === 'speaker' ? '화자 텍스트' : 
+                          keyEditState.keyType === 'text' ? '대화 텍스트' : '선택지 텍스트';
+        pushToHistoryWithTextEdit(`${actionName} 개별 수정: "${keyEditState.newText}"`);
       }
+    }
+
+    // 로컬 텍스트 상태 업데이트 (키 편집 완료 후 blur 방지)
+    if (keyEditState.keyType === 'choice' && keyEditState.choiceKey) {
+      setLocalTextState(prev => ({
+        ...prev,
+        choiceTexts: { ...prev.choiceTexts, [keyEditState.choiceKey!]: keyEditState.newText }
+      }));
+    } else if (keyEditState.keyType === 'speaker') {
+      setLocalTextState(prev => ({ ...prev, speakerText: keyEditState.newText }));
+    } else if (keyEditState.keyType === 'text') {
+      setLocalTextState(prev => ({ ...prev, contentText: keyEditState.newText }));
     }
 
     setKeyEditState(null);

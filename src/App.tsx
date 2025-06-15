@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react';
 import Canvas from './components/Canvas';
 import PropertyPanel from './components/PropertyPanel';
 import { useEditorStore } from './store/editorStore';
+import { globalAsyncOperationManager, type SystemStatus } from './store/asyncOperationManager';
 import { downloadFile, uploadFile } from './utils/importExport';
 
 // 전역 토스트 상태 타입
@@ -42,6 +43,13 @@ function App() {
     type: 'info'
   });
 
+  // 시스템 상태 관리
+  const [systemStatus, setSystemStatus] = useState<SystemStatus>({
+    type: 'idle',
+    message: '자동 저장됨',
+    timestamp: Date.now()
+  });
+
   // 토스트 타이머 참조
   const toastTimerRef = useRef<number | null>(null);
 
@@ -65,6 +73,19 @@ function App() {
   React.useEffect(() => {
     const editorStore = useEditorStore.getState();
     editorStore.showToast = showToast;
+  }, []);
+
+  // AsyncOperationManager와 상태 콜백 연결
+  React.useEffect(() => {
+    const handleStatusChange = (status: SystemStatus) => {
+      setSystemStatus(status);
+    };
+
+    globalAsyncOperationManager.setStatusChangeCallback(handleStatusChange);
+
+    return () => {
+      globalAsyncOperationManager.setStatusChangeCallback(undefined);
+    };
   }, []);
 
   // 컴포넌트 언마운트 시 타이머 정리
@@ -114,13 +135,7 @@ function App() {
 
   // 새로운 레이아웃 시스템 핸들러들
   const handleNewLayoutAll = async () => {
-    try {
-      showToast('전체 캔버스 정렬 중...', 'info');
-      await arrangeAllNodes();
-      showToast('전체 캔버스 정렬이 완료되었습니다!', 'success');
-    } catch (error) {
-      showToast(`정렬 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`, 'warning');
-    }
+    await arrangeAllNodes();
   };
 
   const handleNewLayoutChildren = async () => {
@@ -129,13 +144,7 @@ function App() {
       return;
     }
     
-    try {
-      showToast('선택된 노드의 자식들을 정렬 중...', 'info');
-      await arrangeSelectedNodeChildren(selectedNodeKey);
-      showToast('자식 노드 정렬이 완료되었습니다!', 'success');
-    } catch (error) {
-      showToast(`정렬 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`, 'warning');
-    }
+    await arrangeSelectedNodeChildren(selectedNodeKey);
   };
 
   const handleNewLayoutDescendants = async () => {
@@ -144,13 +153,7 @@ function App() {
       return;
     }
     
-    try {
-      showToast('선택된 노드의 모든 후손들을 정렬 중...', 'info');
-      await arrangeSelectedNodeDescendants(selectedNodeKey);
-      showToast('후손 노드 정렬이 완료되었습니다!', 'success');
-    } catch (error) {
-      showToast(`정렬 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`, 'warning');
-    }
+    await arrangeSelectedNodeDescendants(selectedNodeKey);
   };
 
   // Export 핸들러들 (검증 포함)
@@ -404,8 +407,19 @@ function App() {
             <span>상태: 준비</span>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-            <span>자동 저장됨</span>
+            <div className={`w-2 h-2 rounded-full ${
+              systemStatus.type === 'idle' ? 'bg-green-400' :
+              systemStatus.type === 'working' ? 'bg-blue-400 animate-pulse' :
+              systemStatus.type === 'success' ? 'bg-green-500' :
+              systemStatus.type === 'error' ? 'bg-red-400' : 'bg-gray-400'
+            }`}></div>
+            <span className={
+              systemStatus.type === 'error' ? 'text-red-600' :
+              systemStatus.type === 'working' ? 'text-blue-600' :
+              systemStatus.type === 'success' ? 'text-green-600' : ''
+            }>
+              {systemStatus.message}
+            </span>
           </div>
         </div>
       </footer>

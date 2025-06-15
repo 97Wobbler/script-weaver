@@ -101,7 +101,8 @@ export default function Canvas() {
     copySelectedNodes,
     pasteNodes,
     deleteSelectedNodes,
-    duplicateNode
+    duplicateNode,
+    pushToHistory
   } = useEditorStore();
 
   // Canvas 영역 참조
@@ -252,14 +253,17 @@ export default function Canvas() {
       // 선택지 연결
       const choiceKey = connection.sourceHandle.replace('choice-', '');
       connectNodes(connection.source, connection.target, choiceKey);
+      pushToHistory(`노드 연결 생성: ${connection.source} → ${connection.target} (선택지: ${choiceKey})`);
     } else if (connection.sourceHandle === 'text-output') {
       // 텍스트 노드 연결
       connectNodes(connection.source, connection.target);
+      pushToHistory(`노드 연결 생성: ${connection.source} → ${connection.target}`);
     } else {
       // 기본 처리 (sourceHandle이 없는 경우)
       connectNodes(connection.source, connection.target);
+      pushToHistory(`노드 연결 생성: ${connection.source} → ${connection.target}`);
     }
-  }, [connectNodes]);
+  }, [connectNodes, pushToHistory]);
 
   // 키보드 이벤트 핸들러 (단축키 지원) - 개선된 버전
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
