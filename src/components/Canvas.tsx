@@ -3,6 +3,8 @@ import { ReactFlow, Background, Controls, MiniMap, useNodesState, useEdgesState,
 import "reactflow/dist/style.css";
 import TextNode from "./nodes/TextNode";
 import ChoiceNode from "./nodes/ChoiceNode";
+import { useNodes } from "../hooks/useNodes";
+import { useProject } from "../hooks/useProject";
 import { useEditorStore } from "../store/editorStore";
 import type { EditorNodeWrapper } from "../types/dialogue";
 
@@ -70,29 +72,36 @@ const generateEdges = (nodeWrappers: EditorNodeWrapper[]): Edge[] => {
 };
 
 export default function Canvas() {
+  // 새로운 Hook들로 기능 분산
   const {
-    templateData,
-    currentTemplate,
-    currentScene,
-    moveNode,
     setSelectedNode,
     selectedNodeKey,
-    connectNodes,
-    deleteNode,
     selectedNodeKeys,
     toggleNodeSelection,
     clearSelection,
     selectMultipleNodes,
-    undo,
-    redo,
-    canUndo,
-    canRedo,
-    copySelectedNodes,
-    pasteNodes,
-    deleteSelectedNodes,
-    duplicateNode,
-    pushToHistory,
-  } = useEditorStore();
+  } = useNodes();
+
+  const {
+    templateData,
+    currentTemplate,
+    currentScene,
+  } = useProject();
+
+  // 아직 Hook으로 구현되지 않은 기능들은 editorStore에서 가져옴
+  const editorStore = useEditorStore();
+  const moveNode = editorStore.moveNode;
+  const connectNodes = editorStore.connectNodes;
+  const deleteNode = editorStore.deleteNode;
+  const undo = editorStore.undo;
+  const redo = editorStore.redo;
+  const canUndo = editorStore.canUndo;
+  const canRedo = editorStore.canRedo;
+  const copySelectedNodes = editorStore.copySelectedNodes;
+  const pasteNodes = editorStore.pasteNodes;
+  const deleteSelectedNodes = editorStore.deleteSelectedNodes;
+  const duplicateNode = editorStore.duplicateNode;
+  const pushToHistory = editorStore.pushToHistory;
 
   // Canvas 영역 참조
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -186,7 +195,7 @@ export default function Canvas() {
           // 노드가 선택 해제됨 - 다른 선택된 노드가 있으면 그 중 하나를 selectedNodeKey로 설정
           // toggleNodeSelection 후의 상태를 확인하기 위해 setTimeout 사용
           setTimeout(() => {
-            const currentSelectedKeys = useEditorStore.getState().selectedNodeKeys;
+            const currentSelectedKeys = editorStore.selectedNodeKeys;
             if (currentSelectedKeys instanceof Set && currentSelectedKeys.size > 0) {
               // 첫 번째 선택된 노드를 selectedNodeKey로 설정
               const firstSelectedKey = Array.from(currentSelectedKeys)[0];

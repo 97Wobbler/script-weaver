@@ -11,13 +11,13 @@ interface TextNodeData {
 
 export default function TextNode({ data, selected }: NodeProps<TextNodeData>) {
   const { dialogue, nodeKey } = data;
-  const { disconnectNodes, createAndConnectTextNode, canCreateNewNode, showToast } = useEditorStore();
+  const editorStore = useEditorStore();
   const [isHovering, setIsHovering] = useState(false);
 
   // 연결 제거 핸들러
   const handleDisconnect = (e: React.MouseEvent) => {
     e.stopPropagation();
-    disconnectNodes(nodeKey);
+    editorStore.disconnectNodes(nodeKey);
   };
 
   // 빈 핸들 클릭 시 텍스트 노드 생성 및 연결
@@ -28,16 +28,16 @@ export default function TextNode({ data, selected }: NodeProps<TextNodeData>) {
       return; // 이미 연결되어 있으면 리턴
     }
 
-    if (!canCreateNewNode()) {
-      showToast?.(`노드 개수가 최대 100개 제한에 도달했습니다.`, "warning");
+    if (!editorStore.canCreateNewNode()) {
+      editorStore.showToast?.(`노드 개수가 최대 100개 제한에 도달했습니다.`, "warning");
       return;
     }
 
     try {
-      createAndConnectTextNode(nodeKey, "text");
+      editorStore.createAndConnectTextNode(nodeKey, "text");
     } catch (error) {
       console.error("노드 생성 중 오류:", error);
-      showToast?.("노드 생성 중 오류가 발생했습니다.", "warning");
+      editorStore.showToast?.("노드 생성 중 오류가 발생했습니다.", "warning");
     }
   };
 

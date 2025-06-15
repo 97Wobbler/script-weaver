@@ -12,13 +12,13 @@ interface ChoiceNodeData {
 export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>) {
   const { dialogue, nodeKey } = data;
   const choiceEntries = Object.entries(dialogue.choices);
-  const { disconnectNodes, createAndConnectChoiceNode, canCreateNewNode, showToast } = useEditorStore();
+  const editorStore = useEditorStore();
   const [hoveredChoice, setHoveredChoice] = useState<string | null>(null);
 
   // 선택지 연결 제거 핸들러
   const handleDisconnectChoice = (choiceKey: string) => (e: React.MouseEvent) => {
     e.stopPropagation();
-    disconnectNodes(nodeKey, choiceKey);
+    editorStore.disconnectNodes(nodeKey, choiceKey);
   };
 
   // 빈 선택지 핸들 클릭 시 텍스트 노드 생성 및 연결
@@ -30,16 +30,16 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
       return; // 이미 연결되어 있으면 리턴
     }
 
-    if (!canCreateNewNode()) {
-      showToast?.(`노드 개수가 최대 100개 제한에 도달했습니다.`, "warning");
+    if (!editorStore.canCreateNewNode()) {
+      editorStore.showToast?.(`노드 개수가 최대 100개 제한에 도달했습니다.`, "warning");
       return;
     }
 
     try {
-      createAndConnectChoiceNode(nodeKey, choiceKey, "text");
+      editorStore.createAndConnectChoiceNode(nodeKey, choiceKey, "text");
     } catch (error) {
       console.error("노드 생성 중 오류:", error);
-      showToast?.("노드 생성 중 오류가 발생했습니다.", "warning");
+      editorStore.showToast?.("노드 생성 중 오류가 발생했습니다.", "warning");
     }
   };
 

@@ -8,6 +8,9 @@ import { TestLayout } from "./components/TestLayout";
 import { TestUI } from "./components/TestUI";
 import { TestProject } from "./components/TestProject";
 import { useEditorStore } from "./store/editorStore";
+import { useNodes } from "./hooks/useNodes";
+import { useLayout } from "./hooks/useLayout";
+import { useProject } from "./hooks/useProject";
 import { globalAsyncOperationManager, type SystemStatus } from "./store/asyncOperationManager";
 import { downloadFile, uploadFile } from "./utils/importExport";
 
@@ -22,26 +25,36 @@ function App() {
   // 테스트 모드 상태
   const [isTestMode, setIsTestMode] = useState<false | 'nodes' | 'layout' | 'ui' | 'project'>(false);
   
+  // 새로운 Hook들로 기능 분산
   const {
-    createTextNode,
-    createChoiceNode,
-    templateData,
-    currentTemplate,
-    currentScene,
-    exportToJSON,
-    exportToCSV,
-    importFromJSON,
-    validateAllData,
     setSelectedNode,
     selectedNodeKey,
+  } = useNodes();
+
+  const {
     arrangeChildNodesAsTree,
     arrangeAllNodesAsTree,
     arrangeNodesWithDagre,
     arrangeAllNodes,
     arrangeSelectedNodeChildren,
     arrangeSelectedNodeDescendants,
-    canCreateNewNode,
-  } = useEditorStore();
+  } = useLayout();
+
+  const {
+    templateData,
+    currentTemplate,
+    currentScene,
+    exportToJSON,
+    exportToCSV,
+    importFromJSON,
+  } = useProject();
+
+  // 노드 생성은 아직 editorStore에서 가져옴 (useProject에서 제공하지 않음)
+  const editorStore = useEditorStore();
+  const createTextNode = editorStore.createTextNode;
+  const createChoiceNode = editorStore.createChoiceNode;
+  const canCreateNewNode = editorStore.canCreateNewNode;
+  const validateAllData = editorStore.validateAllData;
 
   // 전역 토스트 상태
   const [toastState, setToastState] = useState<ToastState>({
@@ -78,9 +91,10 @@ function App() {
 
   // editorStore에 showToast 함수 연결
   React.useEffect(() => {
-    const editorStore = useEditorStore.getState();
+    // const editorStore = useEditorStore.getState();
+    // editorStore.showToast = showToast;
     editorStore.showToast = showToast;
-  }, []);
+  }, [showToast, editorStore]);
 
   // AsyncOperationManager와 상태 콜백 연결
   React.useEffect(() => {
