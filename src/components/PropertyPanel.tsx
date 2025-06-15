@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { useEditorStore } from '../store/editorStore';
-import { useLocalizationStore } from '../store/localizationStore';
-import { DialogueSpeed } from '../types/dialogue';
+import React, { useState, useEffect } from "react";
+import { useEditorStore } from "../store/editorStore";
+import { useLocalizationStore } from "../store/localizationStore";
+import { DialogueSpeed } from "../types/dialogue";
 
 // 키 편집 상태 타입
 interface KeyEditState {
   isEditing: boolean;
-  keyType: 'speaker' | 'text' | 'choice';
+  keyType: "speaker" | "text" | "choice";
   originalKey: string;
   originalText: string;
   newKey: string; // 키값 편집을 위해 추가
@@ -23,15 +23,15 @@ interface LocalTextState {
 }
 
 interface PropertyPanelProps {
-  showToast?: (message: string, type?: 'success' | 'info' | 'warning') => void;
+  showToast?: (message: string, type?: "success" | "info" | "warning") => void;
 }
 
 export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
-  const { 
-    selectedNodeKey, 
+  const {
+    selectedNodeKey,
     selectedNodeKeys,
-    templateData, 
-    currentTemplate, 
+    templateData,
+    currentTemplate,
     currentScene,
     updateNodeText,
     updateChoiceText,
@@ -41,28 +41,23 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     updateNodeKeyReference,
     updateChoiceKeyReference,
     setSelectedNode,
-    pushToHistoryWithTextEdit
+    pushToHistoryWithTextEdit,
   } = useEditorStore();
 
-  const { 
-    getText, 
-    findNodesUsingKey, 
-    getKeyUsageCount, 
-    updateKeyText 
-  } = useLocalizationStore();
+  const { getText, findNodesUsingKey, getKeyUsageCount, updateKeyText } = useLocalizationStore();
 
   const [keyEditState, setKeyEditState] = useState<KeyEditState | null>(null);
   const [localTextState, setLocalTextState] = useState<LocalTextState>({
-    speakerText: '',
-    contentText: '',
-    choiceTexts: {}
+    speakerText: "",
+    contentText: "",
+    choiceTexts: {},
   });
-  
+
   // IME 상태 추적 (한국어 입력 문제 해결용)
   const [isComposing, setIsComposing] = useState({
     speaker: false,
     content: false,
-    choices: {} as Record<string, boolean>
+    choices: {} as Record<string, boolean>,
   });
 
   // 키 편집 모달 ESC 키 처리
@@ -70,15 +65,15 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     if (!keyEditState) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         event.preventDefault();
         setKeyEditState(null);
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [keyEditState]);
 
@@ -87,47 +82,42 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   // 현재 선택된 노드 가져오기
   const currentSceneData = templateData[currentTemplate]?.[currentScene];
   const selectedNode = selectedNodeKey ? currentSceneData?.[selectedNodeKey] : undefined;
-  
+
   // 다중 선택 상태 확인
-  const safeSelectedNodeKeys = selectedNodeKeys instanceof Set 
-    ? selectedNodeKeys 
-    : new Set(Array.isArray(selectedNodeKeys) ? selectedNodeKeys : []);
+  const safeSelectedNodeKeys = selectedNodeKeys instanceof Set ? selectedNodeKeys : new Set(Array.isArray(selectedNodeKeys) ? selectedNodeKeys : []);
   const isMultipleSelection = safeSelectedNodeKeys.size > 1;
 
   // 선택된 노드가 변경될 때 로컬 상태 초기화
   useEffect(() => {
     if (selectedNode) {
       setLocalTextState({
-        speakerText: selectedNode.dialogue.speakerText || '',
-        contentText: selectedNode.dialogue.contentText || '',
-        choiceTexts: selectedNode.dialogue.type === 'choice' 
-          ? Object.fromEntries(
-              Object.entries(selectedNode.dialogue.choices).map(([key, choice]) => [key, choice.choiceText])
-            )
-          : {}
+        speakerText: selectedNode.dialogue.speakerText || "",
+        contentText: selectedNode.dialogue.contentText || "",
+        choiceTexts:
+          selectedNode.dialogue.type === "choice" ? Object.fromEntries(Object.entries(selectedNode.dialogue.choices).map(([key, choice]) => [key, choice.choiceText])) : {},
       });
     } else {
       setLocalTextState({
-        speakerText: '',
-        contentText: '',
-        choiceTexts: {}
+        speakerText: "",
+        contentText: "",
+        choiceTexts: {},
       });
     }
   }, [selectedNode]);
 
   // 로컬 상태 변경 핸들러들 (키 생성 없음)
   const handleLocalSpeakerChange = (value: string) => {
-    setLocalTextState(prev => ({ ...prev, speakerText: value }));
+    setLocalTextState((prev) => ({ ...prev, speakerText: value }));
   };
 
   const handleLocalContentTextChange = (value: string) => {
-    setLocalTextState(prev => ({ ...prev, contentText: value }));
+    setLocalTextState((prev) => ({ ...prev, contentText: value }));
   };
 
   const handleLocalChoiceTextChange = (choiceKey: string, choiceText: string) => {
-    setLocalTextState(prev => ({
+    setLocalTextState((prev) => ({
       ...prev,
-      choiceTexts: { ...prev.choiceTexts, [choiceKey]: choiceText }
+      choiceTexts: { ...prev.choiceTexts, [choiceKey]: choiceText },
     }));
   };
 
@@ -135,34 +125,34 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   const commitSpeakerText = () => {
     if (!selectedNodeKey || isComposing.speaker) return;
     const trimmedText = localTextState.speakerText.trim();
-    
+
     const currentNode = selectedNode;
     const currentSpeakerKey = currentNode?.dialogue.speakerKeyRef;
-    const currentSpeakerText = currentNode?.dialogue.speakerText || '';
-    
+    const currentSpeakerText = currentNode?.dialogue.speakerText || "";
+
     // 변경사항이 없으면 히스토리 추가하지 않음
     if (trimmedText === currentSpeakerText) return;
-    
+
     // 중복 텍스트 체크 (기존 키와 다른 키에 동일한 텍스트가 있는지)
     if (trimmedText) {
       const existingKey = useLocalizationStore.getState().findExistingKey(trimmedText);
       if (existingKey && existingKey !== currentSpeakerKey) {
         // 기존 키 자동 사용
-        updateNodeKeyReference(selectedNodeKey, 'speaker', existingKey);
-        setLocalTextState(prev => ({ ...prev, speakerText: trimmedText }));
-        
+        updateNodeKeyReference(selectedNodeKey, "speaker", existingKey);
+        setLocalTextState((prev) => ({ ...prev, speakerText: trimmedText }));
+
         // 히스토리 추가
         pushToHistoryWithTextEdit(`화자 텍스트 수정: "${trimmedText}"`);
-        
+
         // 토스트 알림 표시
-        showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, 'info');
+        showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, "info");
         return;
       }
     }
-    
+
     // 중복이 없는 경우 기존 로직 실행
     updateNodeText(selectedNodeKey, trimmedText, undefined);
-    
+
     // 히스토리 추가
     pushToHistoryWithTextEdit(`화자 텍스트 수정: "${trimmedText}"`);
   };
@@ -170,111 +160,111 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   const commitContentText = () => {
     if (!selectedNodeKey || isComposing.content) return;
     const trimmedText = localTextState.contentText.trim();
-    
+
     const currentNode = selectedNode;
     const currentTextKey = currentNode?.dialogue.textKeyRef;
-    const currentContentText = currentNode?.dialogue.contentText || '';
-    
+    const currentContentText = currentNode?.dialogue.contentText || "";
+
     // 변경사항이 없으면 히스토리 추가하지 않음
     if (trimmedText === currentContentText) return;
-    
+
     // 중복 텍스트 체크 (기존 키와 다른 키에 동일한 텍스트가 있는지)
     if (trimmedText) {
       const existingKey = useLocalizationStore.getState().findExistingKey(trimmedText);
       if (existingKey && existingKey !== currentTextKey) {
         // 기존 키 자동 사용
-        updateNodeKeyReference(selectedNodeKey, 'text', existingKey);
-        setLocalTextState(prev => ({ ...prev, contentText: trimmedText }));
-        
+        updateNodeKeyReference(selectedNodeKey, "text", existingKey);
+        setLocalTextState((prev) => ({ ...prev, contentText: trimmedText }));
+
         // 히스토리 추가
         pushToHistoryWithTextEdit(`대사 텍스트 수정: "${trimmedText}"`);
-        
+
         // 토스트 알림 표시
-        showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, 'info');
+        showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, "info");
         return;
       }
     }
-    
+
     // 중복이 없는 경우 기존 로직 실행
     updateNodeText(selectedNodeKey, undefined, trimmedText);
-    
+
     // 히스토리 추가
     pushToHistoryWithTextEdit(`대사 텍스트 수정: "${trimmedText}"`);
   };
 
   const commitChoiceText = (choiceKey: string) => {
     if (!selectedNodeKey || isComposing.choices[choiceKey]) return;
-    const trimmedText = localTextState.choiceTexts[choiceKey]?.trim() || '';
-    
+    const trimmedText = localTextState.choiceTexts[choiceKey]?.trim() || "";
+
     const currentNode = selectedNode;
-    const currentChoice = currentNode?.dialogue.type === 'choice' ? currentNode.dialogue.choices[choiceKey] : null;
+    const currentChoice = currentNode?.dialogue.type === "choice" ? currentNode.dialogue.choices[choiceKey] : null;
     const currentChoiceKey = currentChoice?.textKeyRef;
-    const currentChoiceText = currentChoice?.choiceText || '';
-    
+    const currentChoiceText = currentChoice?.choiceText || "";
+
     // 변경사항이 없으면 히스토리 추가하지 않음
     if (trimmedText === currentChoiceText) return;
-    
+
     // 중복 텍스트 체크 (기존 키와 다른 키에 동일한 텍스트가 있는지)
     if (trimmedText) {
       const existingKey = useLocalizationStore.getState().findExistingKey(trimmedText);
       if (existingKey && existingKey !== currentChoiceKey) {
         // 기존 키 자동 사용
         updateChoiceKeyReference(selectedNodeKey, choiceKey, existingKey);
-        setLocalTextState(prev => ({ 
-          ...prev, 
-          choiceTexts: { ...prev.choiceTexts, [choiceKey]: trimmedText }
+        setLocalTextState((prev) => ({
+          ...prev,
+          choiceTexts: { ...prev.choiceTexts, [choiceKey]: trimmedText },
         }));
-        
+
         // 히스토리 추가
         pushToHistoryWithTextEdit(`선택지 텍스트 수정: "${trimmedText}"`);
-        
+
         // 토스트 알림 표시
-        showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, 'info');
+        showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, "info");
         return;
       }
     }
-    
+
     // 중복이 없는 경우 기존 로직 실행
     updateChoiceText(selectedNodeKey, choiceKey, trimmedText);
-    
+
     // 히스토리 추가 (한 번만)
     pushToHistoryWithTextEdit(`선택지 텍스트 수정: "${trimmedText}"`);
   };
 
   // IME 이벤트 핸들러들
   const handleSpeakerCompositionStart = () => {
-    setIsComposing(prev => ({ ...prev, speaker: true }));
+    setIsComposing((prev) => ({ ...prev, speaker: true }));
   };
 
   const handleSpeakerCompositionEnd = () => {
-    setIsComposing(prev => ({ ...prev, speaker: false }));
+    setIsComposing((prev) => ({ ...prev, speaker: false }));
   };
 
   const handleContentCompositionStart = () => {
-    setIsComposing(prev => ({ ...prev, content: true }));
+    setIsComposing((prev) => ({ ...prev, content: true }));
   };
 
   const handleContentCompositionEnd = () => {
-    setIsComposing(prev => ({ ...prev, content: false }));
+    setIsComposing((prev) => ({ ...prev, content: false }));
   };
 
   const handleChoiceCompositionStart = (choiceKey: string) => () => {
-    setIsComposing(prev => ({ 
-      ...prev, 
-      choices: { ...prev.choices, [choiceKey]: true } 
+    setIsComposing((prev) => ({
+      ...prev,
+      choices: { ...prev.choices, [choiceKey]: true },
     }));
   };
 
   const handleChoiceCompositionEnd = (choiceKey: string) => () => {
-    setIsComposing(prev => ({ 
-      ...prev, 
-      choices: { ...prev.choices, [choiceKey]: false } 
+    setIsComposing((prev) => ({
+      ...prev,
+      choices: { ...prev.choices, [choiceKey]: false },
     }));
   };
 
   // Enter 키 처리 핸들러들
   const handleSpeakerKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !isComposing.speaker) {
+    if (e.key === "Enter" && !isComposing.speaker) {
       e.preventDefault();
       commitSpeakerText();
       (e.target as HTMLInputElement).blur();
@@ -282,7 +272,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   };
 
   const handleContentKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey && !isComposing.content) {
+    if (e.key === "Enter" && !e.shiftKey && !isComposing.content) {
       e.preventDefault();
       commitContentText();
       (e.target as HTMLTextAreaElement).blur();
@@ -290,7 +280,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   };
 
   const handleChoiceKeyDown = (choiceKey: string) => (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !isComposing.choices[choiceKey]) {
+    if (e.key === "Enter" && !isComposing.choices[choiceKey]) {
       e.preventDefault();
       commitChoiceText(choiceKey);
       (e.target as HTMLInputElement).blur();
@@ -305,31 +295,31 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
 
   // 선택지 추가 (실제 텍스트 기반)
   const handleAddChoice = () => {
-    if (!selectedNodeKey || selectedNode?.dialogue.type !== 'choice') return;
-    
+    if (!selectedNodeKey || selectedNode?.dialogue.type !== "choice") return;
+
     const choiceKey = `choice_${Date.now()}`;
-    addChoice(selectedNodeKey, choiceKey, '', '');
+    addChoice(selectedNodeKey, choiceKey, "", "");
   };
 
   // 선택지 제거
   const handleRemoveChoice = (choiceKey: string) => {
-    if (!selectedNodeKey || !selectedNode || selectedNode.dialogue.type !== 'choice') return;
-    
+    if (!selectedNodeKey || !selectedNode || selectedNode.dialogue.type !== "choice") return;
+
     // 선택지의 키를 LocalizationStore에서도 삭제
     const choice = selectedNode.dialogue.choices[choiceKey];
     if (choice && choice.textKeyRef) {
       const localizationStore = useLocalizationStore.getState();
       localizationStore.deleteKey(choice.textKeyRef);
     }
-    
+
     removeChoice(selectedNodeKey, choiceKey);
   };
 
   // 키 편집 시작
-  const startKeyEdit = (keyType: 'speaker' | 'text' | 'choice', key: string, choiceKey?: string) => {
-    const text = getText(key) || '';
+  const startKeyEdit = (keyType: "speaker" | "text" | "choice", key: string, choiceKey?: string) => {
+    const text = getText(key) || "";
     const usageNodes = findNodesUsingKey(key);
-    
+
     setKeyEditState({
       isEditing: true,
       keyType,
@@ -338,7 +328,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
       newKey: key,
       newText: text,
       usageNodes,
-      choiceKey
+      choiceKey,
     });
   };
 
@@ -348,7 +338,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   };
 
   // 키 편집 완료
-  const confirmKeyEdit = (updateAll: boolean, changeType: 'text' | 'key' | 'both') => {
+  const confirmKeyEdit = (updateAll: boolean, changeType: "text" | "key" | "both") => {
     if (!keyEditState || !selectedNodeKey) return;
 
     const localizationStore = useLocalizationStore.getState();
@@ -360,67 +350,66 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
       if (isTextChanged) {
         // 기존 키의 텍스트 업데이트
         localizationStore.setText(keyEditState.originalKey, keyEditState.newText);
-        
+
         // 모든 노드의 실제 텍스트도 동기화
         const usageNodes = localizationStore.findNodesUsingKey(keyEditState.originalKey);
-        usageNodes.forEach(nodeInfo => {
+        usageNodes.forEach((nodeInfo) => {
           const match = nodeInfo.match(/^(.+)\/(.+)\/(.+) \((.+)\)$/);
           if (match) {
             const [, templateKey, sceneKey, nodeKey, nodeType] = match;
-            
+
             // 노드의 실제 텍스트 필드도 업데이트
-            if (nodeType === '화자') {
+            if (nodeType === "화자") {
               updateNodeText(nodeKey, keyEditState.newText, undefined);
-            } else if (nodeType === '내용') {
+            } else if (nodeType === "내용") {
               updateNodeText(nodeKey, undefined, keyEditState.newText);
-            } else if (nodeType.startsWith('선택지:')) {
-              const choiceKey = nodeType.split(':')[1].trim();
+            } else if (nodeType.startsWith("선택지:")) {
+              const choiceKey = nodeType.split(":")[1].trim();
               updateChoiceText(nodeKey, choiceKey, keyEditState.newText);
             }
           }
         });
       }
-      
+
       if (isKeyChanged) {
         // 키값 변경: 모든 노드의 키 참조를 새 키로 업데이트
         const originalText = keyEditState.newText; // 위에서 업데이트된 텍스트 사용
-        
+
         // 새 키에 텍스트 설정
         localizationStore.setText(keyEditState.newKey, originalText);
-        
+
         // 기존 키를 사용하는 모든 노드의 키 참조 업데이트
         const usageNodes = localizationStore.findNodesUsingKey(keyEditState.originalKey);
-        usageNodes.forEach(nodeInfo => {
+        usageNodes.forEach((nodeInfo) => {
           // nodeInfo 형식: "templateKey/sceneKey/nodeKey (타입)" 파싱
           const match = nodeInfo.match(/^(.+)\/(.+)\/(.+) \((.+)\)$/);
           if (match) {
             const [, templateKey, sceneKey, nodeKey, nodeType] = match;
-            
-            if (nodeType === '화자') {
-              updateNodeKeyReference(nodeKey, 'speaker', keyEditState.newKey);
-            } else if (nodeType === '내용') {
-              updateNodeKeyReference(nodeKey, 'text', keyEditState.newKey);
-            } else if (nodeType.startsWith('선택지:')) {
-              const choiceKey = nodeType.split(':')[1].trim();
+
+            if (nodeType === "화자") {
+              updateNodeKeyReference(nodeKey, "speaker", keyEditState.newKey);
+            } else if (nodeType === "내용") {
+              updateNodeKeyReference(nodeKey, "text", keyEditState.newKey);
+            } else if (nodeType.startsWith("선택지:")) {
+              const choiceKey = nodeType.split(":")[1].trim();
               updateChoiceKeyReference(nodeKey, choiceKey, keyEditState.newKey);
             }
           }
         });
-        
+
         // 기존 키 삭제
         localizationStore.deleteKey(keyEditState.originalKey);
       }
-      
+
       // 키 편집 시 히스토리 추가 (모든 위치 함께 변경)
-      const actionName = keyEditState.keyType === 'speaker' ? '화자 텍스트' : 
-                        keyEditState.keyType === 'text' ? '대화 텍스트' : '선택지 텍스트';
+      const actionName = keyEditState.keyType === "speaker" ? "화자 텍스트" : keyEditState.keyType === "text" ? "대화 텍스트" : "선택지 텍스트";
       pushToHistoryWithTextEdit(`${actionName} 일괄 수정: "${keyEditState.newText}"`);
     } else {
       // 현재 노드만 변경 (새 키로 분리)
       if (isTextChanged || isKeyChanged) {
         // 새 키 생성 또는 기존 키 찾기
         let targetKey = keyEditState.originalKey;
-        
+
         if (isKeyChanged) {
           targetKey = keyEditState.newKey;
         } else if (isTextChanged) {
@@ -430,48 +419,47 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
             targetKey = existingKey;
           } else {
             // 새 키 생성
-            if (keyEditState.keyType === 'speaker') {
+            if (keyEditState.keyType === "speaker") {
               targetKey = localizationStore.generateSpeakerKey(keyEditState.newText).key;
-            } else if (keyEditState.keyType === 'text') {
+            } else if (keyEditState.keyType === "text") {
               targetKey = localizationStore.generateTextKey(keyEditState.newText).key;
-            } else if (keyEditState.keyType === 'choice') {
+            } else if (keyEditState.keyType === "choice") {
               targetKey = localizationStore.generateChoiceKey(keyEditState.newText).key;
             }
           }
         }
-        
+
         // 새 키에 텍스트 설정
         localizationStore.setText(targetKey, keyEditState.newText);
-        
+
         // 현재 노드의 키 참조 및 실제 텍스트 업데이트
-        if (keyEditState.keyType === 'speaker') {
-          updateNodeKeyReference(selectedNodeKey, 'speaker', targetKey);
+        if (keyEditState.keyType === "speaker") {
+          updateNodeKeyReference(selectedNodeKey, "speaker", targetKey);
           updateNodeText(selectedNodeKey, keyEditState.newText, undefined);
-        } else if (keyEditState.keyType === 'text') {
-          updateNodeKeyReference(selectedNodeKey, 'text', targetKey);
+        } else if (keyEditState.keyType === "text") {
+          updateNodeKeyReference(selectedNodeKey, "text", targetKey);
           updateNodeText(selectedNodeKey, undefined, keyEditState.newText);
-        } else if (keyEditState.keyType === 'choice' && keyEditState.choiceKey) {
+        } else if (keyEditState.keyType === "choice" && keyEditState.choiceKey) {
           updateChoiceKeyReference(selectedNodeKey, keyEditState.choiceKey, targetKey);
           updateChoiceText(selectedNodeKey, keyEditState.choiceKey, keyEditState.newText);
         }
-        
+
         // 키 편집 시 히스토리 추가 (현재 노드만 변경)
-        const actionName = keyEditState.keyType === 'speaker' ? '화자 텍스트' : 
-                          keyEditState.keyType === 'text' ? '대화 텍스트' : '선택지 텍스트';
+        const actionName = keyEditState.keyType === "speaker" ? "화자 텍스트" : keyEditState.keyType === "text" ? "대화 텍스트" : "선택지 텍스트";
         pushToHistoryWithTextEdit(`${actionName} 개별 수정: "${keyEditState.newText}"`);
       }
     }
 
     // 로컬 텍스트 상태 업데이트 (키 편집 완료 후 blur 방지)
-    if (keyEditState.keyType === 'choice' && keyEditState.choiceKey) {
-      setLocalTextState(prev => ({
+    if (keyEditState.keyType === "choice" && keyEditState.choiceKey) {
+      setLocalTextState((prev) => ({
         ...prev,
-        choiceTexts: { ...prev.choiceTexts, [keyEditState.choiceKey!]: keyEditState.newText }
+        choiceTexts: { ...prev.choiceTexts, [keyEditState.choiceKey!]: keyEditState.newText },
       }));
-    } else if (keyEditState.keyType === 'speaker') {
-      setLocalTextState(prev => ({ ...prev, speakerText: keyEditState.newText }));
-    } else if (keyEditState.keyType === 'text') {
-      setLocalTextState(prev => ({ ...prev, contentText: keyEditState.newText }));
+    } else if (keyEditState.keyType === "speaker") {
+      setLocalTextState((prev) => ({ ...prev, speakerText: keyEditState.newText }));
+    } else if (keyEditState.keyType === "text") {
+      setLocalTextState((prev) => ({ ...prev, contentText: keyEditState.newText }));
     }
 
     setKeyEditState(null);
@@ -490,19 +478,19 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 w-96 max-w-full">
           <h3 className="text-lg font-semibold mb-4">키 편집</h3>
-          
+
           {/* 키값 편집 필드 */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              키 값
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">키 값</label>
             <input
               type="text"
               value={keyEditState.newKey}
-              onChange={(e) => setKeyEditState({
-                ...keyEditState,
-                newKey: e.target.value
-              })}
+              onChange={(e) =>
+                setKeyEditState({
+                  ...keyEditState,
+                  newKey: e.target.value,
+                })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
               placeholder="키 값 입력"
             />
@@ -510,37 +498,29 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
 
           {/* 텍스트 내용 편집 필드 */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              텍스트 내용
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">텍스트 내용</label>
             <textarea
               value={keyEditState.newText}
               onChange={(e) => {
                 let newText = e.target.value;
-                
+
                 // 화자와 선택지는 줄 바꿈 금지
-                if (keyEditState.keyType === 'speaker' || keyEditState.keyType === 'choice') {
-                  newText = newText.replace(/\n/g, '');
+                if (keyEditState.keyType === "speaker" || keyEditState.keyType === "choice") {
+                  newText = newText.replace(/\n/g, "");
                 }
-                
+
                 setKeyEditState({
                   ...keyEditState,
-                  newText: newText
+                  newText: newText,
                 });
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 h-20 resize-none"
               placeholder={
-                keyEditState.keyType === 'speaker' 
-                  ? "화자명 입력 (줄 바꿈 불가)"
-                  : keyEditState.keyType === 'choice'
-                  ? "선택지 텍스트 입력 (줄 바꿈 불가)"
-                  : "대화 내용 입력"
+                keyEditState.keyType === "speaker" ? "화자명 입력 (줄 바꿈 불가)" : keyEditState.keyType === "choice" ? "선택지 텍스트 입력 (줄 바꿈 불가)" : "대화 내용 입력"
               }
             />
-            {(keyEditState.keyType === 'speaker' || keyEditState.keyType === 'choice') && (
-              <p className="text-xs text-gray-500 mt-1">
-                {keyEditState.keyType === 'speaker' ? '화자명' : '선택지 텍스트'}에는 줄 바꿈을 사용할 수 없습니다.
-              </p>
+            {(keyEditState.keyType === "speaker" || keyEditState.keyType === "choice") && (
+              <p className="text-xs text-gray-500 mt-1">{keyEditState.keyType === "speaker" ? "화자명" : "선택지 텍스트"}에는 줄 바꿈을 사용할 수 없습니다.</p>
             )}
           </div>
 
@@ -560,24 +540,13 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
           {/* 개선된 버튼 표시 로직 */}
           <div className="space-y-2">
             <button
-              onClick={() => confirmKeyEdit(true, 'both')}
+              onClick={() => confirmKeyEdit(true, "both")}
               disabled={!hasChanges}
-              className={`w-full px-4 py-2 text-white rounded text-sm transition-colors ${
-                hasChanges 
-                  ? 'bg-blue-600 hover:bg-blue-700' 
-                  : 'bg-gray-400 cursor-not-allowed'
-              }`}
-            >
-              {keyEditState.usageNodes.length > 1 
-                ? `모든 위치 함께 변경 (${keyEditState.usageNodes.length}개 위치)`
-                : '변경 적용'
-              }
+              className={`w-full px-4 py-2 text-white rounded text-sm transition-colors ${hasChanges ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-400 cursor-not-allowed"}`}>
+              {keyEditState.usageNodes.length > 1 ? `모든 위치 함께 변경 (${keyEditState.usageNodes.length}개 위치)` : "변경 적용"}
             </button>
-            
-            <button
-              onClick={() => setKeyEditState(null)}
-              className="w-full px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm"
-            >
+
+            <button onClick={() => setKeyEditState(null)} className="w-full px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm">
               취소
             </button>
           </div>
@@ -587,15 +556,8 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   };
 
   // 키 표시 컴포넌트 (클릭 가능)
-  const KeyDisplay = ({ keyRef, keyType, choiceKey }: { 
-    keyRef: string; 
-    keyType: 'speaker' | 'text' | 'choice';
-    choiceKey?: string;
-  }) => (
-    <button
-      onClick={() => startKeyEdit(keyType, keyRef, choiceKey)}
-      className="mt-1 text-xs text-gray-500 hover:text-blue-600 hover:underline text-left"
-    >
+  const KeyDisplay = ({ keyRef, keyType, choiceKey }: { keyRef: string; keyType: "speaker" | "text" | "choice"; choiceKey?: string }) => (
+    <button onClick={() => startKeyEdit(keyType, keyRef, choiceKey)} className="mt-1 text-xs text-gray-500 hover:text-blue-600 hover:underline text-left">
       키: {keyRef} ({getKeyUsageCount(keyRef)}개 사용)
     </button>
   );
@@ -607,9 +569,18 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center text-gray-500">
             <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
-            <p className="text-sm">노드를 선택하면<br />속성을 편집할 수 있습니다</p>
+            <p className="text-sm">
+              노드를 선택하면
+              <br />
+              속성을 편집할 수 있습니다
+            </p>
           </div>
         </div>
       </aside>
@@ -629,22 +600,22 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
               <p className="text-sm font-medium">다중 선택됨</p>
               <p className="text-sm">{safeSelectedNodeKeys.size}개 노드가 선택되었습니다</p>
               <p className="text-xs text-gray-400 mt-4">
-                단일 노드를 선택하면<br />속성을 편집할 수 있습니다
+                단일 노드를 선택하면
+                <br />
+                속성을 편집할 수 있습니다
               </p>
             </div>
-            
+
             {/* 선택된 노드 목록 */}
             <div className="mt-4 p-3 bg-gray-50 rounded-md">
               <p className="text-xs font-medium text-gray-600 mb-2">선택된 노드:</p>
               <div className="space-y-1 max-h-32 overflow-y-auto">
-                {Array.from(safeSelectedNodeKeys).map(nodeKey => {
+                {Array.from(safeSelectedNodeKeys).map((nodeKey) => {
                   const node = currentSceneData?.[nodeKey];
                   return (
                     <div key={nodeKey} className="text-xs text-gray-500 flex items-center justify-between">
                       <span className="font-mono">{nodeKey}</span>
-                      <span className="text-gray-400">
-                        {node?.dialogue.type === 'text' ? '텍스트' : '선택지'}
-                      </span>
+                      <span className="text-gray-400">{node?.dialogue.type === "text" ? "텍스트" : "선택지"}</span>
                     </div>
                   );
                 })}
@@ -657,9 +628,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   }
 
   // 현재 속성값들 (로컬 상태 사용)
-  const currentSpeed = (selectedNode.dialogue.type === 'text' || selectedNode.dialogue.type === 'choice') 
-    ? selectedNode.dialogue.speed || 'NORMAL' 
-    : 'NORMAL';
+  const currentSpeed = selectedNode.dialogue.type === "text" || selectedNode.dialogue.type === "choice" ? selectedNode.dialogue.speed || "NORMAL" : "NORMAL";
 
   return (
     <aside className="w-80 bg-white border-l border-gray-200 flex flex-col">
@@ -670,16 +639,14 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">노드 속성</h3>
             <div className="text-sm text-gray-600 space-y-1">
               <p>노드 ID: {selectedNode.nodeKey}</p>
-              <p>타입: {selectedNode.dialogue.type === 'text' ? '텍스트' : '선택지'}</p>
+              <p>타입: {selectedNode.dialogue.type === "text" ? "텍스트" : "선택지"}</p>
             </div>
           </div>
 
           {/* 기본 속성 편집 - 실제 텍스트 기반 */}
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                화자 (Speaker)
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">화자 (Speaker)</label>
               <input
                 type="text"
                 value={localTextState.speakerText}
@@ -692,18 +659,11 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               {/* 자동생성된 키값 표시 */}
-              {selectedNode.dialogue.speakerKeyRef && (
-                <KeyDisplay 
-                  keyRef={selectedNode.dialogue.speakerKeyRef} 
-                  keyType="speaker"
-                />
-              )}
+              {selectedNode.dialogue.speakerKeyRef && <KeyDisplay keyRef={selectedNode.dialogue.speakerKeyRef} keyType="speaker" />}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {selectedNode.dialogue.type === 'choice' ? '선택지 질문' : '대화 내용'}
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{selectedNode.dialogue.type === "choice" ? "선택지 질문" : "대화 내용"}</label>
               <textarea
                 value={localTextState.contentText}
                 onChange={(e) => handleLocalContentTextChange(e.target.value)}
@@ -711,28 +671,20 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
                 onKeyDown={handleContentKeyDown}
                 onCompositionStart={handleContentCompositionStart}
                 onCompositionEnd={handleContentCompositionEnd}
-                placeholder={selectedNode.dialogue.type === 'choice' ? '선택지 질문을 입력하세요' : '대화 내용을 입력하세요'}
+                placeholder={selectedNode.dialogue.type === "choice" ? "선택지 질문을 입력하세요" : "대화 내용을 입력하세요"}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               />
               {/* 자동생성된 키값 표시 */}
-              {selectedNode.dialogue.textKeyRef && (
-                <KeyDisplay 
-                  keyRef={selectedNode.dialogue.textKeyRef} 
-                  keyType="text"
-                />
-              )}
+              {selectedNode.dialogue.textKeyRef && <KeyDisplay keyRef={selectedNode.dialogue.textKeyRef} keyType="text" />}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                출력 속도
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">출력 속도</label>
               <select
                 value={currentSpeed}
                 onChange={(e) => handleSpeedChange(e.target.value as keyof typeof DialogueSpeed)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 <option value="SLOW">느림</option>
                 <option value="NORMAL">보통</option>
                 <option value="FAST">빠름</option>
@@ -741,14 +693,11 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
           </div>
 
           {/* 선택지 노드 전용 영역 */}
-          {selectedNode.dialogue.type === 'choice' && (
+          {selectedNode.dialogue.type === "choice" && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-md font-medium text-gray-900">선택지</h4>
-                <button
-                  onClick={handleAddChoice}
-                  className="px-3 py-1 text-sm bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 transition-colors"
-                >
+                <button onClick={handleAddChoice} className="px-3 py-1 text-sm bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 transition-colors">
                   + 추가
                 </button>
               </div>
@@ -758,18 +707,15 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
                   <div key={choiceKey} className="p-3 border border-gray-200 rounded-md">
                     <div className="flex justify-between items-start mb-2">
                       <span className="text-sm font-medium text-gray-700">{choiceKey}</span>
-                      <button
-                        onClick={() => handleRemoveChoice(choiceKey)}
-                        className="text-red-500 hover:text-red-700 text-sm"
-                      >
+                      <button onClick={() => handleRemoveChoice(choiceKey)} className="text-red-500 hover:text-red-700 text-sm">
                         삭제
                       </button>
                     </div>
-                    
+
                     {/* 실제 텍스트 입력 */}
                     <input
                       type="text"
-                      value={localTextState.choiceTexts[choiceKey] || ''}
+                      value={localTextState.choiceTexts[choiceKey] || ""}
                       onChange={(e) => handleLocalChoiceTextChange(choiceKey, e.target.value)}
                       onBlur={() => commitChoiceText(choiceKey)}
                       onKeyDown={handleChoiceKeyDown(choiceKey)}
@@ -778,19 +724,11 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
                       placeholder="선택지 텍스트"
                       className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
-                    
+
                     {/* 자동생성된 키값 표시 */}
-                    {choice.textKeyRef && (
-                      <KeyDisplay 
-                        keyRef={choice.textKeyRef} 
-                        keyType="choice"
-                        choiceKey={choiceKey}
-                      />
-                    )}
-                    
-                    <div className="mt-2 text-xs text-gray-500">
-                      다음 노드: {choice.nextNodeKey || '미연결'}
-                    </div>
+                    {choice.textKeyRef && <KeyDisplay keyRef={choice.textKeyRef} keyType="choice" choiceKey={choiceKey} />}
+
+                    <div className="mt-2 text-xs text-gray-500">다음 노드: {choice.nextNodeKey || "미연결"}</div>
                   </div>
                 ))}
               </div>
@@ -805,11 +743,9 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
                 <span>변경사항이 실시간으로 저장됩니다</span>
               </div>
             </div>
-            
+
             {/* 키 관리 힌트 */}
-            <div className="mt-2 text-xs text-gray-400 text-center">
-              키는 자동으로 생성되며 로컬라이제이션에서 관리됩니다
-            </div>
+            <div className="mt-2 text-xs text-gray-400 text-center">키는 자동으로 생성되며 로컬라이제이션에서 관리됩니다</div>
           </div>
         </div>
       </div>
@@ -818,4 +754,4 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
       {renderKeyEditModal()}
     </aside>
   );
-} 
+}

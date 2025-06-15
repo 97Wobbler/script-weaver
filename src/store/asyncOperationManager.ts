@@ -1,4 +1,4 @@
-export type OperationStatus = 'idle' | 'working' | 'error' | 'success';
+export type OperationStatus = "idle" | "working" | "error" | "success";
 
 export interface SystemStatus {
   type: OperationStatus;
@@ -28,7 +28,6 @@ export class AsyncOperationManager {
    */
   canStartOperation(operationType: string): boolean {
     if (this.isOperationInProgress) {
-      console.log(`[AsyncOperationManager] 작업 진행 중이므로 '${operationType}' 차단됨 (현재: ${this.currentOperation})`);
       return false;
     }
     return true;
@@ -41,13 +40,12 @@ export class AsyncOperationManager {
     if (!this.canStartOperation(operationType)) {
       return false;
     }
-    
+
     this.isOperationInProgress = true;
     this.currentOperation = operationType;
-    
-    console.log(`[AsyncOperationManager] 작업 시작: ${operationType}`);
-    this.notifyStatusChange('working', `${operationType}...`);
-    
+
+    this.notifyStatusChange("working", `${operationType}...`);
+
     return true;
   }
 
@@ -56,16 +54,14 @@ export class AsyncOperationManager {
    */
   endOperation(): void {
     if (!this.isOperationInProgress) {
-      console.warn('[AsyncOperationManager] 진행 중인 작업이 없는데 endOperation 호출됨');
+      console.warn("[AsyncOperationManager] 진행 중인 작업이 없으나 endOperation 호출됨");
       return;
     }
 
-    const completedOperation = this.currentOperation;
     this.isOperationInProgress = false;
     this.currentOperation = null;
-    
-    console.log(`[AsyncOperationManager] 작업 완료: ${completedOperation}`);
-    this.notifyStatusChange('idle', '자동 저장됨');
+
+    this.notifyStatusChange("idle", "자동 저장됨");
   }
 
   /**
@@ -87,7 +83,6 @@ export class AsyncOperationManager {
    */
   canPerformUndoRedo(): boolean {
     if (this.isOperationInProgress) {
-      console.log(`[AsyncOperationManager] undo/redo 차단됨 (진행 중인 작업: ${this.currentOperation})`);
       return false;
     }
     return true;
@@ -101,7 +96,7 @@ export class AsyncOperationManager {
       this.onStatusChange({
         type,
         message,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
   }
@@ -118,11 +113,11 @@ export class AsyncOperationManager {
    */
   showError(message: string): void {
     console.error(`[AsyncOperationManager] 에러: ${message}`);
-    this.notifyStatusChange('error', message);
-    
+    this.notifyStatusChange("error", message);
+
     // 3초 후 자동으로 idle 상태로 복원
     setTimeout(() => {
-      this.notifyStatusChange('idle', '자동 저장됨');
+      this.notifyStatusChange("idle", "자동 저장됨");
     }, 3000);
   }
 
@@ -130,15 +125,14 @@ export class AsyncOperationManager {
    * 성공 상태 표시 (임시)
    */
   showSuccess(message: string): void {
-    console.log(`[AsyncOperationManager] 성공: ${message}`);
-    this.notifyStatusChange('success', message);
-    
+    this.notifyStatusChange("success", message);
+
     // 2초 후 자동으로 idle 상태로 복원
     setTimeout(() => {
-      this.notifyStatusChange('idle', '자동 저장됨');
+      this.notifyStatusChange("idle", "자동 저장됨");
     }, 2000);
   }
 }
 
 // 전역 인스턴스 (싱글톤 패턴)
-export const globalAsyncOperationManager = new AsyncOperationManager(); 
+export const globalAsyncOperationManager = new AsyncOperationManager();
