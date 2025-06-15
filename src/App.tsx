@@ -3,6 +3,7 @@
 import React, { useState, useRef } from "react";
 import Canvas from "./components/Canvas";
 import PropertyPanel from "./components/PropertyPanel";
+import { TestNodes } from "./components/TestNodes";
 import { useEditorStore } from "./store/editorStore";
 import { globalAsyncOperationManager, type SystemStatus } from "./store/asyncOperationManager";
 import { downloadFile, uploadFile } from "./utils/importExport";
@@ -15,6 +16,9 @@ interface ToastState {
 }
 
 function App() {
+  // 테스트 모드 상태
+  const [isTestMode, setIsTestMode] = useState(false);
+  
   const {
     createTextNode,
     createChoiceNode,
@@ -233,6 +237,25 @@ function App() {
 
   // Undo/Redo 핸들러들
 
+  // 테스트 모드일 때 TestNodes 컴포넌트 렌더링
+  if (isTestMode) {
+    return (
+      <div className="h-screen flex flex-col bg-gray-50">
+        <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+          <h1 className="text-lg font-semibold text-gray-900">🧪 useNodes Hook 테스트</h1>
+          <button
+            onClick={() => setIsTestMode(false)}
+            className="px-4 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700">
+            일반 모드로 돌아가기
+          </button>
+        </div>
+        <div className="flex-1 overflow-auto">
+          <TestNodes />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
       {/* Header */}
@@ -253,6 +276,15 @@ function App() {
         {/* Toolbar */}
         <aside className="w-64 bg-white border-r border-gray-200 p-4">
           <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-medium text-gray-900 mb-2">개발자 도구</h3>
+              <button
+                onClick={() => setIsTestMode(true)}
+                className="w-full px-3 py-2 text-sm bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-md hover:bg-yellow-100 transition-colors">
+                🧪 useNodes 테스트
+              </button>
+            </div>
+            
             <div>
               <h3 className="text-sm font-medium text-gray-900 mb-2">노드 추가</h3>
               <div className="space-y-2">

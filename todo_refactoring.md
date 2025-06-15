@@ -131,34 +131,53 @@ src/
 
 #### 2단계: 3단계 분리 전략 적용 (수정됨)
 **목표**: Store + Service + Hook 3단계 아키텍처로 책임 분리
+
+**방법론**: **B. 하이브리드 접근법** (검증 완료 ✅)
+- **전략**: Store 생성 → Hook 생성 → 테스트 → 다음 Store로 진행
+- **장점**: 각 단계별 검증 가능, 점진적 통합, 안정성 확보
+- **검증 결과**: useNodes Hook 완전 테스트 통과 (2025-06-15)
+  - ✅ 노드 CRUD 기능
+  - ✅ 선택 관리 (단일/다중)
+  - ✅ 실시간 양방향 동기화
+  - ✅ 무한 루프 방지 및 안정성 확보
+
 **작업**:
 
 **2-1. Store 레이어 (상태 관리만)**
-- [ ] 1. `src/stores/nodeStore.ts` 생성
-   - [ ] 노드 상태: `nodes`, `selectedNodeKey`, `selectedNodeKeys`
-   - [ ] 기본 CRUD: `addNode`, `updateNode`, `deleteNode`, `selectNode`
-   - [ ] 예상 크기: ~150줄
+- [x] 1. `src/store/nodeStore.ts` 생성 ✅
+   - [x] 노드 상태: `nodes`, `selectedNodeKey`, `selectedNodeKeys`
+   - [x] 기본 CRUD: `addNode`, `updateNode`, `deleteNode`, `getNode`
+   - [x] 선택 관리: `setSelectedNode`, `toggleNodeSelection`, `clearSelection`, `selectMultipleNodes`
+   - [x] 드래그 상태: `lastDraggedNodeKey`, `lastDragActionTime`
+   - [x] 유틸리티: `hasNode`, `getNodeCount`, `getAllNodeKeys`, `getSelectedNodes`
+   - [x] 실제 크기: 184줄 (예상 150줄 대비 123%)
 
-- [ ] 2. `src/stores/historyStore.ts` 생성
-   - [ ] 히스토리 상태: `history`, `historyIndex`, `isUndoRedoInProgress`
-   - [ ] 기본 액션: `pushToHistory`, `undo`, `redo`, `canUndo`, `canRedo`
-   - [ ] 예상 크기: ~120줄
+- [x] 2. `src/store/historyStore.ts` 생성 ✅
+   - [x] 히스토리 상태: `history`, `historyIndex`, `isUndoRedoInProgress`
+   - [x] 복합 액션 관리: `currentCompoundActionId`, `compoundActionStartState`
+   - [x] 기본 액션: `pushToHistory`, `undo`, `redo`, `canUndo`, `canRedo`
+   - [x] 복합 액션: `startCompoundAction`, `endCompoundAction`, `cancelCompoundAction`
+   - [x] 유틸리티: `getCurrentState`, `getHistorySize`, `trimHistory`, `clearHistory`
+   - [x] 실제 크기: 220줄 (예상 120줄 대비 183%)
 
-- [ ] 3. `src/stores/layoutStore.ts` 생성
+- [ ] 3. `src/store/layoutStore.ts` 생성 (다음 단계)
    - [ ] 레이아웃 상태: `lastNodePosition`, `layoutInProgress`
    - [ ] 기본 액션: `updateNodePosition`, `setLayoutInProgress`
    - [ ] 예상 크기: ~100줄
+   - [ ] **진행 방법**: B 방법 적용 (Store → Hook → 테스트)
 
-- [ ] 4. `src/stores/uiStore.ts` 생성 (확장됨)
+- [ ] 4. `src/store/uiStore.ts` 생성 (확장됨)
    - [ ] UI 상태: `toastMessage`, `isLoading`, `modals`, `errors`
    - [ ] UI 액션: `showToast`, `setLoading`, `openModal`, `showError`
    - [ ] AsyncOperationManager 기능 통합
    - [ ] 예상 크기: ~100줄
+   - [ ] **진행 방법**: B 방법 적용 (Store → Hook → 테스트)
 
-- [ ] 5. `src/stores/projectStore.ts` 생성
+- [ ] 5. `src/store/projectStore.ts` 생성
    - [ ] 프로젝트 상태: `templateData`, `currentTemplate`, `currentScene`
    - [ ] 기본 액션: `setTemplate`, `setScene`, `updateTemplateData`
    - [ ] 예상 크기: ~130줄
+   - [ ] **진행 방법**: B 방법 적용 (Store → Hook → 테스트)
 
 **2-2. Service 레이어 (비즈니스 로직)**
 - [ ] 1. `src/services/nodeService.ts` 생성
@@ -187,10 +206,18 @@ src/
    - [ ] 예상 크기: ~250줄
 
 **2-3. Hook 레이어 (컴포넌트 인터페이스)**
-- [ ] 1. `src/hooks/useNodes.ts`: Store + Service 조합 인터페이스 (~100줄)
+- [x] 1. `src/hooks/useNodes.ts`: Store + Service 조합 인터페이스 ✅
+   - [x] nodeStore와 editorStore 통합 인터페이스 제공
+   - [x] 양방향 동기화 기능 (syncFromEditor, syncToEditor)
+   - [x] 통합 CRUD 및 선택 관리 API
+   - [x] 실제 크기: 174줄 (예상 100줄 대비 174%)
+   - [x] **검증 완료**: TestNodes 컴포넌트로 모든 기능 테스트 통과
 - [ ] 2. `src/hooks/useHistory.ts`: 히스토리 관련 통합 인터페이스 (~80줄)
+   - [ ] **진행 방법**: B 방법 적용 (historyStore 완성 후 Hook 생성 → 테스트)
 - [ ] 3. `src/hooks/useLayout.ts`: 레이아웃 관련 통합 인터페이스 (~100줄)
+   - [ ] **진행 방법**: B 방법 적용 (layoutStore 완성 후 Hook 생성 → 테스트)
 - [ ] 4. `src/hooks/useProject.ts`: 프로젝트 관련 통합 인터페이스 (~80줄)
+   - [ ] **진행 방법**: B 방법 적용 (projectStore 완성 후 Hook 생성 → 테스트)
 
 #### 3단계: 의존성 해결 및 점진적 마이그레이션
 **목표**: 순환 의존성 제거 및 안전한 전환
