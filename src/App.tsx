@@ -4,6 +4,9 @@ import React, { useState, useRef } from "react";
 import Canvas from "./components/Canvas";
 import PropertyPanel from "./components/PropertyPanel";
 import { TestNodes } from "./components/TestNodes";
+import { TestLayout } from "./components/TestLayout";
+import { TestUI } from "./components/TestUI";
+import { TestProject } from "./components/TestProject";
 import { useEditorStore } from "./store/editorStore";
 import { globalAsyncOperationManager, type SystemStatus } from "./store/asyncOperationManager";
 import { downloadFile, uploadFile } from "./utils/importExport";
@@ -17,7 +20,7 @@ interface ToastState {
 
 function App() {
   // 테스트 모드 상태
-  const [isTestMode, setIsTestMode] = useState(false);
+  const [isTestMode, setIsTestMode] = useState<false | 'nodes' | 'layout' | 'ui' | 'project'>(false);
   
   const {
     createTextNode,
@@ -237,12 +240,21 @@ function App() {
 
   // Undo/Redo 핸들러들
 
-  // 테스트 모드일 때 TestNodes 컴포넌트 렌더링
+  // 테스트 모드일 때 테스트 컴포넌트 렌더링
   if (isTestMode) {
+    const testTitle = isTestMode === 'nodes' ? '🧪 useNodes Hook 테스트' : 
+                     isTestMode === 'layout' ? '🎯 useLayout Hook 테스트' : 
+                     isTestMode === 'ui' ? '🎨 useUI Hook 테스트' :
+                     '📁 useProject Hook 테스트';
+    const TestComponent = isTestMode === 'nodes' ? TestNodes : 
+                         isTestMode === 'layout' ? TestLayout : 
+                         isTestMode === 'ui' ? TestUI :
+                         TestProject;
+    
     return (
       <div className="h-screen flex flex-col bg-gray-50">
         <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-900">🧪 useNodes Hook 테스트</h1>
+          <h1 className="text-lg font-semibold text-gray-900">{testTitle}</h1>
           <button
             onClick={() => setIsTestMode(false)}
             className="px-4 py-2 text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700">
@@ -250,7 +262,7 @@ function App() {
           </button>
         </div>
         <div className="flex-1 overflow-auto">
-          <TestNodes />
+          <TestComponent />
         </div>
       </div>
     );
@@ -278,11 +290,28 @@ function App() {
           <div className="space-y-4">
             <div>
               <h3 className="text-sm font-medium text-gray-900 mb-2">개발자 도구</h3>
-              <button
-                onClick={() => setIsTestMode(true)}
-                className="w-full px-3 py-2 text-sm bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-md hover:bg-yellow-100 transition-colors">
-                🧪 useNodes 테스트
-              </button>
+              <div className="space-y-2">
+                <button
+                  onClick={() => setIsTestMode('nodes')}
+                  className="w-full px-3 py-2 text-sm bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-md hover:bg-yellow-100 transition-colors">
+                  🧪 useNodes 테스트
+                </button>
+                <button
+                  onClick={() => setIsTestMode('layout')}
+                  className="w-full px-3 py-2 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors">
+                  🎯 useLayout 테스트
+                </button>
+                <button
+                  onClick={() => setIsTestMode('ui')}
+                  className="w-full px-3 py-2 text-sm bg-pink-50 text-pink-700 border border-pink-200 rounded-md hover:bg-pink-100 transition-colors">
+                  🎨 useUI 테스트
+                </button>
+                <button
+                  onClick={() => setIsTestMode('project')}
+                  className="w-full px-3 py-2 text-sm bg-purple-50 text-purple-700 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors">
+                  📁 useProject 테스트
+                </button>
+              </div>
             </div>
             
             <div>
