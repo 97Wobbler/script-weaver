@@ -2,7 +2,9 @@ import React, { useState } from "react";
 import { Handle, Position } from "reactflow";
 import type { NodeProps } from "reactflow";
 import type { ChoiceDialogue } from "../../types/dialogue";
-import { useEditorStore } from "../../store/editorStore";
+import { useNodeCreation } from "../../hooks/useNodeCreation";
+import { useNodeConnections } from "../../hooks/useNodeConnections";
+import { useToast } from "../../hooks/useToast";
 
 interface ChoiceNodeData {
   dialogue: ChoiceDialogue;
@@ -11,35 +13,36 @@ interface ChoiceNodeData {
 
 export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>) {
   const { dialogue, nodeKey } = data;
-  const choiceEntries = Object.entries(dialogue.choices);
-  const editorStore = useEditorStore();
+  const { canCreateNewNode } = useNodeCreation();
+  const { disconnectNodes, createAndConnectChoiceNode } = useNodeConnections();
+  const { showToast } = useToast();
   const [hoveredChoice, setHoveredChoice] = useState<string | null>(null);
 
-  // 선택지 연결 제거 핸들러
-  const handleDisconnectChoice = (choiceKey: string) => (e: React.MouseEvent) => {
+  // 연결 제거 핸들러
+  const handleDisconnect = (choiceKey: string) => (e: React.MouseEvent) => {
     e.stopPropagation();
-    editorStore.disconnectNodes(nodeKey, choiceKey);
+    disconnectNodes(nodeKey, choiceKey);
   };
 
-  // 빈 선택지 핸들 클릭 시 텍스트 노드 생성 및 연결
+  // 빈 핸들 클릭 시 텍스트 노드 생성 및 연결
   const handleCreateTextNode = (choiceKey: string) => (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    const choice = dialogue.choices[choiceKey];
+    const choice = dialogue.choices?.[choiceKey];
     if (choice?.nextNodeKey) {
       return; // 이미 연결되어 있으면 리턴
     }
 
-    if (!editorStore.canCreateNewNode()) {
-      editorStore.showToast?.(`노드 개수가 최대 100개 제한에 도달했습니다.`, "warning");
+    if (!canCreateNewNode()) {
+      showToast(`노드 개수가 최대 100개 제한에 도달했습니다.`, "warning");
       return;
     }
 
     try {
-      editorStore.createAndConnectChoiceNode(nodeKey, choiceKey, "text");
+      createAndConnectChoiceNode(nodeKey, choiceKey, "text");
     } catch (error) {
       console.error("노드 생성 중 오류:", error);
-      editorStore.showToast?.("노드 생성 중 오류가 발생했습니다.", "warning");
+      showToast("노드 생성 중 오류가 발생했습니다.", "warning");
     }
   };
 
@@ -73,9 +76,9 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
 
         {/* Choices - 실제 텍스트 표시 */}
         <div>
-          <span className="text-xs text-gray-500 uppercase tracking-wide">선택지 ({choiceEntries.length}개)</span>
+          <span className="text-xs text-gray-500 uppercase tracking-wide">선택지 ({Object.entries(dialogue.choices).length}개)</span>
           <div className="space-y-2 mt-1">
-            {choiceEntries.map(([choiceKey, choice]) => (
+            {Object.entries(dialogue.choices).map(([choiceKey, choice]) => (
               <div
                 key={choiceKey}
                 className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded text-xs relative"
@@ -98,7 +101,7 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
                     top: "50%",
                     transform: "translateY(-50%)",
                   }}
-                  onClick={choice.nextNodeKey ? handleDisconnectChoice(choiceKey) : handleCreateTextNode(choiceKey)}
+                  onClick={choice.nextNodeKey ? handleDisconnect(choiceKey) : handleCreateTextNode(choiceKey)}
                 />
               </div>
             ))}

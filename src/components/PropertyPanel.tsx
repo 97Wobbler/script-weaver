@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-// import { useEditorStore } from "../store/editorStore";
 import { useNodes } from "../hooks/useNodes";
 import { useProject } from "../hooks/useProject";
-import { useEditorStore } from "../store/editorStore";
+import { useHistory } from "../hooks/useHistory";
+import { useNodeEditor } from "../hooks/useNodeEditor";
 import { useLocalizationStore } from "../store/localizationStore";
 import { DialogueSpeed } from "../types/dialogue";
 
@@ -43,16 +43,19 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     currentScene,
   } = useProject();
 
-  // 아직 Hook으로 구현되지 않은 기능들은 editorStore에서 가져옴
-  const editorStore = useEditorStore();
-  const updateNodeText = editorStore.updateNodeText;
-  const updateChoiceText = editorStore.updateChoiceText;
-  const addChoice = editorStore.addChoice;
-  const removeChoice = editorStore.removeChoice;
-  const updateDialogue = editorStore.updateDialogue;
-  const updateNodeKeyReference = editorStore.updateNodeKeyReference;
-  const updateChoiceKeyReference = editorStore.updateChoiceKeyReference;
-  const pushToHistoryWithTextEdit = editorStore.pushToHistoryWithTextEdit;
+  const {
+    pushToHistoryWithTextEdit,
+  } = useHistory();
+
+  const {
+    updateNodeText,
+    updateChoiceText,
+    addChoice,
+    removeChoice,
+    updateDialogue,
+    updateNodeKeyReference,
+    updateChoiceKeyReference,
+  } = useNodeEditor();
 
   const { getText, findNodesUsingKey, getKeyUsageCount, updateKeyText } = useLocalizationStore();
 

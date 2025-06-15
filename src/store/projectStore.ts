@@ -583,37 +583,5 @@ export const useProjectStore = create<ProjectStore>()(
   }))
 );
 
-// 로컬스토리지 연동 - 더 간단한 방법으로 변경
-useProjectStore.subscribe((state) => {
-  try {
-    const dataToSave = {
-      metadata: state.metadata,
-      templateData: state.templateData,
-      currentTemplate: state.currentTemplate,
-      currentScene: state.currentScene,
-    };
-    localStorage.setItem('script-weaver-project', JSON.stringify(dataToSave));
-    console.log('localStorage에 저장됨:', dataToSave.metadata.name, dataToSave.metadata.tags);
-  } catch (error) {
-    console.warn('Failed to save project to localStorage:', error);
-  }
-});
-
-// 초기 로드
-const loadFromLocalStorage = () => {
-  try {
-    const saved = localStorage.getItem('script-weaver-project');
-    if (saved) {
-      const projectData = JSON.parse(saved);
-      const result = useProjectStore.getState().loadProject(projectData);
-      if (!result.success) {
-        console.warn('Failed to load project from localStorage:', result.error);
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to load project from localStorage:', error);
-  }
-};
-
-// 초기 로드 실행
-loadFromLocalStorage(); 
+// localStorage 연동은 persist 미들웨어에서 자동으로 처리됨
+// 추가 subscribe나 초기 로드는 불필요 (무한 루프 방지) 

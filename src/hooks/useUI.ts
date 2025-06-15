@@ -1,6 +1,5 @@
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { useUIStore } from "../store/uiStore";
-import { useEditorStore } from "../store/editorStore";
 import type { ToastType, SystemStatus, ModalState, LoadingState, ErrorState } from "../store/uiStore";
 
 // useUI Hook 반환 타입
@@ -59,30 +58,20 @@ export interface UseUIReturn {
 
 /**
  * UI 관련 기능을 통합 제공하는 Hook
- * 기존 editorStore와 새로운 uiStore를 조합하여 사용
+ * uiStore를 기반으로 UI 상태 관리
  */
 export const useUI = (): UseUIReturn => {
-  // Store 훅들
+  // Store 훅
   const uiStore = useUIStore();
-  const editorStore = useEditorStore();
   
-  // editorStore → uiStore 동기화
+  // 동기화 함수들 (더 이상 editorStore가 없으므로 빈 함수)
   const syncFromEditor = useCallback(() => {
-    // editorStore의 showToast 함수를 uiStore의 showToast로 연결
-    // 이미 editorStore에서 showToast를 사용하고 있으므로 연결만 하면 됨
+    // 더 이상 동기화할 editorStore가 없음
   }, []);
   
-  // uiStore → editorStore 동기화
   const syncToEditor = useCallback(() => {
-    // uiStore의 showToast 함수를 editorStore에 연결
-    editorStore.showToast = uiStore.showToast;
-  }, [uiStore.showToast, editorStore]);
-  
-  // 컴포넌트 마운트 시 초기 동기화
-  useEffect(() => {
-    // editorStore의 showToast 함수를 uiStore로 연결
-    editorStore.showToast = uiStore.showToast;
-  }, [uiStore.showToast, editorStore]);
+    // 더 이상 동기화할 editorStore가 없음
+  }, []);
   
   // 성공 메시지 표시 (토스트 + 시스템 상태) - uiStore의 showSuccess 사용
   const showSuccess = useCallback((message: string) => {

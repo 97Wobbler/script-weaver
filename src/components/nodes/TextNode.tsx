@@ -2,7 +2,9 @@ import React, { useState } from "react";
 import { Handle, Position } from "reactflow";
 import type { NodeProps } from "reactflow";
 import type { TextDialogue } from "../../types/dialogue";
-import { useEditorStore } from "../../store/editorStore";
+import { useNodeCreation } from "../../hooks/useNodeCreation";
+import { useNodeConnections } from "../../hooks/useNodeConnections";
+import { useToast } from "../../hooks/useToast";
 
 interface TextNodeData {
   dialogue: TextDialogue;
@@ -11,13 +13,15 @@ interface TextNodeData {
 
 export default function TextNode({ data, selected }: NodeProps<TextNodeData>) {
   const { dialogue, nodeKey } = data;
-  const editorStore = useEditorStore();
+  const { canCreateNewNode } = useNodeCreation();
+  const { disconnectNodes, createAndConnectTextNode } = useNodeConnections();
+  const { showToast } = useToast();
   const [isHovering, setIsHovering] = useState(false);
 
   // 연결 제거 핸들러
   const handleDisconnect = (e: React.MouseEvent) => {
     e.stopPropagation();
-    editorStore.disconnectNodes(nodeKey);
+    disconnectNodes(nodeKey);
   };
 
   // 빈 핸들 클릭 시 텍스트 노드 생성 및 연결
@@ -28,16 +32,16 @@ export default function TextNode({ data, selected }: NodeProps<TextNodeData>) {
       return; // 이미 연결되어 있으면 리턴
     }
 
-    if (!editorStore.canCreateNewNode()) {
-      editorStore.showToast?.(`노드 개수가 최대 100개 제한에 도달했습니다.`, "warning");
+    if (!canCreateNewNode()) {
+      showToast(`노드 개수가 최대 100개 제한에 도달했습니다.`, "warning");
       return;
     }
 
     try {
-      editorStore.createAndConnectTextNode(nodeKey, "text");
+      createAndConnectTextNode(nodeKey, "text");
     } catch (error) {
       console.error("노드 생성 중 오류:", error);
-      editorStore.showToast?.("노드 생성 중 오류가 발생했습니다.", "warning");
+      showToast("노드 생성 중 오류가 발생했습니다.", "warning");
     }
   };
 

@@ -161,22 +161,17 @@ export const TestLayout: React.FC = () => {
         
         <div style={{ marginBottom: "10px" }}>
           <button onClick={() => {
-            layout.arrangeAllNodesAsTree();
-            alert("전체 트리 정렬이 완료되었습니다.\n모든 노드가 계층적으로 재배치되었습니다.");
+            alert("전체 트리 정렬 기능은 현재 리팩터링 중입니다.");
           }} style={{ marginRight: "10px" }}>
             전체 트리 정렬
           </button>
           <button onClick={() => {
-            if (nodes.selectedNodeKey) {
-              layout.arrangeChildNodesAsTree(nodes.selectedNodeKey);
-              alert(`선택된 노드(${nodes.selectedNodeKey})의 자식 노드들이 트리 형태로 정렬되었습니다.`);
-            }
+            alert("선택된 노드 자식 트리 정렬 기능은 현재 리팩터링 중입니다.");
           }} disabled={!nodes.selectedNodeKey} style={{ marginRight: "10px" }}>
             선택된 노드 자식 트리 정렬
           </button>
           <button onClick={() => {
-            layout.arrangeNodesWithDagre();
-            alert("Dagre 알고리즘으로 노드 정렬이 완료되었습니다.\n그래프 구조에 최적화된 배치입니다.");
+            alert("Dagre 정렬 기능은 현재 리팩터링 중입니다.");
           }} style={{ marginRight: "10px" }}>
             Dagre 정렬
           </button>

@@ -14,6 +14,12 @@ export interface NodeState {
   // 드래그 관련 상태
   lastDraggedNodeKey: string | null;
   lastDragActionTime: number;
+  
+  // 복사/붙여넣기를 위한 클립보드
+  clipboard: EditorNodeWrapper[];
+  
+  // 노드 위치 관리
+  lastNodePosition: { x: number; y: number };
 }
 
 // 노드 Store 액션 인터페이스
@@ -43,6 +49,9 @@ export interface NodeActions {
   hasNode: (nodeKey: string) => boolean;
   getNodeCount: () => number;
   getAllNodeKeys: () => string[];
+  
+  // 위치 관리
+  setLastNodePosition: (position: { x: number; y: number }) => void;
 }
 
 export interface NodeStore extends NodeState, NodeActions {}
@@ -54,6 +63,8 @@ const initialState: NodeState = {
   selectedNodeKeys: new Set<string>(),
   lastDraggedNodeKey: null,
   lastDragActionTime: 0,
+  clipboard: [],
+  lastNodePosition: { x: 100, y: 100 },
 };
 
 // 노드 Store 생성
@@ -64,15 +75,15 @@ export const useNodeStore = create<NodeStore>()(
       
       // 노드 데이터 관리
       setNodes: (nodes: Scene) => {
-        set(() => ({ nodes }));
+        set({ nodes });
       },
       
       clearNodes: () => {
-        set(() => ({ 
+        set({ 
           nodes: {},
           selectedNodeKey: undefined,
           selectedNodeKeys: new Set<string>(),
-        }));
+        });
       },
       
       // 기본 CRUD 액션
@@ -127,7 +138,7 @@ export const useNodeStore = create<NodeStore>()(
       
       // 선택 관리 액션
       setSelectedNode: (nodeKey?: string) => {
-        set(() => ({ selectedNodeKey: nodeKey }));
+        set({ selectedNodeKey: nodeKey });
       },
       
       toggleNodeSelection: (nodeKey: string) => {
@@ -150,16 +161,16 @@ export const useNodeStore = create<NodeStore>()(
       },
       
       clearSelection: () => {
-        set(() => ({ 
+        set({ 
           selectedNodeKey: undefined,
           selectedNodeKeys: new Set<string>() 
-        }));
+        });
       },
       
       selectMultipleNodes: (nodeKeys: string[]) => {
-        set(() => ({ 
+        set({ 
           selectedNodeKeys: new Set(nodeKeys)
-        }));
+        });
       },
       
       getSelectedNodes: () => {
@@ -170,11 +181,11 @@ export const useNodeStore = create<NodeStore>()(
       
       // 드래그 상태 관리
       setLastDraggedNode: (nodeKey: string | null) => {
-        set(() => ({ lastDraggedNodeKey: nodeKey }));
+        set({ lastDraggedNodeKey: nodeKey });
       },
       
       updateDragActionTime: () => {
-        set(() => ({ lastDragActionTime: Date.now() }));
+        set({ lastDragActionTime: Date.now() });
       },
       
       // 유틸리티
@@ -189,6 +200,11 @@ export const useNodeStore = create<NodeStore>()(
       getAllNodeKeys: () => {
         return Object.keys(get().nodes);
       },
+      
+      // 위치 관리
+      setLastNodePosition: (position: { x: number; y: number }) => {
+        set({ lastNodePosition: position });
+      },
     }),
     {
       name: "script-weaver-node-store",
@@ -196,15 +212,18 @@ export const useNodeStore = create<NodeStore>()(
       partialize: (state) => ({
         // localStorage에는 선택 상태는 저장하지 않음 (세션별로 초기화)
         nodes: state.nodes,
+        lastNodePosition: state.lastNodePosition,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          // Set 타입이 제대로 복원되지 않는 경우 안전하게 변환
-          if (!(state.selectedNodeKeys instanceof Set)) {
-            state.selectedNodeKeys = new Set();
-          }
+          // Set 객체들을 다시 초기화
+          state.selectedNodeKeys = new Set<string>();
+          state.clipboard = [];
         }
       },
     }
   )
-); 
+);
+
+// 편의를 위한 export
+export const nodeStore = useNodeStore.getState(); 

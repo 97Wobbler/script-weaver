@@ -17,10 +17,9 @@ export const TestNodes: React.FC = () => {
     setSelectedNode,
     toggleNodeSelection,
     clearSelection,
+    hasNode,
     getNodeCount,
     getAllNodeKeys,
-    syncFromEditor,
-    syncToEditor
   } = useNodes();
 
   const [testText, setTestText] = useState("안녕하세요!");
@@ -147,12 +146,6 @@ export const TestNodes: React.FC = () => {
         <div style={{ marginBottom: "10px" }}>
           <button onClick={clearSelection} style={{ marginRight: "10px" }}>
             선택 해제
-          </button>
-          <button onClick={syncFromEditor} style={{ marginRight: "10px" }}>
-            에디터에서 동기화
-          </button>
-          <button onClick={syncToEditor} style={{ marginRight: "10px" }}>
-            에디터로 동기화
           </button>
         </div>
       </div>

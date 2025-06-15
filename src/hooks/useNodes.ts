@@ -1,22 +1,22 @@
-import { useCallback, useEffect } from "react";
-import { useNodeStore } from "../store/nodeStore";
-import { useEditorStore } from "../store/editorStore";
-import type { EditorNodeWrapper, Scene } from "../types/dialogue";
+import { useCallback, useEffect } from 'react';
+import { useNodeStore } from '../store/nodeStore';
+import { useProjectStore } from '../store/projectStore';
+import type { EditorNodeWrapper, Scene } from '../types/dialogue';
 
 // useNodes Hook 반환 타입
 export interface UseNodesReturn {
-  // 상태 (새 nodeStore 기반)
+  // 상태
   nodes: Scene;
   selectedNodeKey?: string;
   selectedNodeKeys: Set<string>;
   
-  // 기본 노드 관리 (새 nodeStore + editorStore 조합)
+  // 노드 관리
   addNode: (node: EditorNodeWrapper) => void;
   updateNode: (nodeKey: string, updates: Partial<EditorNodeWrapper>) => void;
   deleteNode: (nodeKey: string) => void;
   getNode: (nodeKey: string) => EditorNodeWrapper | undefined;
   
-  // 선택 관리 (새 nodeStore 기반)
+  // 선택 관리
   setSelectedNode: (nodeKey?: string) => void;
   toggleNodeSelection: (nodeKey: string) => void;
   clearSelection: () => void;
@@ -28,9 +28,8 @@ export interface UseNodesReturn {
   getNodeCount: () => number;
   getAllNodeKeys: () => string[];
   
-  // 동기화 함수 (테스트용)
-  syncFromEditor: () => void;
-  syncToEditor: () => void;
+  // 현재 씬의 노드들 가져오기
+  getCurrentScene: () => Scene;
 }
 
 /**
@@ -38,121 +37,86 @@ export interface UseNodesReturn {
  * 기존 editorStore와 새로운 nodeStore를 조합하여 사용
  */
 export const useNodes = (): UseNodesReturn => {
-  // Store 훅들
   const nodeStore = useNodeStore();
-  const editorStore = useEditorStore();
+  const projectStore = useProjectStore();
   
-  // 현재 활성 씬 가져오기
-  const getCurrentScene = useCallback(() => {
-    return editorStore.templateData[editorStore.currentTemplate]?.[editorStore.currentScene] || {};
-  }, [editorStore.templateData, editorStore.currentTemplate, editorStore.currentScene]);
+  // 현재 씬의 노드들 가져오기
+  const getCurrentScene = useCallback((): Scene => {
+    const templateData = projectStore.templateData;
+    const currentTemplate = projectStore.currentTemplate;
+    const currentScene = projectStore.currentScene;
+    
+    return templateData[currentTemplate]?.[currentScene] || {};
+  }, [projectStore.templateData, projectStore.currentTemplate, projectStore.currentScene]);
   
-  // editorStore → nodeStore 동기화
-  const syncFromEditor = useCallback(() => {
-    const currentScene = getCurrentScene();
-    nodeStore.setNodes(currentScene);
-    
-    // 선택 상태도 동기화
-    if (editorStore.selectedNodeKey) {
-      nodeStore.setSelectedNode(editorStore.selectedNodeKey);
-    }
-    
-    nodeStore.selectMultipleNodes(Array.from(editorStore.selectedNodeKeys));
-  }, [getCurrentScene, nodeStore, editorStore.selectedNodeKey, editorStore.selectedNodeKeys]);
-  
-  // nodeStore → editorStore 동기화
-  const syncToEditor = useCallback(() => {
-    // templateData 업데이트
-    editorStore.setCurrentTemplate(editorStore.currentTemplate);
-    editorStore.setCurrentScene(editorStore.currentScene);
-    
-    // 각 노드를 editorStore에 업데이트
-    Object.values(nodeStore.nodes).forEach(node => {
-      editorStore.updateNode(node.nodeKey, node);
-    });
-    
-    // 선택 상태 동기화
-    if (nodeStore.selectedNodeKey) {
-      editorStore.setSelectedNode(nodeStore.selectedNodeKey);
-    }
-    
-    nodeStore.selectedNodeKeys.forEach(nodeKey => {
-      editorStore.toggleNodeSelection(nodeKey);
-    });
-  }, [nodeStore, editorStore]);
-  
-  // 컴포넌트 마운트 시 초기 동기화
+  // 현재 씬이 변경될 때만 nodeStore 동기화 (무한 루프 방지)
   useEffect(() => {
-    const currentScene = editorStore.templateData[editorStore.currentTemplate]?.[editorStore.currentScene] || {};
-    nodeStore.setNodes(currentScene);
-    
-    // 선택 상태도 동기화
-    if (editorStore.selectedNodeKey) {
-      nodeStore.setSelectedNode(editorStore.selectedNodeKey);
+    const currentScene = getCurrentScene();
+    // 현재 씬이 변경된 경우에만 동기화 (데이터가 다를 때만)
+    if (JSON.stringify(nodeStore.nodes) !== JSON.stringify(currentScene)) {
+      nodeStore.setNodes(currentScene);
+      
+      // 선택 상태 동기화 (필요한 경우)
+      if (nodeStore.selectedNodeKey && !currentScene[nodeStore.selectedNodeKey]) {
+        nodeStore.setSelectedNode(undefined);
+      }
     }
-    
-    nodeStore.selectMultipleNodes(Array.from(editorStore.selectedNodeKeys));
-  }, [editorStore.currentTemplate, editorStore.currentScene]); // template과 scene 변경 시만 실행
+  }, [projectStore.currentTemplate, projectStore.currentScene]); // getCurrentScene 의존성 제거
   
-  // 노드 추가 (양쪽 Store에 모두 반영)
+  // 노드 변경 시 projectStore에 반영 (디바운스 필요)
+  useEffect(() => {
+    const currentTemplate = projectStore.currentTemplate;
+    const currentScene = projectStore.currentScene;
+    
+    // 타이머를 사용해 디바운스 처리 (무한 루프 방지)
+    const timer = setTimeout(() => {
+      const currentSceneData = projectStore.templateData[currentTemplate]?.[currentScene] || {};
+      // 데이터가 실제로 다를 때만 업데이트
+      if (JSON.stringify(currentSceneData) !== JSON.stringify(nodeStore.nodes)) {
+        projectStore.updateTemplateData({
+          ...projectStore.templateData,
+          [currentTemplate]: {
+            ...projectStore.templateData[currentTemplate],
+            [currentScene]: nodeStore.nodes,
+          },
+        });
+      }
+    }, 100); // 100ms 디바운스
+    
+    return () => clearTimeout(timer);
+  }, [nodeStore.nodes]);
+  
+  // 노드 관련 액션들
   const addNode = useCallback((node: EditorNodeWrapper) => {
-    // nodeStore에 추가
     nodeStore.addNode(node);
-    
-    // editorStore에도 추가
-    editorStore.addNode(node);
-    
-    // 히스토리에 기록
-    editorStore.pushToHistory(`노드 추가: ${node.nodeKey}`);
-  }, [nodeStore, editorStore]);
+  }, [nodeStore]);
   
-  // 노드 업데이트 (양쪽 Store에 모두 반영)
   const updateNode = useCallback((nodeKey: string, updates: Partial<EditorNodeWrapper>) => {
-    // nodeStore 업데이트
     nodeStore.updateNode(nodeKey, updates);
-    
-    // editorStore 업데이트
-    editorStore.updateNode(nodeKey, updates);
-    
-    // 히스토리에 기록
-    editorStore.pushToHistory(`노드 수정: ${nodeKey}`);
-  }, [nodeStore, editorStore]);
+  }, [nodeStore]);
   
-  // 노드 삭제 (양쪽 Store에 모두 반영)
   const deleteNode = useCallback((nodeKey: string) => {
-    // nodeStore에서 삭제
     nodeStore.deleteNode(nodeKey);
-    
-    // editorStore에서 삭제
-    editorStore.deleteNode(nodeKey);
-    
-    // 히스토리에 기록
-    editorStore.pushToHistory(`노드 삭제: ${nodeKey}`);
-  }, [nodeStore, editorStore]);
+  }, [nodeStore]);
   
-  // 선택 관리 (nodeStore 기반)
   const setSelectedNode = useCallback((nodeKey?: string) => {
     nodeStore.setSelectedNode(nodeKey);
-    editorStore.setSelectedNode(nodeKey);
-  }, [nodeStore, editorStore]);
+  }, [nodeStore]);
   
   const toggleNodeSelection = useCallback((nodeKey: string) => {
     nodeStore.toggleNodeSelection(nodeKey);
-    editorStore.toggleNodeSelection(nodeKey);
-  }, [nodeStore, editorStore]);
+  }, [nodeStore]);
   
   const clearSelection = useCallback(() => {
     nodeStore.clearSelection();
-    editorStore.clearSelection();
-  }, [nodeStore, editorStore]);
+  }, [nodeStore]);
   
   const selectMultipleNodes = useCallback((nodeKeys: string[]) => {
     nodeStore.selectMultipleNodes(nodeKeys);
-    editorStore.selectMultipleNodes(nodeKeys);
-  }, [nodeStore, editorStore]);
+  }, [nodeStore]);
   
   return {
-    // 상태 (nodeStore 기반)
+    // 상태
     nodes: nodeStore.nodes,
     selectedNodeKey: nodeStore.selectedNodeKey,
     selectedNodeKeys: nodeStore.selectedNodeKeys,
@@ -174,9 +138,6 @@ export const useNodes = (): UseNodesReturn => {
     hasNode: nodeStore.hasNode,
     getNodeCount: nodeStore.getNodeCount,
     getAllNodeKeys: nodeStore.getAllNodeKeys,
-    
-    // 동기화 (테스트/디버깅용)
-    syncFromEditor,
-    syncToEditor,
+    getCurrentScene,
   };
 }; 

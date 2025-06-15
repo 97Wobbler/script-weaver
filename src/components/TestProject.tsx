@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { useProject } from '../hooks/useProject';
-import { useEditorStore } from '../store/editorStore';
 
 export const TestProject: React.FC = () => {
   const project = useProject();
-  const editorStore = useEditorStore();
   const [newTemplateName, setNewTemplateName] = useState('');
   const [newSceneName, setNewSceneName] = useState('');
   const [newProjectName, setNewProjectName] = useState('');
@@ -416,27 +414,7 @@ export const TestProject: React.FC = () => {
           )}
         </div>
 
-        {/* EditorStore 정보 */}
-        <div className="p-3 bg-green-50 rounded">
-          <h4 className="font-medium text-green-800 mb-2">EditorStore 데이터</h4>
-          <div className="text-sm">
-            <div><strong>템플릿:</strong> {editorStore.currentTemplate}</div>
-            <div><strong>씬:</strong> {editorStore.currentScene}</div>
-            <div><strong>노드 수:</strong> {editorStore.templateData[editorStore.currentTemplate]?.[editorStore.currentScene] ? Object.keys(editorStore.templateData[editorStore.currentTemplate][editorStore.currentScene]).length : 0}</div>
-          </div>
-          {editorStore.templateData[editorStore.currentTemplate]?.[editorStore.currentScene] && (
-            <div className="mt-2">
-              <strong>노드 목록:</strong>
-              <div className="max-h-24 overflow-y-auto bg-white p-2 rounded border mt-1">
-                {Object.keys(editorStore.templateData[editorStore.currentTemplate][editorStore.currentScene]).map(nodeKey => (
-                  <div key={nodeKey} className="text-xs text-gray-600">
-                    {nodeKey}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+
 
         {/* 동기화 버튼 */}
         <div className="mt-3">

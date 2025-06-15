@@ -5,7 +5,8 @@ import TextNode from "./nodes/TextNode";
 import ChoiceNode from "./nodes/ChoiceNode";
 import { useNodes } from "../hooks/useNodes";
 import { useProject } from "../hooks/useProject";
-import { useEditorStore } from "../store/editorStore";
+import { useHistory } from "../hooks/useHistory";
+import { useNodeOperations } from "../hooks/useNodeOperations";
 import type { EditorNodeWrapper } from "../types/dialogue";
 
 // React Flow nodeTypes는 컴포넌트 외부에서 정의하여 재생성 방지
@@ -88,20 +89,25 @@ export default function Canvas() {
     currentScene,
   } = useProject();
 
-  // 아직 Hook으로 구현되지 않은 기능들은 editorStore에서 가져옴
-  const editorStore = useEditorStore();
-  const moveNode = editorStore.moveNode;
-  const connectNodes = editorStore.connectNodes;
-  const deleteNode = editorStore.deleteNode;
-  const undo = editorStore.undo;
-  const redo = editorStore.redo;
-  const canUndo = editorStore.canUndo;
-  const canRedo = editorStore.canRedo;
-  const copySelectedNodes = editorStore.copySelectedNodes;
-  const pasteNodes = editorStore.pasteNodes;
-  const deleteSelectedNodes = editorStore.deleteSelectedNodes;
-  const duplicateNode = editorStore.duplicateNode;
-  const pushToHistory = editorStore.pushToHistory;
+  const {
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    pushToHistory,
+  } = useHistory();
+
+  const {
+    moveNode,
+    connectNodes,
+    deleteNode,
+    copySelectedNodes,
+    pasteNodes,
+    deleteSelectedNodes,
+    duplicateNode,
+  } = useNodeOperations();
+
+
 
   // Canvas 영역 참조
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -195,7 +201,7 @@ export default function Canvas() {
           // 노드가 선택 해제됨 - 다른 선택된 노드가 있으면 그 중 하나를 selectedNodeKey로 설정
           // toggleNodeSelection 후의 상태를 확인하기 위해 setTimeout 사용
           setTimeout(() => {
-            const currentSelectedKeys = editorStore.selectedNodeKeys;
+            const currentSelectedKeys = selectedNodeKeys;
             if (currentSelectedKeys instanceof Set && currentSelectedKeys.size > 0) {
               // 첫 번째 선택된 노드를 selectedNodeKey로 설정
               const firstSelectedKey = Array.from(currentSelectedKeys)[0];
@@ -275,7 +281,7 @@ export default function Canvas() {
       if (cmdKey && event.key === "z" && !event.shiftKey) {
         if (!isInputting) {
           event.preventDefault();
-          if (canUndo()) {
+          if (canUndo) {
             undo();
           }
         }
@@ -285,7 +291,7 @@ export default function Canvas() {
       if (cmdKey && (event.key === "y" || (event.key === "z" && event.shiftKey))) {
         if (!isInputting) {
           event.preventDefault();
-          if (canRedo()) {
+          if (canRedo) {
             redo();
           }
         }

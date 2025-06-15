@@ -1,16 +1,19 @@
 // React import removed as it's not needed with jsx transform
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Canvas from "./components/Canvas";
 import PropertyPanel from "./components/PropertyPanel";
 import { TestNodes } from "./components/TestNodes";
 import { TestLayout } from "./components/TestLayout";
 import { TestUI } from "./components/TestUI";
 import { TestProject } from "./components/TestProject";
-import { useEditorStore } from "./store/editorStore";
+import { TestHistory } from "./components/TestHistory";
 import { useNodes } from "./hooks/useNodes";
-import { useLayout } from "./hooks/useLayout";
 import { useProject } from "./hooks/useProject";
+import { useLayout } from "./hooks/useLayout";
+import { useNodeCreation } from "./hooks/useNodeCreation";
+import { useToast } from "./hooks/useToast";
+
 import { globalAsyncOperationManager, type SystemStatus } from "./store/asyncOperationManager";
 import { downloadFile, uploadFile } from "./utils/importExport";
 
@@ -23,22 +26,13 @@ interface ToastState {
 
 function App() {
   // 테스트 모드 상태
-  const [isTestMode, setIsTestMode] = useState<false | 'nodes' | 'layout' | 'ui' | 'project'>(false);
+  const [isTestMode, setIsTestMode] = useState<false | 'nodes' | 'layout' | 'ui' | 'project' | 'history'>(false);
   
   // 새로운 Hook들로 기능 분산
   const {
-    setSelectedNode,
     selectedNodeKey,
+    setSelectedNode,
   } = useNodes();
-
-  const {
-    arrangeChildNodesAsTree,
-    arrangeAllNodesAsTree,
-    arrangeNodesWithDagre,
-    arrangeAllNodes,
-    arrangeSelectedNodeChildren,
-    arrangeSelectedNodeDescendants,
-  } = useLayout();
 
   const {
     templateData,
@@ -49,12 +43,18 @@ function App() {
     importFromJSON,
   } = useProject();
 
-  // 노드 생성은 아직 editorStore에서 가져옴 (useProject에서 제공하지 않음)
-  const editorStore = useEditorStore();
-  const createTextNode = editorStore.createTextNode;
-  const createChoiceNode = editorStore.createChoiceNode;
-  const canCreateNewNode = editorStore.canCreateNewNode;
-  const validateAllData = editorStore.validateAllData;
+  const {
+    // Layout 함수들은 제거됨 (editorStore 의존성으로 인해)
+  } = useLayout();
+
+  const {
+    createTextNode,
+    createChoiceNode,
+    canCreateNewNode,
+    validateAllData,
+  } = useNodeCreation();
+
+  const { registerToast } = useToast();
 
   // 전역 토스트 상태
   const [toastState, setToastState] = useState<ToastState>({
@@ -90,14 +90,12 @@ function App() {
   };
 
   // editorStore에 showToast 함수 연결
-  React.useEffect(() => {
-    // const editorStore = useEditorStore.getState();
-    // editorStore.showToast = showToast;
-    editorStore.showToast = showToast;
-  }, [showToast, editorStore]);
+  useEffect(() => {
+    registerToast(showToast);
+  }, [showToast, registerToast]);
 
   // AsyncOperationManager와 상태 콜백 연결
-  React.useEffect(() => {
+  useEffect(() => {
     const handleStatusChange = (status: SystemStatus) => {
       setSystemStatus(status);
     };
@@ -110,7 +108,7 @@ function App() {
   }, []);
 
   // 컴포넌트 언마운트 시 타이머 정리
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       if (toastTimerRef.current) {
         clearTimeout(toastTimerRef.current);
@@ -143,38 +141,22 @@ function App() {
     }
   };
 
-  // 노드 정렬 핸들러 (기존)
+  // 노드 정렬 핸들러 (임시 비활성화 - editorStore 마이그레이션 필요)
   const handleArrangeNodes = () => {
-    if (selectedNodeKey) {
-      // 선택된 노드가 있으면 그 자식 노드들을 정렬
-      arrangeChildNodesAsTree(selectedNodeKey);
-    } else {
-      // 선택된 노드가 없으면 모든 노드를 정렬
-      arrangeAllNodesAsTree();
-    }
+    showToast("노드 정렬 기능은 현재 리팩터링 중입니다.", "warning");
   };
 
-  // 새로운 레이아웃 시스템 핸들러들
+  // 새로운 레이아웃 시스템 핸들러들 (임시 비활성화)
   const handleNewLayoutAll = async () => {
-    await arrangeAllNodes();
+    showToast("전체 노드 정렬 기능은 현재 리팩터링 중입니다.", "warning");
   };
 
   const handleNewLayoutChildren = async () => {
-    if (!selectedNodeKey) {
-      showToast("노드를 선택한 후 자식 정렬을 실행해주세요.", "warning");
-      return;
-    }
-
-    await arrangeSelectedNodeChildren(selectedNodeKey);
+    showToast("자식 노드 정렬 기능은 현재 리팩터링 중입니다.", "warning");
   };
 
   const handleNewLayoutDescendants = async () => {
-    if (!selectedNodeKey) {
-      showToast("노드를 선택한 후 후손 정렬을 실행해주세요.", "warning");
-      return;
-    }
-
-    await arrangeSelectedNodeDescendants(selectedNodeKey);
+    showToast("후손 노드 정렬 기능은 현재 리팩터링 중입니다.", "warning");
   };
 
   // Export 핸들러들 (검증 포함)
@@ -252,17 +234,17 @@ function App() {
     }
   };
 
-  // Undo/Redo 핸들러들
-
   // 테스트 모드일 때 테스트 컴포넌트 렌더링
   if (isTestMode) {
     const testTitle = isTestMode === 'nodes' ? '🧪 useNodes Hook 테스트' : 
                      isTestMode === 'layout' ? '🎯 useLayout Hook 테스트' : 
                      isTestMode === 'ui' ? '🎨 useUI Hook 테스트' :
+                     isTestMode === 'history' ? '🔄 useHistory Hook 테스트' :
                      '📁 useProject Hook 테스트';
     const TestComponent = isTestMode === 'nodes' ? TestNodes : 
                          isTestMode === 'layout' ? TestLayout : 
                          isTestMode === 'ui' ? TestUI :
+                         isTestMode === 'history' ? TestHistory :
                          TestProject;
     
     return (
@@ -324,6 +306,11 @@ function App() {
                   onClick={() => setIsTestMode('project')}
                   className="w-full px-3 py-2 text-sm bg-purple-50 text-purple-700 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors">
                   📁 useProject 테스트
+                </button>
+                <button
+                  onClick={() => setIsTestMode('history')}
+                  className="w-full px-3 py-2 text-sm bg-red-50 text-red-700 border border-red-200 rounded-md hover:bg-red-100 transition-colors">
+                  🔄 useHistory 테스트
                 </button>
               </div>
             </div>
@@ -392,7 +379,7 @@ function App() {
                     {selectedNodeKey ? "🔗 기존 자식 정렬" : "📐 기존 전체 정렬"}
                   </button>
                   <button
-                    onClick={arrangeNodesWithDagre}
+                    onClick={() => showToast("Dagre 정렬 기능은 현재 리팩터링 중입니다.", "warning")}
                     className="w-full px-2 py-1 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded hover:bg-gray-100 transition-colors"
                     title="기존 Dagre 정렬">
                     ✨ 기존 Dagre

@@ -163,20 +163,38 @@ src/
 - **기능 보존**: 기존 기능 100% 보존하면서 아키텍처 개선
 - **타입 안전성**: 모든 컴포넌트에서 타입 에러 없이 마이그레이션 완료
 
-#### 4단계: 정리 및 최적화 (최종 단계)
+#### 4단계: 정리 및 최적화 (진행중)
 **목표**: editorStore 완전 제거 및 코드베이스 최종 정리
 
-**🧹 정리 작업**:
-- [ ] **editorStore.ts 완전 제거**: 모든 마이그레이션 완료 후 삭제
-  - [ ] 안에 있는 useEditorStore 훅 옮기거나 제거
-- [ ] **useHistory.ts 완성**: 마지막 남은 Hook 구현
-  - historyStore와 editorStore 통합 인터페이스
-  - 양방향 동기화 및 복합 액션 관리
-  - TestHistory 컴포넌트로 검증
+**🧹 완료된 정리 작업**:
+- [x] **editorStore.ts 완전 제거**: God Object 완전 해체 완료
+  - [x] TestProject.tsx에서 editorStore 참조 제거
+  - [x] useProject.ts, useLayout.ts, useUI.ts에서 editorStore import 제거
+  - [x] useEditorStore 훅 참조 모두 제거
+- [x] **useHistory.ts 완성**: historyStore 인터페이스 연동 완료
+  - [x] historyStore와의 인터페이스 매칭 수정
+  - [x] 누락된 함수들 추가 (cancelCompoundAction, trimHistory 등)
+- [x] **빌드 에러 해결**: TypeScript 에러 모두 해결
+  - [x] 모든 arrange 함수 참조 제거 또는 임시 핸들러로 교체
+  - [x] 빌드 성공 확인 (npm run build 성공)
+
+**⚠️ 임시 비활성화된 기능**:
+- **노드 배치 기능**: arrange 함수들이 editorStore 의존성으로 인해 임시 비활성화
+  - App.tsx: "노드 정렬 기능은 현재 리팩터링 중입니다." 알림으로 대체
+  - TestLayout.tsx: "정렬 기능은 현재 리팩터링 중입니다." 알림으로 대체
+
+**🚨 긴급 버그 수정 (2025-06-16 01:00)**:
+- [x] **무한 루프 문제 해결**: ✅ 완료
+  - [x] projectStore.ts에서 중복 localStorage subscribe 제거
+  - [x] useNodes.ts에서 순환 의존성 해결 (디바운스 + 조건부 업데이트)
+  - [x] "Maximum update depth exceeded" 에러 해결
+
+**🔄 남은 작업 (다음 단계)**:
+- [ ] **배치 기능 복원**: arrange 함수들을 새 아키텍처에 맞게 재구현
+- [ ] **코드 품질**: ESLint, Prettier 적용 및 코드 정리
+- [ ] **성능 최적화**: 메모이제이션, 불필요한 리렌더링 방지
 - [ ] **타입 정의 정리**: 불필요한 타입 제거 및 정리
 - [ ] **Import 정리**: 사용하지 않는 import 제거
-- [ ] **성능 최적화**: 메모이제이션, 불필요한 리렌더링 방지
-- [ ] **코드 품질**: ESLint, Prettier 적용 및 코드 정리
 - [ ] **테스트**: 모든 디버깅용 테스트 컴포넌트 제거
 
 **📊 최종 목표**:
@@ -252,6 +270,7 @@ src/
 - **데이터 지속성**: localStorage 자동 동기화로 사용자 데이터 보존
 - **협업**: 도메인별 분리로 여러 개발자 동시 작업 시 충돌 최소화
 
-**현재 상태 (2025-06-15 23:51)**: 3단계 기존 컴포넌트 마이그레이션 완료 ✅
-**다음 단계**: 4단계 정리 및 최적화 (useHistory.ts 구현 + editorStore 완전 제거)
-**완료 예상**: useHistory.ts 구현 완료 시 editorStore 완전 제거 가능
+**현재 상태 (2025-06-16 00:55)**: 4단계 기본 마이그레이션 진행중
+**완료 성과**: editorStore God Object 완전 해체, TypeScript 빌드 성공
+**다음 단계**: 배치 기능 복원 및 코드 품질 향상
+**최종 완료**: 노드 정렬 기능 재구현 완료 시 전체 리팩터링 마무리

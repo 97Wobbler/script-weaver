@@ -1,65 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback } from 'react';
 import { useProjectStore } from '../store/projectStore';
-import { useEditorStore } from '../store/editorStore';
-import type { TemplateDialogues, Scene } from '../types/dialogue';
+import type { TemplateDialogues } from '../types/dialogue';
 
-// 프로젝트 관리 훅
+// 프로젝트 관리 훅 (단순화 버전)
 export const useProject = () => {
   const projectStore = useProjectStore();
-  const editorStore = useEditorStore();
-  
-  // 동기화 중인지 추적하는 플래그
-  const syncingRef = useRef(false);
-
-  // editorStore와 projectStore 동기화 (templateData만)
-  useEffect(() => {
-    const unsubscribe = useEditorStore.subscribe(
-      (state) => {
-        if (syncingRef.current) return; // 동기화 중이면 무시
-        
-        // 무한 루프 방지: projectStore의 templateData와 다를 때만 업데이트
-        if (JSON.stringify(state.templateData) !== JSON.stringify(projectStore.templateData)) {
-          syncingRef.current = true;
-          projectStore.updateTemplateData(state.templateData);
-          syncingRef.current = false;
-        }
-      }
-    );
-
-    return unsubscribe;
-  }, [projectStore]);
-
-  // currentTemplate, currentScene 동기화 (단방향: projectStore -> editorStore)
-  useEffect(() => {
-    const unsubscribeTemplate = useProjectStore.subscribe(
-      (state) => {
-        if (syncingRef.current) return; // 동기화 중이면 무시
-        
-        if (state.currentTemplate !== editorStore.currentTemplate) {
-          syncingRef.current = true;
-          editorStore.setCurrentTemplate(state.currentTemplate);
-          syncingRef.current = false;
-        }
-      }
-    );
-
-    const unsubscribeScene = useProjectStore.subscribe(
-      (state) => {
-        if (syncingRef.current) return; // 동기화 중이면 무시
-        
-        if (state.currentScene !== editorStore.currentScene) {
-          syncingRef.current = true;
-          editorStore.setCurrentScene(state.currentScene);
-          syncingRef.current = false;
-        }
-      }
-    );
-
-    return () => {
-      unsubscribeTemplate();
-      unsubscribeScene();
-    };
-  }, [editorStore]);
 
   // 프로젝트 메타데이터 관리
   const updateMetadata = useCallback((metadata: Parameters<typeof projectStore.updateMetadata>[0]) => {
@@ -141,19 +86,11 @@ export const useProject = () => {
   // 프로젝트 관리
   const newProject = useCallback((metadata?: Parameters<typeof projectStore.newProject>[0]) => {
     projectStore.newProject(metadata);
-    // editorStore도 초기화
-    // editorStore.resetEditor(); // 임시 비활성화
-  }, [projectStore, editorStore]);
+  }, [projectStore]);
 
   const loadProject = useCallback((projectData: any) => {
-    const result = projectStore.loadProject(projectData);
-    if (result.success) {
-      // editorStore도 업데이트
-      editorStore.setCurrentTemplate(projectStore.currentTemplate);
-      editorStore.setCurrentScene(projectStore.currentScene);
-    }
-    return result;
-  }, [projectStore, editorStore]);
+    return projectStore.loadProject(projectData);
+  }, [projectStore]);
 
   const saveProject = useCallback(() => {
     return projectStore.saveProject();
@@ -202,94 +139,77 @@ export const useProject = () => {
   }, [exportToCSV, projectStore.metadata.name]);
 
   const downloadProject = useCallback((filename?: string) => {
-    const projectData = saveProject();
-    const blob = new Blob([projectData], { type: 'application/json' });
+    const projectData = projectStore.saveProject();
+    const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename || `${projectStore.metadata.name || 'project'}_project.json`;
+    a.download = filename || `${projectStore.metadata.name || 'project'}.swproj`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [saveProject, projectStore.metadata.name]);
+  }, [projectStore]);
 
   // 파일 업로드 헬퍼
-  const uploadJSON = useCallback(() => {
-    return new Promise<{ success: boolean; error?: string }>((resolve) => {
+  const uploadJSON = useCallback((): Promise<{ success: boolean; error?: string }> => {
+    return new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.json';
       input.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const content = e.target?.result as string;
-            const result = importFromJSON(content);
-            resolve(result);
-          };
-          reader.onerror = () => {
-            resolve({ success: false, error: 'Failed to read file' });
-          };
-          reader.readAsText(file);
-        } else {
-          resolve({ success: false, error: 'No file selected' });
+        if (!file) {
+          resolve({ success: false, error: '파일이 선택되지 않았습니다.' });
+          return;
         }
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const jsonString = e.target?.result as string;
+            const result = importFromJSON(jsonString);
+            resolve(result);
+          } catch (error) {
+            resolve({ success: false, error: '파일 읽기 중 오류가 발생했습니다.' });
+          }
+        };
+        reader.readAsText(file);
       };
       input.click();
     });
   }, [importFromJSON]);
 
-  const uploadProject = useCallback(() => {
-    return new Promise<{ success: boolean; error?: string }>((resolve) => {
+  const uploadProject = useCallback((): Promise<{ success: boolean; error?: string }> => {
+    return new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.json';
+      input.accept = '.swproj,.json';
       input.onchange = (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const content = e.target?.result as string;
-            try {
-              const projectData = JSON.parse(content);
-              const result = loadProject(projectData);
-              resolve(result);
-            } catch (error) {
-              resolve({ success: false, error: 'Invalid project file format' });
-            }
-          };
-          reader.onerror = () => {
-            resolve({ success: false, error: 'Failed to read file' });
-          };
-          reader.readAsText(file);
-        } else {
-          resolve({ success: false, error: 'No file selected' });
+        if (!file) {
+          resolve({ success: false, error: '파일이 선택되지 않았습니다.' });
+          return;
         }
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const jsonString = e.target?.result as string;
+            const projectData = JSON.parse(jsonString);
+            const result = loadProject(projectData);
+            resolve(result);
+          } catch (error) {
+            resolve({ success: false, error: '파일 읽기 중 오류가 발생했습니다.' });
+          }
+        };
+        reader.readAsText(file);
       };
       input.click();
     });
   }, [loadProject]);
 
-  // 상태 관리
-  const markDirty = useCallback(() => {
-    projectStore.markDirty();
-  }, [projectStore]);
-
-  const markClean = useCallback(() => {
-    projectStore.markClean();
-  }, [projectStore]);
-
-  // 유틸리티
-  const getTemplateList = useCallback(() => {
-    return projectStore.getTemplateList();
-  }, [projectStore]);
-
-  const getSceneList = useCallback((templateKey: string) => {
-    return projectStore.getSceneList(templateKey);
-  }, [projectStore]);
-
+  // 유틸리티 함수들
   const hasTemplate = useCallback((templateKey: string) => {
     return projectStore.hasTemplate(templateKey);
   }, [projectStore]);
@@ -302,92 +222,71 @@ export const useProject = () => {
     return projectStore.getCurrentScene();
   }, [projectStore]);
 
-  // 검증
   const validateProject = useCallback(() => {
     return projectStore.validateProject();
   }, [projectStore]);
 
-  // 마이그레이션
   const migrateProject = useCallback(() => {
-    projectStore.migrateProject();
+    return projectStore.migrateProject();
   }, [projectStore]);
 
-  // 강제 동기화
   const forceSync = useCallback(() => {
-    syncingRef.current = true;
-    projectStore.updateTemplateData(editorStore.templateData);
-    syncingRef.current = false;
-  }, [projectStore, editorStore]);
+    // 동기화 로직 (현재는 빈 함수)
+  }, []);
+
+  const markDirty = useCallback(() => {
+    projectStore.markDirty();
+  }, [projectStore]);
 
   return {
     // 상태
-    metadata: projectStore.metadata,
-    templateData: projectStore.templateData,
-    currentTemplate: projectStore.currentTemplate,
-    currentScene: projectStore.currentScene,
-    isDirty: projectStore.isDirty,
-    lastSaved: projectStore.lastSaved,
-    templateList: projectStore.templateList,
-    sceneList: projectStore.sceneList,
-
-    // 프로젝트 메타데이터 관리
+    ...projectStore,
+    
+    // 메타데이터
     updateMetadata,
     setProjectName,
     setProjectDescription,
     addTag,
     removeTag,
-
-    // 템플릿/씬 네비게이션
+    
+    // 네비게이션
     setCurrentTemplate,
     setCurrentScene,
-
+    
     // 템플릿 관리
     createTemplate,
     deleteTemplate,
     renameTemplate,
     duplicateTemplate,
-
+    
     // 씬 관리
     createScene,
     deleteScene,
     renameScene,
     duplicateScene,
-
+    
     // 파일 입출력
     exportToJSON,
     exportToCSV,
     importFromJSON,
-
-    // 프로젝트 관리
-    newProject,
-    loadProject,
-    saveProject,
-
-    // 파일 다운로드/업로드 헬퍼
     downloadJSON,
     downloadCSV,
     downloadProject,
     uploadJSON,
     uploadProject,
-
-    // 상태 관리
-    markDirty,
-    markClean,
-
+    
+    // 프로젝트 관리
+    newProject,
+    loadProject,
+    saveProject,
+    
     // 유틸리티
-    getTemplateList,
-    getSceneList,
     hasTemplate,
     hasScene,
     getCurrentScene,
-
-    // 검증
     validateProject,
-
-    // 마이그레이션
     migrateProject,
-
-    // 강제 동기화
     forceSync,
+    markDirty,
   };
 }; 
