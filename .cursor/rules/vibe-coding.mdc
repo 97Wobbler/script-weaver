@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 1.	Interpreting the input file
 	•	The file todo.md reflects the current task status:

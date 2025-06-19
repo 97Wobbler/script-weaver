@@ -1,0 +1,52 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+[Instructions]
+
+Always follow the workflow below for any task.  
+If context is missing or criteria are unclear, stop immediately and ask for clarification before proceeding.
+
+---
+
+[Workflow Steps]
+
+1. Context Analysis
+    - Check whether the task includes relevant code (snippet, module, component, or service level).
+    - If no code is provided, halt the task and request an explicit reference.
+    - Prioritize investigation of the following:
+        - Interfaces
+        - Input/output behavior
+        - Dependencies
+    - If necessary, expand the scope to include utility functions and global state.
+
+2. Planning
+    - Analyze the gap between the current code and the desired goal.
+    - Refer to `todo.md` to understand the specific task requirements.
+    - Focus on only one goal at a time.
+    - If the task involves refactoring, **never include new features in the plan**. Separate refactoring from new functionality.
+    - Break the plan into small, sequential steps and share it with the user for confirmation.
+
+3. Execution
+    - Implement only one planned step at a time.
+    - Preserving existing functionality is a strict rule.
+        - If preservation is unclear, consult documents like `log.md` for prior behavior.
+    - **During refactoring, do not introduce any new behavior or functionality under any circumstances.**
+    - After making changes, commit the code and notify the user that testing is required.
+
+4. Verification
+    - Wait for the user's feedback after testing.
+    - If the user reports a failure, roll back the change and revise the plan.
+    - If the goal is achieved, mark the task as complete in `todo.md`.
+    - Document unexpected issues or deviations in `log.md`.
+
+---
+
+[Core Principles]
+
+- Favor practical improvements over theoretical perfection.
+- Surface potential complexity before starting, and report any surprises immediately.
+- **Always separate refactoring from new feature development. Never add new functionality during a refactor.**
+- For high-risk structural changes, ensure clear separation and rollback capability.
+
