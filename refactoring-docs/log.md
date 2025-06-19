@@ -35,32 +35,109 @@
 
 ## 🕒 진행 상황 타임라인
 
-### Phase 0-2: 현재 상태 완전 분석 (2025-06-19 19:50:57 완료)
+### **Phase 0-2: 현재 상태 완전 분석** (2025-06-20 08:08 ~ 08:36)
 
-**작업 내용**: editorStore.ts God Object 문제 범위 및 구조 분석 완료
+**완료 작업**: editorStore.ts 내 모든 메서드 목록 및 크기 조사, 도메인 경계 식별, 의존성 관계 파악
 
-**주요 분석 결과**:
-- **파일 크기**: 2,941줄 (목표: 500줄 이하로 분할)
-- **메서드 수**: 50+ 개의 public 메서드
-- **의존 컴포넌트**: 5개 (Canvas, PropertyPanel, TextNode, ChoiceNode, App)
+#### 📊 **주요 분석 결과**
 
-**큰 메서드들 (50줄 이상, 우선 리팩터링 대상)**:
-1. `arrangeAllNodesAsTree()` - 약 200줄 (최우선)
-2. `calculateChildNodePosition()` - 약 150줄
-3. `arrangeChildNodesAsTree()` - 약 150줄  
-4. `arrangeSelectedNodeChildren()` - 약 120줄
-5. `arrangeSelectedNodeDescendants()` - 약 120줄
-6. `deleteSelectedNodes()` - 약 100줄
-7. `pasteNodes()` - 약 100줄
-8. `getNextNodePosition()` - 약 90줄
-9. `arrangeAllNodes()` - 약 80줄
+**1. 파일 규모**
+- **총 라인 수**: 2,941줄 (목표: 500줄 이하로 분할)
+- **총 메서드 수**: 44개 (인터페이스 정의 기준)
+- **God Object 확인**: 단일 파일에 모든 기능 집중된 상태
 
-**도메인 경계 식별 (향후 파일 분할 기준)**:
-1. **PROJECT_DOMAIN**: 템플릿/씬 관리
-2. **NODE_DOMAIN**: 노드 CRUD 
-3. **HISTORY_DOMAIN**: Undo/Redo 시스템
-4. **LAYOUT_DOMAIN**: 위치/정렬 시스템  
-5. **UI_DOMAIN**: 선택/상호작용
+**2. 대형 메서드 목록** (50줄 이상)
+```
+arrangeAllNodesAsTree  : 2168~2324 (155줄) - 전체 트리 정렬
+arrangeChildNodesAsTree: 2025~2165 (141줄) - 트리 정렬
+arrangeAllNodes        : 2535~2655 (121줄) - 전체 레이아웃 정렬
+pasteNodes             : 585~699   (115줄) - 복사/붙여넣기 로직  
+calculateChildNodePosition: 1808~1920 (113줄) - 자식 위치 계산
+deleteSelectedNodes    : 724~834   (110줄) - 다중 노드 삭제 로직
+createAndConnectChoiceNode: 1513~1619 (107줄) - 노드 생성/연결
+arrangeSelectedNodeDescendants: 2759~2866 (107줄) - 후손 노드 정렬
+createAndConnectTextNode: 1620~1723 (104줄) - 노드 생성/연결
+arrangeSelectedNodeChildren: 2657~2755 (99줄) - 자식 노드 정렬
+deleteNode             : 904~992   (90줄)  - 단일 노드 삭제
+moveNode               : 993~1072  (80줄)  - 노드 위치 이동
+getNextNodePosition    : 1735~1807 (80줄)  - 위치 계산
+```
 
-**다음 단계**: Phase 1-1 메서드 크기 측정 및 분류
+**3. 자연스러운 도메인 경계 식별**
+```typescript
+// === PROJECT DOMAIN === (프로젝트/씬 관리)
+- templateData, currentTemplate, currentScene
+- createTemplate, createScene, resetEditor
+- loadFromLocalStorage, migrateToNewArchitecture
 
+// === NODE DOMAIN === (노드 CRUD 및 내용 관리)  
+- selectedNodeKey, selectedNodeKeys, lastDraggedNodeKey
+- addNode, updateNode, deleteNode, moveNode
+- updateDialogue, updateNodeText, updateChoiceText
+- createTextNode, createChoiceNode, duplicateNode
+- addChoice, removeChoice, connectNodes, disconnectNodes
+- createAndConnectChoiceNode, createAndConnectTextNode
+
+// === HISTORY DOMAIN === (실행취소/재실행)
+- history, historyIndex, isUndoRedoInProgress
+- currentCompoundActionId, compoundActionStartState
+- pushToHistory, pushToHistoryWithTextEdit
+- undo, redo, canUndo, canRedo
+- startCompoundAction, endCompoundAction
+
+// === LAYOUT DOMAIN === (노드 배치 및 정렬)
+- lastNodePosition
+- getNextNodePosition, calculateChildNodePosition
+- arrangeChildNodesAsTree, arrangeAllNodesAsTree, arrangeNodesWithDagre
+- arrangeAllNodes, arrangeSelectedNodeChildren, arrangeSelectedNodeDescendants
+
+// === UI DOMAIN === (사용자 인터페이스 상태)
+- showToast, toggleNodeSelection, clearSelection
+- selectMultipleNodes, copySelectedNodes, pasteNodes
+- deleteSelectedNodes, moveSelectedNodes
+- updateNodeKeyReference, updateChoiceKeyReference
+- updateNodeVisibility, updateNodePositionAndVisibility
+```
+
+**4. 컴포넌트 의존성 관계**
+```
+App.tsx - 8개 메서드: 기본 상태 + Import/Export + 검증
+PropertyPanel.tsx - 11개 메서드: 텍스트 편집 + 키 관리 중심
+Canvas.tsx - 18개 메서드: 선택/이동/단축키 중심  
+TextNode.tsx - 4개 메서드: 연결/생성 중심
+ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
+
+총 5개 컴포넌트가 44개 메서드 의존
+```
+
+**5. 메서드 간 상호 의존성**
+- **높은 결합도**: Layout 메서드들이 Node 메서드들을 내부에서 직접 호출
+- **순환 참조**: History와 다른 도메인 간 양방향 의존성
+- **공통 상태 접근**: 모든 메서드가 templateData에 직접 접근
+
+#### 🎯 **핵심 문제점**
+
+1. **메서드 크기 초과**: 13개 메서드가 80줄 이상 (목표: 50줄 이하)
+2. **단일 책임 위반**: 레이아웃 메서드 내부에 히스토리/검증 로직 혼재  
+3. **높은 결합도**: 도메인 간 직접 호출로 분리 어려움
+4. **공통 상태**: templateData 중심의 모든 도메인 의존성
+
+#### 📋 **다음 단계 준비**
+
+**Phase 1 대상 메서드** (50줄 이상 우선 분할):
+1. arrangeAllNodesAsTree (155줄) - 최우선
+2. arrangeChildNodesAsTree (141줄)  
+3. arrangeAllNodes (121줄)
+4. pasteNodes (115줄)
+5. calculateChildNodePosition (113줄)
+6. deleteSelectedNodes (110줄)
+7. createAndConnectChoiceNode (107줄)
+8. arrangeSelectedNodeDescendants (107줄)
+9. createAndConnectTextNode (104줄)
+10. arrangeSelectedNodeChildren (99줄)
+11. deleteNode (90줄)
+12. moveNode (80줄)
+13. getNextNodePosition (80줄)
+
+**예상 분할 후 파일 수**: 5-7개 도메인 파일 + 1개 통합 파일
+**목표 달성 가능성**: 높음 (명확한 도메인 경계 존재)
