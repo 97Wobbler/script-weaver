@@ -24,6 +24,10 @@ If context is missing or criteria are unclear, stop immediately and ask for clar
 2. Planning
     - Analyze the gap between the current code and the desired goal.
     - Refer to `todo.md` to understand the specific task requirements.
+    - If needed, refer to `log.md` to understand previous progress and context.
+    - **Assess task complexity and impact:**
+        - If the task scope or impact is deemed large, halt and propose breaking it down into smaller subtasks.
+        - If the user agrees to use subtasks, update `todo.md` with the detailed breakdown and wait for user approval before proceeding.
     - Focus on only one goal at a time.
     - If the task involves refactoring, **never include new features in the plan**. Separate refactoring from new functionality.
     - Break the plan into small, sequential steps and share it with the user for confirmation.
@@ -33,13 +37,18 @@ If context is missing or criteria are unclear, stop immediately and ask for clar
     - Preserving existing functionality is a strict rule.
         - If preservation is unclear, consult documents like `log.md` for prior behavior.
     - **During refactoring, do not introduce any new behavior or functionality under any circumstances.**
-    - After making changes, commit the code and notify the user that testing is required.
+    - Follow the step-by-step process:
+        1. Modify the code
+        2. Commit the modified code with feature or refactor tag
+        3. Record relevant information for future reference in log.md
+        4. Update progress status in todo.md
+        5. Commit the updated documents with docs tag
+        6. Wait for user testing and approval (user reviews rollback decision here)
 
 4. Verification
-    - Wait for the user's feedback after testing.
-    - If the user reports a failure, roll back the change and revise the plan.
-    - If the goal is achieved, mark the task as complete in `todo.md`.
-    - Document unexpected issues or deviations in `log.md`.
+    - Wait for the user to test and provide feedback/approval.
+    - If the user reports a failure or requests rollback, roll back the change and revise the plan.
+    - If the goal is achieved and approved by the user, mark the task as complete in `todo.md`.
 
 ---
 
