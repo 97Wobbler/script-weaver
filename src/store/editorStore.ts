@@ -177,6 +177,11 @@ interface EditorStore extends EditorState {
   _createNewTextChild: (fromNode: EditorNodeWrapper, fromNodeKey: string, nodeType: "text" | "choice") => { newNodeKey: string; newNode: EditorNodeWrapper; tempPosition: { x: number; y: number } };
   _connectAndUpdateTextNode: (fromNode: EditorNodeWrapper, fromNodeKey: string, newNodeKey: string, newNode: EditorNodeWrapper, tempPosition: { x: number; y: number }) => void;
   _finalizeTextNodeCreation: (fromNodeKey: string, newNodeKey: string) => Promise<void>;
+
+  // 자식 노드 정렬 헬퍼 메서드들 (private)
+  _findChildNodes: (nodeKey: string, currentScene: Scene) => Set<string>;
+  _runChildLayoutSystem: (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => Promise<void>;
+  _handleChildLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], childCount: number) => void;
 }
 
 // 타입 안전한 헬퍼 함수들
@@ -2694,16 +2699,7 @@ export const useEditorStore = create<EditorStore>()(
             if (!parentNode) return;
 
             // 자식 노드들 찾기
-            const childNodeKeys = new Set<string>();
-            if (parentNode.dialogue.type === "text" && parentNode.dialogue.nextNodeKey) {
-              childNodeKeys.add(parentNode.dialogue.nextNodeKey);
-            } else if (parentNode.dialogue.type === "choice") {
-              Object.values(parentNode.dialogue.choices).forEach((choice) => {
-                if (choice.nextNodeKey) {
-                  childNodeKeys.add(choice.nextNodeKey);
-                }
-              });
-            }
+            const childNodeKeys = get()._findChildNodes(nodeKey, currentScene);
 
             // 정렬할 노드들 (부모 + 자식)
             const affectedNodeKeys = [nodeKey, ...Array.from(childNodeKeys)];
@@ -2711,63 +2707,11 @@ export const useEditorStore = create<EditorStore>()(
             // 정렬 전 위치 캡처
             const beforePositions = captureNodePositions(currentScene, affectedNodeKeys);
 
-            const { globalLayoutSystem } = await import("../utils/layoutEngine");
+            // 레이아웃 시스템 실행
+            await get()._runChildLayoutSystem(nodeKey, currentScene, affectedNodeKeys);
 
-            await globalLayoutSystem.runLayout(
-              currentScene,
-              {
-                rootNodeId: nodeKey,
-                depth: 1, // 직접 자식만
-                includeRoot: true,
-                direction: "LR",
-                nodeSpacing: 50,
-                rankSpacing: 100,
-                anchorNodeId: nodeKey, // 선택된 노드를 앵커로 고정
-              },
-              (nodeId, position) => {
-                // moveNode를 직접 호출하지 않고 위치만 업데이트 (히스토리 중복 방지)
-                const currentState = get();
-                const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
-                if (!currentScene) return;
-
-                const currentNode = getNode(currentScene, nodeId);
-                if (!currentNode) return;
-
-                const updatedNode = { ...currentNode, position };
-                const updatedScene = setNode(currentScene, nodeId, updatedNode);
-
-                set((state) => ({
-                  ...state,
-                  templateData: {
-                    ...state.templateData,
-                    [state.currentTemplate]: {
-                      ...state.templateData[state.currentTemplate],
-                      [state.currentScene]: updatedScene,
-                    },
-                  },
-                  lastNodePosition: position,
-                }));
-              }
-            );
-
-            // 정렬 후 위치 캡처 및 변화 감지
-            const afterState = get();
-            const afterScene = afterState.templateData[afterState.currentTemplate]?.[afterState.currentScene];
-            if (!afterScene) return;
-
-            const afterPositions = captureNodePositions(afterScene, affectedNodeKeys);
-            const hasChanged = comparePositions(beforePositions, afterPositions);
-
-            if (hasChanged) {
-              // 변화가 있을 때만 히스토리 저장
-              get().pushToHistory(`자식 노드 정렬 (${childNodeKeys.size}개 노드)`);
-            } else {
-              // 변화가 없으면 토스트 메시지 표시
-              const showToast = get().showToast;
-              if (showToast) {
-                showToast("이미 정렬된 상태입니다", "info");
-              }
-            }
+            // 결과 처리 및 히스토리 저장
+            get()._handleChildLayoutResult(beforePositions, affectedNodeKeys, childNodeKeys.size);
           } catch (error) {
             console.error("[정렬 시스템] 자식 노드 정렬 중 오류:", error);
             if (!internal) {
@@ -2953,41 +2897,41 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         // 텍스트 노드 생성 및 연결 헬퍼 메서드들 (private)
-                 _validateTextNodeCreation: (fromNodeKey: string) => {
-           // 복합 액션 시작
-           get().startCompoundAction("텍스트 노드 생성 및 연결");
+        _validateTextNodeCreation: (fromNodeKey: string) => {
+          // 복합 액션 시작
+          get().startCompoundAction("텍스트 노드 생성 및 연결");
 
-           // 노드 개수 제한 체크
-           if (!get().canCreateNewNode()) {
-             get().endCompoundAction(); // 복합 액션 종료
-             const state = get();
-             if (state.showToast) {
-               state.showToast(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`, "warning");
-             }
-             return { isValid: false, fromNode: null, currentScene: null };
-           }
+          // 노드 개수 제한 체크
+          if (!get().canCreateNewNode()) {
+            get().endCompoundAction(); // 복합 액션 종료
+            const state = get();
+            if (state.showToast) {
+              state.showToast(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`, "warning");
+            }
+            return { isValid: false, fromNode: null, currentScene: null };
+          }
 
-           const state = get();
-           const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-           if (!currentScene) {
-             get().endCompoundAction(); // 복합 액션 종료
-             return { isValid: false, fromNode: null, currentScene: null };
-           }
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) {
+            get().endCompoundAction(); // 복합 액션 종료
+            return { isValid: false, fromNode: null, currentScene: null };
+          }
 
-           const fromNode = getNode(currentScene, fromNodeKey);
-           if (!fromNode || fromNode.dialogue.type !== "text") {
-             get().endCompoundAction(); // 복합 액션 종료
-             return { isValid: false, fromNode: null, currentScene: null };
-           }
+          const fromNode = getNode(currentScene, fromNodeKey);
+          if (!fromNode || fromNode.dialogue.type !== "text") {
+            get().endCompoundAction(); // 복합 액션 종료
+            return { isValid: false, fromNode: null, currentScene: null };
+          }
 
-           // 이미 연결된 노드가 있으면 생성하지 않음
-           if (fromNode.dialogue.nextNodeKey) {
-             get().endCompoundAction(); // 복합 액션 종료
-             return { isValid: false, fromNode: null, currentScene: null };
-           }
+          // 이미 연결된 노드가 있으면 생성하지 않음
+          if (fromNode.dialogue.nextNodeKey) {
+            get().endCompoundAction(); // 복합 액션 종료
+            return { isValid: false, fromNode: null, currentScene: null };
+          }
 
-           return { isValid: true, fromNode, currentScene };
-         },
+          return { isValid: true, fromNode, currentScene };
+        },
 
         _createNewTextChild: (fromNode: EditorNodeWrapper, fromNodeKey: string, nodeType: "text" | "choice") => {
           const newNodeKey = get().generateNodeKey();
@@ -3043,26 +2987,107 @@ export const useEditorStore = create<EditorStore>()(
           updateLocalizationStoreRef();
         },
 
-                 _finalizeTextNodeCreation: async (fromNodeKey: string, newNodeKey: string) => {
-           // Dagre 레이아웃을 사용하여 정확한 위치 계산 및 배치 (DOM 렌더링 후)
-           return new Promise<void>((resolve) => {
-             setTimeout(async () => {
-               try {
-                 // 부모 노드의 자식들을 정렬 (새로 생성된 노드 포함)
-                 await get().arrangeSelectedNodeChildren(fromNodeKey, true);
+        _finalizeTextNodeCreation: async (fromNodeKey: string, newNodeKey: string) => {
+          // Dagre 레이아웃을 사용하여 정확한 위치 계산 및 배치 (DOM 렌더링 후)
+          return new Promise<void>((resolve) => {
+            setTimeout(async () => {
+              try {
+                // 부모 노드의 자식들을 정렬 (새로 생성된 노드 포함)
+                await get().arrangeSelectedNodeChildren(fromNodeKey, true);
 
-                 // 정렬 완료 후 숨김 해제
-                 get().updateNodeVisibility(newNodeKey, false);
-               } catch (error) {
-                 get().updateNodeVisibility(newNodeKey, false);
-               } finally {
-                 // 복합 액션 종료
-                 get().endCompoundAction();
-                 resolve();
+                // 정렬 완료 후 숨김 해제
+                get().updateNodeVisibility(newNodeKey, false);
+              } catch (error) {
+                get().updateNodeVisibility(newNodeKey, false);
+              } finally {
+                // 복합 액션 종료
+                get().endCompoundAction();
+                resolve();
+              }
+            }, 100); // DOM 렌더링 후 정렬하기 위한 지연
+          });
+        },
+
+        // 자식 노드 정렬 헬퍼 메서드들 (private)
+                 _findChildNodes: (nodeKey: string, currentScene: Scene) => {
+           const childNodeKeys = new Set<string>();
+           const parentNode = getNode(currentScene, nodeKey);
+           if (!parentNode) return childNodeKeys;
+
+           // 직접 자식만 찾기 (재귀 없음)
+           if (parentNode.dialogue.type === "text" && parentNode.dialogue.nextNodeKey) {
+             childNodeKeys.add(parentNode.dialogue.nextNodeKey);
+           } else if (parentNode.dialogue.type === "choice") {
+             Object.values(parentNode.dialogue.choices).forEach((choice) => {
+               if (choice.nextNodeKey) {
+                 childNodeKeys.add(choice.nextNodeKey);
                }
-             }, 100); // DOM 렌더링 후 정렬하기 위한 지연
-           });
+             });
+           }
+
+           return childNodeKeys;
          },
+
+                 _runChildLayoutSystem: async (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => {
+           const { globalLayoutSystem } = await import("../utils/layoutEngine");
+
+           await globalLayoutSystem.runLayout(
+             currentScene,
+             {
+               rootNodeId: nodeKey,
+               depth: 1, // 직접 자식만
+               includeRoot: true,
+               direction: "LR",
+               nodeSpacing: 50,
+               rankSpacing: 100,
+               anchorNodeId: nodeKey, // 선택된 노드를 앵커로 고정
+             },
+            (nodeId, position) => {
+              // moveNode를 직접 호출하지 않고 위치만 업데이트 (히스토리 중복 방지)
+              const currentState = get();
+              const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
+              if (!currentScene) return;
+
+              const currentNode = getNode(currentScene, nodeId);
+              if (!currentNode) return;
+
+              const updatedNode = { ...currentNode, position };
+              const updatedScene = setNode(currentScene, nodeId, updatedNode);
+
+              set((state) => ({
+                ...state,
+                templateData: {
+                  ...state.templateData,
+                  [state.currentTemplate]: {
+                    ...state.templateData[state.currentTemplate],
+                    [state.currentScene]: updatedScene,
+                  },
+                },
+                lastNodePosition: position,
+              }));
+            }
+          );
+        },
+
+        _handleChildLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], childCount: number) => {
+          const afterState = get();
+          const afterScene = afterState.templateData[afterState.currentTemplate]?.[afterState.currentScene];
+          if (!afterScene) return;
+
+          const afterPositions = captureNodePositions(afterScene, affectedNodeKeys);
+          const hasChanged = comparePositions(beforePositions, afterPositions);
+
+          if (hasChanged) {
+            // 변화가 있을 때만 히스토리 저장
+            get().pushToHistory(`자식 노드 정렬 (${childCount}개 노드)`);
+          } else {
+            // 변화가 없으면 토스트 메시지 표시
+            const showToast = get().showToast;
+            if (showToast) {
+              showToast("이미 정렬된 상태입니다", "info");
+            }
+          }
+        },
       };
     },
     {
