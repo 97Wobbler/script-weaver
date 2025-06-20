@@ -188,6 +188,13 @@ interface EditorStore extends EditorState {
   _findReferencingNodes: (currentScene: Scene, nodeKey: string) => string[];
   _performNodeDeletion: (nodeKey: string) => void;
   _cleanupAfterNodeDeletion: (keysToCleanup: string[]) => void;
+
+  // 노드 이동 헬퍼 메서드들 (private)
+  _validateNodeMovement: (nodeKey: string, position: { x: number; y: number }) => { isValid: boolean; currentNode: EditorNodeWrapper | null; hasPositionChanged: boolean };
+  _checkContinuousDrag: (nodeKey: string, currentTime: number) => boolean;
+  _performNodeMove: (nodeKey: string, position: { x: number; y: number }, currentTime: number) => void;
+  _handleContinuousDrag: (nodeKey: string, currentTime: number) => void;
+  _addMoveHistory: (nodeKey: string) => void;
 }
 
 // 타입 안전한 헬퍼 함수들
@@ -1123,33 +1130,62 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         moveNode: (nodeKey, position) => {
-          const state = get();
           const currentTime = Date.now();
-          const CONTINUOUS_DRAG_THRESHOLD = 1000; // 1초 이내면 연속 드래그로 간주
+          
+          // 1. 노드 및 위치 변경 유효성 검사
+          const validationResult = get()._validateNodeMovement(nodeKey, position);
+          if (!validationResult.isValid) return;
 
-          // 현재 노드의 위치 확인
+          // 2. 연속 드래그 여부 확인
+          const isContinuousDrag = get()._checkContinuousDrag(nodeKey, currentTime);
+
+          // 3. 실제 노드 위치 업데이트
+          get()._performNodeMove(nodeKey, position, currentTime);
+
+          // 4. 히스토리 처리 (연속 드래그 vs 일반)
+          if (isContinuousDrag) {
+            get()._handleContinuousDrag(nodeKey, currentTime);
+          } else {
+            get()._addMoveHistory(nodeKey);
+          }
+        },
+
+        // 노드 이동 유효성 검사
+        _validateNodeMovement: (nodeKey: string, position: { x: number; y: number }) => {
+          const state = get();
           const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          
           if (!currentScene) {
-            return;
+            return { isValid: false, currentNode: null, hasPositionChanged: false };
           }
 
           const currentNode = getNode(currentScene, nodeKey);
           if (!currentNode) {
-            return;
+            return { isValid: false, currentNode: null, hasPositionChanged: false };
           }
 
           // 위치 변경 여부 확인 (소수점 반올림 고려)
           const oldPosition = currentNode.position;
           const hasPositionChanged = Math.round(oldPosition.x) !== Math.round(position.x) || Math.round(oldPosition.y) !== Math.round(position.y);
 
-          // 위치가 실제로 변경되지 않았으면 히스토리 추가 없이 종료
-          if (!hasPositionChanged) {
-            return;
-          }
+          return { 
+            isValid: hasPositionChanged, 
+            currentNode, 
+            hasPositionChanged 
+          };
+        },
 
-          // 연속 드래그 여부 확인 (같은 노드 && 1초 이내)
-          const isContinuousDrag = state.lastDraggedNodeKey === nodeKey && currentTime - state.lastDragActionTime <= CONTINUOUS_DRAG_THRESHOLD;
+        // 연속 드래그 여부 확인
+        _checkContinuousDrag: (nodeKey: string, currentTime: number): boolean => {
+          const state = get();
+          const CONTINUOUS_DRAG_THRESHOLD = 1000; // 1초 이내면 연속 드래그로 간주
+          
+          return state.lastDraggedNodeKey === nodeKey && 
+                 currentTime - state.lastDragActionTime <= CONTINUOUS_DRAG_THRESHOLD;
+        },
 
+        // 실제 노드 위치 업데이트
+        _performNodeMove: (nodeKey: string, position: { x: number; y: number }, currentTime: number) => {
           set((currentState) => {
             const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
             if (!currentScene) return currentState;
@@ -1174,14 +1210,17 @@ export const useEditorStore = create<EditorStore>()(
               lastDragActionTime: currentTime,
             };
           });
+        },
 
-          // 덮어쓰기 방식으로 연속 드래그 처리
+        // 연속 드래그 히스토리 처리 (덮어쓰기)
+        _handleContinuousDrag: (nodeKey: string, currentTime: number) => {
           const currentState = get();
           const lastHistory = currentState.history[currentState.historyIndex];
 
-          if (isContinuousDrag && lastHistory && lastHistory.action === `노드 이동 (${nodeKey})` && currentTime - lastHistory.timestamp < 2000) {
-            // 2초 이내
-
+          if (lastHistory && 
+              lastHistory.action === `노드 이동 (${nodeKey})` && 
+              currentTime - lastHistory.timestamp < 2000) {
+            
             // 기존 히스토리의 최종 상태만 업데이트 (덮어쓰기)
             set((state) => {
               const updatedHistory = [...state.history];
@@ -1189,7 +1228,7 @@ export const useEditorStore = create<EditorStore>()(
                 ...lastHistory,
                 templateData: JSON.parse(JSON.stringify(state.templateData)),
                 localizationData: useLocalizationStore.getState().exportLocalizationData(),
-                timestamp: currentTime, // 타임스탬프 업데이트
+                timestamp: currentTime,
               };
 
               return {
@@ -1197,8 +1236,14 @@ export const useEditorStore = create<EditorStore>()(
               };
             });
           } else {
-            get().pushToHistory(`노드 이동 (${nodeKey})`);
+            // 연속 드래그가 아니라면 새 히스토리 추가
+            get()._addMoveHistory(nodeKey);
           }
+        },
+
+        // 일반 이동 히스토리 추가
+        _addMoveHistory: (nodeKey: string) => {
+          get().pushToHistory(`노드 이동 (${nodeKey})`);
         },
 
         // 대화 내용 수정 (실제 텍스트 기반)
