@@ -182,6 +182,12 @@ interface EditorStore extends EditorState {
   _findChildNodes: (nodeKey: string, currentScene: Scene) => Set<string>;
   _runChildLayoutSystem: (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => Promise<void>;
   _handleChildLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], childCount: number) => void;
+
+  // 단일 노드 삭제 헬퍼 메서드들 (private)
+  _collectNodeKeysForCleanup: (nodeToDelete: EditorNodeWrapper) => string[];
+  _findReferencingNodes: (currentScene: Scene, nodeKey: string) => string[];
+  _performNodeDeletion: (nodeKey: string) => void;
+  _cleanupAfterNodeDeletion: (keysToCleanup: string[]) => void;
 }
 
 // 타입 안전한 헬퍼 함수들
@@ -1001,7 +1007,6 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         deleteNode: (nodeKey) => {
-          // 노드 삭제 전에 해당 노드의 키들을 먼저 수집하고 사용 개수 확인
           const state = get();
           const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
           if (!currentScene) return;
@@ -1009,10 +1014,22 @@ export const useEditorStore = create<EditorStore>()(
           const nodeToDelete = getNode(currentScene, nodeKey);
           if (!nodeToDelete) return;
 
+          // 1. 로컬라이제이션 키 수집
+          const keysToCleanup = get()._collectNodeKeysForCleanup(nodeToDelete);
+
+          // 2. 실제 노드 삭제 수행
+          get()._performNodeDeletion(nodeKey);
+
+          // 3. 삭제 후 정리 작업
+          get()._cleanupAfterNodeDeletion(keysToCleanup);
+        },
+
+        // 삭제할 노드의 로컬라이제이션 키 수집
+        _collectNodeKeysForCleanup: (nodeToDelete: EditorNodeWrapper): string[] => {
           const localizationStore = useLocalizationStore.getState();
           const keysToCleanup: string[] = [];
 
-          // 삭제될 노드에서 단독으로 사용하는 키들 수집
+          // 단독으로 사용하는 화자 키 수집
           if (nodeToDelete.dialogue.speakerKeyRef) {
             const usageCount = localizationStore.getKeyUsageCount(nodeToDelete.dialogue.speakerKeyRef);
             if (usageCount === 1) {
@@ -1020,6 +1037,7 @@ export const useEditorStore = create<EditorStore>()(
             }
           }
 
+          // 단독으로 사용하는 텍스트 키 수집
           if (nodeToDelete.dialogue.textKeyRef) {
             const usageCount = localizationStore.getKeyUsageCount(nodeToDelete.dialogue.textKeyRef);
             if (usageCount === 1) {
@@ -1040,31 +1058,41 @@ export const useEditorStore = create<EditorStore>()(
             });
           }
 
+          return keysToCleanup;
+        },
+
+        // 삭제 대상 노드를 참조하는 다른 노드들 찾기
+        _findReferencingNodes: (currentScene: Scene, nodeKey: string): string[] => {
+          const referencingNodes: string[] = [];
+          
+          Object.entries(currentScene).forEach(([key, nodeWrapper]) => {
+            if (key === nodeKey) return; // 자기 자신은 제외
+
+            const { dialogue } = nodeWrapper;
+
+            // TextDialogue 참조 확인
+            if (dialogue.type === "text" && dialogue.nextNodeKey === nodeKey) {
+              referencingNodes.push(`${key} (텍스트 노드)`);
+            }
+
+            // ChoiceDialogue 참조 확인
+            if (dialogue.type === "choice" && dialogue.choices) {
+              Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
+                if (choice.nextNodeKey === nodeKey) {
+                  referencingNodes.push(`${key} (선택지 "${choice.choiceText || choice.textKeyRef || choiceKey}")`);
+                }
+              });
+            }
+          });
+
+          return referencingNodes;
+        },
+
+        // 실제 노드 삭제 수행
+        _performNodeDeletion: (nodeKey: string) => {
           set((currentState) => {
             const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
             if (!currentScene) return currentState;
-
-            // 삭제할 노드를 참조하는 다른 노드들 찾기
-            const referencingNodes: string[] = [];
-            Object.entries(currentScene).forEach(([key, nodeWrapper]) => {
-              if (key === nodeKey) return; // 자기 자신은 제외
-
-              const { dialogue } = nodeWrapper;
-
-              // TextDialogue 참조 확인
-              if (dialogue.type === "text" && dialogue.nextNodeKey === nodeKey) {
-                referencingNodes.push(`${key} (텍스트 노드)`);
-              }
-
-              // ChoiceDialogue 참조 확인
-              if (dialogue.type === "choice" && dialogue.choices) {
-                Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
-                  if (choice.nextNodeKey === nodeKey) {
-                    referencingNodes.push(`${key} (선택지 "${choice.choiceText || choice.textKeyRef || choiceKey}")`);
-                  }
-                });
-              }
-            });
 
             const updatedScene = deleteNodeFromScene(currentScene, nodeKey);
 
@@ -1079,13 +1107,18 @@ export const useEditorStore = create<EditorStore>()(
               selectedNodeKey: currentState.selectedNodeKey === nodeKey ? undefined : currentState.selectedNodeKey,
             };
           });
+        },
 
-          // 노드 삭제 성공 후 단독 사용 키들 정리
+        // 삭제 후 정리 작업
+        _cleanupAfterNodeDeletion: (keysToCleanup: string[]) => {
+          const localizationStore = useLocalizationStore.getState();
+
+          // 단독 사용 키들 정리
           keysToCleanup.forEach((key) => {
             localizationStore.deleteKey(key);
           });
 
-          // 상태 변경 후에 히스토리에 추가
+          // 히스토리에 추가
           get().pushToHistory("노드 삭제");
         },
 
