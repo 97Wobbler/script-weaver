@@ -134,7 +134,7 @@
     -   [x] createAndConnectChoiceNode (107줄) - 노드 생성/연결 ✅ **완료 (13줄로 분할)**
     -   [x] arrangeSelectedNodeDescendants (107줄) - 후손 노드 정렬 ✅ **완료 (33줄로 분할)**
     -   [x] createAndConnectTextNode (104줄) - 노드 생성/연결 ✅ **완료 (14줄로 분할)**
-    -   [ ] arrangeSelectedNodeChildren (99줄) - 자식 노드 정렬
+    -   [x] arrangeSelectedNodeChildren (99줄) - 자식 노드 정렬 ✅ **완료 (34줄로 분할)**
     -   [ ] deleteNode (90줄) - 단일 노드 삭제
     -   [ ] moveNode (80줄) - 노드 위치 이동
     -   [ ] getNextNodePosition (80줄) - 위치 계산
@@ -145,7 +145,7 @@
 -   메서드별 단일 책임 명확화
 -   기능 100% 보존
 
-**진행 상황**: **9/13 완료** (69.2%)
+**진행 상황**: **10/13 완료** (76.9%)
 
 #### 1.3 공통 로직 추출 및 단순화
 
