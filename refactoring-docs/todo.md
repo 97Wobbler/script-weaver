@@ -129,7 +129,7 @@
     -   [x] arrangeChildNodesAsTree (141줄) - 트리 정렬 ✅ **완료 (19줄로 분할)**
     -   [x] arrangeAllNodes (121줄) - 전체 레이아웃 정렬 ✅ **완료 (22줄로 분할)**
     -   [x] pasteNodes (115줄) - 복사/붙여넣기 로직 ✅ **완료 (32줄로 분할)**
-    -   [ ] calculateChildNodePosition (113줄) - 자식 위치 계산
+    -   [x] calculateChildNodePosition (113줄) - 자식 위치 계산 ✅ **완료 (15줄로 분할)**
     -   [ ] deleteSelectedNodes (110줄) - 다중 노드 삭제 로직
     -   [ ] createAndConnectChoiceNode (107줄) - 노드 생성/연결
     -   [ ] arrangeSelectedNodeDescendants (107줄) - 후손 노드 정렬
@@ -145,7 +145,7 @@
 -   메서드별 단일 책임 명확화
 -   기능 100% 보존
 
-**진행 상황**: **4/13 완료** (30.8%)
+**진행 상황**: **5/13 완료** (38.5%)
 
 #### 1.3 공통 로직 추출 및 단순화
 
