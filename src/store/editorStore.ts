@@ -19,15 +19,28 @@ interface HistoryState {
 }
 
 interface EditorStore extends EditorState {
-  // === HISTORY DOMAIN ===
-  // Undo/Redo 상태
-  history: HistoryState[];
-  historyIndex: number;
-  isUndoRedoInProgress: boolean;
+  // === PROJECT DOMAIN - 액션들 ===
+  // 기본 액션들
+  setCurrentTemplate: (templateKey: string) => void;
+  setCurrentScene: (sceneKey: string) => void;
 
-  // 복합 액션 그룹 관리
-  currentCompoundActionId: string | null;
-  compoundActionStartState: HistoryState | null;
+  // 템플릿/씬 관리 액션들
+  createTemplate: (templateKey: string) => void;
+  createScene: (templateKey: string, sceneKey: string) => void;
+
+  // 검증 액션들
+  validateCurrentScene: () => { isValid: boolean; errors: string[] };
+  validateAllData: () => ValidationResult;
+
+  // Import/Export 액션들
+  exportToJSON: () => string;
+  exportToCSV: () => { dialogue: string; localization: string };
+  importFromJSON: (jsonString: string) => void;
+
+  // 데이터 관리 액션들
+  resetEditor: () => void;
+  loadFromLocalStorage: () => void;
+  migrateToNewArchitecture: () => void;
 
   // === NODE DOMAIN ===
   // 연속 드래그 감지용 상태
@@ -37,16 +50,7 @@ interface EditorStore extends EditorState {
   // 다중 선택 상태
   selectedNodeKeys: Set<string>;
 
-  // === UI DOMAIN ===
-  // 전역 토스트 함수
-  showToast?: (message: string, type?: "success" | "info" | "warning") => void;
-
-  // === PROJECT DOMAIN - 액션들 ===
-  // 기본 액션들
-  setCurrentTemplate: (templateKey: string) => void;
-  setCurrentScene: (sceneKey: string) => void;
-  
-  // === NODE DOMAIN - 액션들 ===
+  // 노드 선택 액션
   setSelectedNode: (nodeKey?: string) => void;
 
   // 다중 선택 액션들
@@ -54,20 +58,6 @@ interface EditorStore extends EditorState {
   clearSelection: () => void;
   selectMultipleNodes: (nodeKeys: string[]) => void;
 
-  // === HISTORY DOMAIN - 액션들 ===
-  // 복합 액션 그룹 관리
-  startCompoundAction: (actionName: string) => string;
-  endCompoundAction: () => void;
-
-  // Undo/Redo 액션들
-  pushToHistory: (action: string) => void;
-  pushToHistoryWithTextEdit: (action: string) => void; // 텍스트 편집 전용 히스토리
-  undo: () => void;
-  redo: () => void;
-  canUndo: () => boolean;
-  canRedo: () => boolean;
-
-  // === NODE DOMAIN - 조작 액션들 ===
   // 복사/붙여넣기
   copySelectedNodes: () => void;
   pasteNodes: (position?: { x: number; y: number }) => void;
@@ -83,7 +73,6 @@ interface EditorStore extends EditorState {
   deleteNode: (nodeKey: string) => void;
   moveNode: (nodeKey: string, position: { x: number; y: number }) => void;
 
-  // === NODE DOMAIN - 내용 편집 액션들 ===
   // 대화 내용 수정 (실제 텍스트 기반)
   updateDialogue: (nodeKey: string, dialogue: Partial<Dialogue>) => void;
   updateNodeText: (nodeKey: string, speakerText?: string, contentText?: string) => void;
@@ -97,116 +86,82 @@ interface EditorStore extends EditorState {
   addChoice: (nodeKey: string, choiceKey: string, choiceText: string, nextNodeKey?: string) => void;
   removeChoice: (nodeKey: string, choiceKey: string) => void;
 
-  // === NODE DOMAIN - 연결 관리 액션들 ===
+  // 노드 연결 관리
   connectNodes: (fromNodeKey: string, toNodeKey: string, choiceKey?: string) => void;
   disconnectNodes: (fromNodeKey: string, choiceKey?: string) => void;
 
-  // === NODE DOMAIN - 자동 생성 및 연결 액션들 ===
-  // AC-02: 선택지별 새 노드 자동 생성 및 연결
+  // 자식 노드 생성 및 연결
   createAndConnectChoiceNode: (fromNodeKey: string, choiceKey: string, nodeType?: "text" | "choice") => string;
-
-  // 텍스트 노드에서 새 노드 자동 생성 및 연결
   createAndConnectTextNode: (fromNodeKey: string, nodeType?: "text" | "choice") => string;
 
-  // === PROJECT DOMAIN - 템플릿/씬 관리 액션들 ===
-  createTemplate: (templateKey: string) => void;
-  createScene: (templateKey: string, sceneKey: string) => void;
-
-  // === LAYOUT DOMAIN - 위치 계산 액션들 ===
-  getNextNodePosition: () => { x: number; y: number };
-  calculateChildNodePosition: (parentNodeKey: string, choiceKey?: string) => { x: number; y: number };
-  
-  // === NODE DOMAIN - 유틸리티 액션들 ===
+  // 유틸리티 액션들
   generateNodeKey: () => string;
   getCurrentNodeCount: () => number;
   canCreateNewNode: () => boolean;
 
-  // === LAYOUT DOMAIN - 정렬 액션들 ===
-  // 노드 자동 정렬 (기존)
-  arrangeChildNodesAsTree: (rootNodeKey: string) => void;
-  arrangeAllNodesAsTree: () => void;
-  arrangeNodesWithDagre: () => void;
+  // 키 참조 업데이트 액션들
+  updateNodeKeyReference: (nodeKey: string, keyType: "speaker" | "text", newKeyRef: string) => void;
+  updateChoiceKeyReference: (nodeKey: string, choiceKey: string, newKeyRef: string) => void;
 
-  // === LAYOUT DOMAIN - 헬퍼 메서드들 (private) ===
-  // 노드 정렬 헬퍼 메서드들
-  _buildNodeRelationMaps: (currentScene: Scene, allNodeKeys: string[]) => { childrenMap: Map<string, string[]>; parentMap: Map<string, string[]> };
-  _buildNodeLevelMap: (rootNodeKey: string, childrenMap: Map<string, string[]>) => Map<number, string[]>;
-  _updateLevelNodePositions: (levelMap: Map<number, string[]>, startX: number, rootY: number) => void;
-  _updateChildNodePositions: (levelMap: Map<number, string[]>, rootNodeKey: string, startX: number, startY: number) => void;
-  _findRootNodeForLayout: (currentScene: Scene, allNodeKeys: string[]) => string;
-  _runGlobalLayoutSystem: (currentScene: Scene, rootNodeKey: string) => Promise<void>;
-  _runLayoutSystem: (currentScene: Scene, rootNodeId: string, layoutType: "global" | "descendant" | "child") => Promise<void>;
-  _handleLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, allNodeKeys: string[]) => void;
-  _handleLayoutSystemResult: (beforePositions: Map<string, { x: number; y: number }>, nodeKeys: string[], layoutType: "global" | "descendant" | "child", nodeCount: number) => void;
-  
-  // === NODE DOMAIN - 헬퍼 메서드들 (private) ===
+  // 노드 업데이트 함수
+  updateNodeVisibility: (nodeKey: string, hidden: boolean) => void;
+  updateNodePositionAndVisibility: (nodeKey: string, position: { x: number; y: number }, hidden: boolean) => void;
+
   // 붙여넣기 관련 헬퍼들
   _validatePasteOperation: (nodesToPaste: number) => boolean;
   _setupPastedNodeLocalization: (newNode: EditorNodeWrapper) => void;
   _createPastedNodes: (startX: number, startY: number) => { newNodes: EditorNodeWrapper[]; newNodeKeys: string[] };
-  
+
   // 위치 계산 헬퍼들
   _getRealNodeDimensions: (nodeKey: string) => { width: number; height: number };
   _getEstimatedNodeDimensions: () => { width: number; height: number };
-  _calculateTextNodeChildPosition: (parentPosition: { x: number; y: number }, parentDimensions: { width: number; height: number }, HORIZONTAL_SPACING: number) => { x: number; y: number };
-  _calculateChoiceNodeChildPosition: (parentNode: EditorNodeWrapper, choiceKey: string, parentPosition: { x: number; y: number }, parentDimensions: { width: number; height: number }, HORIZONTAL_SPACING: number, VERTICAL_SPACING: number, currentScene: Scene) => { x: number; y: number };
-  
+  _calculateTextNodeChildPosition: (
+    parentPosition: { x: number; y: number },
+    parentDimensions: { width: number; height: number },
+    HORIZONTAL_SPACING: number
+  ) => { x: number; y: number };
+  _calculateChoiceNodeChildPosition: (
+    parentNode: EditorNodeWrapper,
+    choiceKey: string,
+    parentPosition: { x: number; y: number },
+    parentDimensions: { width: number; height: number },
+    HORIZONTAL_SPACING: number,
+    VERTICAL_SPACING: number,
+    currentScene: Scene
+  ) => { x: number; y: number };
+
   // 삭제 관련 헬퍼들
   _getNodesForDeletion: () => { targetKeys: string[]; currentScene: Scene | null };
   _collectKeysForCleanup: (targetKeys: string[], currentScene: Scene) => string[];
   _performNodesDeletion: (targetKeys: string[]) => void;
   _finalizeNodesDeletion: (allKeysToCleanup: string[], targetKeys: string[]) => void;
-  
+
   // 노드 생성 및 연결 헬퍼들
   _validateChoiceNodeCreation: (fromNodeKey: string, choiceKey: string) => { isValid: boolean; fromNode: EditorNodeWrapper | null; choice: any | null; currentScene: Scene | null };
-  _createNewChoiceChild: (fromNode: EditorNodeWrapper, fromNodeKey: string, choiceKey: string, nodeType: "text" | "choice") => { newNodeKey: string; newNode: EditorNodeWrapper; tempPosition: { x: number; y: number } };
-  _connectAndUpdateChoiceNode: (fromNode: EditorNodeWrapper, fromNodeKey: string, choiceKey: string, choice: any, newNodeKey: string, newNode: EditorNodeWrapper, tempPosition: { x: number; y: number }) => void;
+  _createNewChoiceChild: (
+    fromNode: EditorNodeWrapper,
+    fromNodeKey: string,
+    choiceKey: string,
+    nodeType: "text" | "choice"
+  ) => { newNodeKey: string; newNode: EditorNodeWrapper; tempPosition: { x: number; y: number } };
+  _connectAndUpdateChoiceNode: (
+    fromNode: EditorNodeWrapper,
+    fromNodeKey: string,
+    choiceKey: string,
+    choice: any,
+    newNodeKey: string,
+    newNode: EditorNodeWrapper,
+    tempPosition: { x: number; y: number }
+  ) => void;
   _finalizeChoiceNodeCreation: (fromNodeKey: string, newNodeKey: string) => void;
 
-  // === LAYOUT DOMAIN - 새로운 레이아웃 시스템 ===
-  // 새로운 레이아웃 시스템 (즉시 배치)
-  arrangeAllNodes: (internal?: boolean) => Promise<void>;
-  arrangeSelectedNodeChildren: (nodeKey: string, internal?: boolean) => Promise<void>;
-  arrangeSelectedNodeDescendants: (nodeKey: string, internal?: boolean) => Promise<void>;
-
-  // === PROJECT DOMAIN - 검증 액션들 ===
-  validateCurrentScene: () => { isValid: boolean; errors: string[] };
-  validateAllData: () => ValidationResult;
-
-  // === PROJECT DOMAIN - Import/Export 액션들 ===
-  exportToJSON: () => string;
-  exportToCSV: () => { dialogue: string; localization: string };
-  importFromJSON: (jsonString: string) => void;
-
-  // === PROJECT DOMAIN - 데이터 관리 액션들 ===
-  resetEditor: () => void;
-  loadFromLocalStorage: () => void;
-  migrateToNewArchitecture: () => void;
-
-  // === NODE DOMAIN - 키 참조 업데이트 액션들 ===
-  updateNodeKeyReference: (nodeKey: string, keyType: "speaker" | "text", newKeyRef: string) => void;
-  updateChoiceKeyReference: (nodeKey: string, choiceKey: string, newKeyRef: string) => void;
-
-  // === NODE DOMAIN - 기타 노드 관리 액션들 ===
-  // 노드 숨김 상태 업데이트 함수 추가
-  updateNodeVisibility: (nodeKey: string, hidden: boolean) => void;
-
-  // 노드 위치와 숨김 상태 동시 업데이트 함수 추가
-  updateNodePositionAndVisibility: (nodeKey: string, position: { x: number; y: number }, hidden: boolean) => void;
-
-  // === LAYOUT DOMAIN - 후손/자식 정렬 헬퍼 메서드들 (private) ===
-  _findRelatedNodes: (nodeKey: string, currentScene: Scene, maxDepth?: number) => Set<string>;
-  _findDescendantNodes: (nodeKey: string, currentScene: Scene) => Set<string>;
-  _runDescendantLayoutSystem: (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => Promise<void>;
-  _handleDescendantLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], descendantCount: number) => void;
-  _findChildNodes: (nodeKey: string, currentScene: Scene) => Set<string>;
-  _runChildLayoutSystem: (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => Promise<void>;
-  _handleChildLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], childCount: number) => void;
-
-  // === NODE DOMAIN - 추가 헬퍼 메서드들 (private) ===
   // 텍스트 노드 생성 및 연결 헬퍼 메서드들
   _validateTextNodeCreation: (fromNodeKey: string) => { isValid: boolean; fromNode: EditorNodeWrapper | null; currentScene: Scene | null };
-  _createNewTextChild: (fromNode: EditorNodeWrapper, fromNodeKey: string, nodeType: "text" | "choice") => { newNodeKey: string; newNode: EditorNodeWrapper; tempPosition: { x: number; y: number } };
+  _createNewTextChild: (
+    fromNode: EditorNodeWrapper,
+    fromNodeKey: string,
+    nodeType: "text" | "choice"
+  ) => { newNodeKey: string; newNode: EditorNodeWrapper; tempPosition: { x: number; y: number } };
   _connectAndUpdateTextNode: (fromNode: EditorNodeWrapper, fromNodeKey: string, newNodeKey: string, newNode: EditorNodeWrapper, tempPosition: { x: number; y: number }) => void;
   _finalizeTextNodeCreation: (fromNodeKey: string, newNodeKey: string) => Promise<void>;
 
@@ -224,14 +179,75 @@ interface EditorStore extends EditorState {
   _handleContinuousDrag: (nodeKey: string, currentTime: number) => void;
   _addMoveHistory: (nodeKey: string) => void;
 
-  // === LAYOUT DOMAIN - 위치 계산 헬퍼 메서드들 (private) ===
+  // 노드 공통 유틸리티 헬퍼들
+  _validateNodeCountLimit: (options?: { endCompoundAction?: boolean }) => { isValid: boolean };
+
+  // === HISTORY DOMAIN ===
+  // Undo/Redo 상태
+  history: HistoryState[];
+  historyIndex: number;
+  isUndoRedoInProgress: boolean;
+
+  // 복합 액션 그룹 관리
+  currentCompoundActionId: string | null;
+  compoundActionStartState: HistoryState | null;
+
+  // 복합 액션 그룹 관리
+  startCompoundAction: (actionName: string) => string;
+  endCompoundAction: () => void;
+
+  // Undo/Redo 액션들
+  pushToHistory: (action: string) => void;
+  pushToHistoryWithTextEdit: (action: string) => void; // 텍스트 편집 전용 히스토리
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+
+  // === LAYOUT DOMAIN
+  // 위치 계산 액션들
+  getNextNodePosition: () => { x: number; y: number };
+  calculateChildNodePosition: (parentNodeKey: string, choiceKey?: string) => { x: number; y: number };
+
+  // 노드 자동 정렬 (기존)
+  arrangeChildNodesAsTree: (rootNodeKey: string) => void;
+  arrangeAllNodesAsTree: () => void;
+  arrangeNodesWithDagre: () => void;
+
+  // 새로운 레이아웃 시스템 (즉시 배치)
+  arrangeAllNodes: (internal?: boolean) => Promise<void>;
+  arrangeSelectedNodeChildren: (nodeKey: string, internal?: boolean) => Promise<void>;
+  arrangeSelectedNodeDescendants: (nodeKey: string, internal?: boolean) => Promise<void>;
+
+  // 노드 정렬 헬퍼 메서드들
+  _buildNodeRelationMaps: (currentScene: Scene, allNodeKeys: string[]) => { childrenMap: Map<string, string[]>; parentMap: Map<string, string[]> };
+  _buildNodeLevelMap: (rootNodeKey: string, childrenMap: Map<string, string[]>) => Map<number, string[]>;
+  _updateLevelNodePositions: (levelMap: Map<number, string[]>, startX: number, rootY: number) => void;
+  _updateChildNodePositions: (levelMap: Map<number, string[]>, rootNodeKey: string, startX: number, startY: number) => void;
+  _findRootNodeForLayout: (currentScene: Scene, allNodeKeys: string[]) => string;
+  _runGlobalLayoutSystem: (currentScene: Scene, rootNodeKey: string) => Promise<void>;
+  _runLayoutSystem: (currentScene: Scene, rootNodeId: string, layoutType: "global" | "descendant" | "child") => Promise<void>;
+  _handleLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, allNodeKeys: string[]) => void;
+  _handleLayoutSystemResult: (beforePositions: Map<string, { x: number; y: number }>, nodeKeys: string[], layoutType: "global" | "descendant" | "child", nodeCount: number) => void;
+
+  // 위치 계산 헬퍼 메서드들 (private)
   _initializePositionCalculation: () => any;
   _calculateCandidatePosition: (initData: any) => { x: number; y: number };
   _findNonOverlappingPosition: (candidatePosition: { x: number; y: number }, initData: any) => { x: number; y: number };
   _getFallbackPosition: (lastNodePosition: { x: number; y: number }) => { x: number; y: number };
 
-  // === NODE DOMAIN - 공통 유틸리티 헬퍼들 (private) ===
-  _validateNodeCountLimit: (options?: { endCompoundAction?: boolean }) => { isValid: boolean };
+  // 후손/자식 정렬 헬퍼 메서드들 (private)
+  _findRelatedNodes: (nodeKey: string, currentScene: Scene, maxDepth?: number) => Set<string>;
+  _findDescendantNodes: (nodeKey: string, currentScene: Scene) => Set<string>;
+  _runDescendantLayoutSystem: (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => Promise<void>;
+  _handleDescendantLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], descendantCount: number) => void;
+  _findChildNodes: (nodeKey: string, currentScene: Scene) => Set<string>;
+  _runChildLayoutSystem: (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => Promise<void>;
+  _handleChildLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], childCount: number) => void;
+
+  // === UI DOMAIN ===
+  // 전역 토스트 함수
+  showToast?: (message: string, type?: "success" | "info" | "warning") => void;
 }
 
 // 타입 안전한 헬퍼 함수들
@@ -311,10 +327,10 @@ const initialState: EditorState = {
   currentTemplate: "default",
   templateData: createEmptyTemplate(),
   currentScene: "main",
-  
+
   // NODE DOMAIN
   selectedNodeKey: undefined,
-  
+
   // LAYOUT DOMAIN
   lastNodePosition: { x: 250, y: 100 },
 };
@@ -897,7 +913,7 @@ export const useEditorStore = create<EditorStore>()(
 
         // 헬퍼 메서드: 로컬라이제이션 키 수집 (다중 삭제용, 통합 함수 호출)
         _collectKeysForCleanup: (targetKeys: string[], currentScene: Scene) => {
-          const nodes = targetKeys.map(nodeKey => getNode(currentScene, nodeKey)).filter(Boolean) as EditorNodeWrapper[];
+          const nodes = targetKeys.map((nodeKey) => getNode(currentScene, nodeKey)).filter(Boolean) as EditorNodeWrapper[];
           return get()._collectLocalizationKeys(nodes);
         },
 
@@ -1085,7 +1101,7 @@ export const useEditorStore = create<EditorStore>()(
         // 삭제 대상 노드를 참조하는 다른 노드들 찾기
         _findReferencingNodes: (currentScene: Scene, nodeKey: string): string[] => {
           const referencingNodes: string[] = [];
-          
+
           Object.entries(currentScene).forEach(([key, nodeWrapper]) => {
             if (key === nodeKey) return; // 자기 자신은 제외
 
@@ -1145,7 +1161,7 @@ export const useEditorStore = create<EditorStore>()(
 
         moveNode: (nodeKey, position) => {
           const currentTime = Date.now();
-          
+
           // 1. 노드 및 위치 변경 유효성 검사
           const validationResult = get()._validateNodeMovement(nodeKey, position);
           if (!validationResult.isValid) return;
@@ -1168,7 +1184,7 @@ export const useEditorStore = create<EditorStore>()(
         _validateNodeMovement: (nodeKey: string, position: { x: number; y: number }) => {
           const state = get();
           const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          
+
           if (!currentScene) {
             return { isValid: false, currentNode: null, hasPositionChanged: false };
           }
@@ -1182,10 +1198,10 @@ export const useEditorStore = create<EditorStore>()(
           const oldPosition = currentNode.position;
           const hasPositionChanged = Math.round(oldPosition.x) !== Math.round(position.x) || Math.round(oldPosition.y) !== Math.round(position.y);
 
-          return { 
-            isValid: hasPositionChanged, 
-            currentNode, 
-            hasPositionChanged 
+          return {
+            isValid: hasPositionChanged,
+            currentNode,
+            hasPositionChanged,
           };
         },
 
@@ -1193,9 +1209,8 @@ export const useEditorStore = create<EditorStore>()(
         _checkContinuousDrag: (nodeKey: string, currentTime: number): boolean => {
           const state = get();
           const CONTINUOUS_DRAG_THRESHOLD = 1000; // 1초 이내면 연속 드래그로 간주
-          
-          return state.lastDraggedNodeKey === nodeKey && 
-                 currentTime - state.lastDragActionTime <= CONTINUOUS_DRAG_THRESHOLD;
+
+          return state.lastDraggedNodeKey === nodeKey && currentTime - state.lastDragActionTime <= CONTINUOUS_DRAG_THRESHOLD;
         },
 
         // 실제 노드 위치 업데이트
@@ -1231,10 +1246,7 @@ export const useEditorStore = create<EditorStore>()(
           const currentState = get();
           const lastHistory = currentState.history[currentState.historyIndex];
 
-          if (lastHistory && 
-              lastHistory.action === `노드 이동 (${nodeKey})` && 
-              currentTime - lastHistory.timestamp < 2000) {
-            
+          if (lastHistory && lastHistory.action === `노드 이동 (${nodeKey})` && currentTime - lastHistory.timestamp < 2000) {
             // 기존 히스토리의 최종 상태만 업데이트 (덮어쓰기)
             set((state) => {
               const updatedHistory = [...state.history];
@@ -1752,7 +1764,15 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         // 헬퍼 메서드: 선택지 노드 연결 및 상태 업데이트
-        _connectAndUpdateChoiceNode: (fromNode: EditorNodeWrapper, fromNodeKey: string, choiceKey: string, choice: any, newNodeKey: string, newNode: EditorNodeWrapper, tempPosition: { x: number; y: number }) => {
+        _connectAndUpdateChoiceNode: (
+          fromNode: EditorNodeWrapper,
+          fromNodeKey: string,
+          choiceKey: string,
+          choice: any,
+          newNodeKey: string,
+          newNode: EditorNodeWrapper,
+          tempPosition: { x: number; y: number }
+        ) => {
           // 부모 노드의 선택지 연결 업데이트
           const updatedFromNode = { ...fromNode };
           (updatedFromNode.dialogue as ChoiceDialogue).choices[choiceKey] = {
@@ -1894,7 +1914,7 @@ export const useEditorStore = create<EditorStore>()(
         // 후보 위치 계산 (이전 노드 기준)
         _calculateCandidatePosition: (initData: any) => {
           const { lastNodePosition, constants } = initData;
-          
+
           return {
             x: lastNodePosition.x + constants.DEFAULT_NODE_WIDTH + constants.SPACING_X,
             y: lastNodePosition.y,
@@ -1930,9 +1950,7 @@ export const useEditorStore = create<EditorStore>()(
           // 겹치지 않는 위치 찾기
           let attempts = 0;
 
-          while (isPositionOccupied(candidateX, candidateY, estimatedNewNodeDimensions.width, estimatedNewNodeDimensions.height) && 
-                 attempts < constants.MAX_ATTEMPTS) {
-            
+          while (isPositionOccupied(candidateX, candidateY, estimatedNewNodeDimensions.width, estimatedNewNodeDimensions.height) && attempts < constants.MAX_ATTEMPTS) {
             candidateY += estimatedNewNodeDimensions.height + constants.SPACING_Y;
 
             // Y가 너무 아래로 가면 다음 열로 이동
@@ -2007,7 +2025,7 @@ export const useEditorStore = create<EditorStore>()(
         // 헬퍼 메서드: 텍스트 노드의 자식 위치 계산 (단일 자식)
         _calculateTextNodeChildPosition: (parentPosition: { x: number; y: number }, parentDimensions: { width: number; height: number }, HORIZONTAL_SPACING: number) => {
           const newNodeX = parentPosition.x + parentDimensions.width + HORIZONTAL_SPACING;
-          
+
           // TextNode의 경우 (단일 자식): 부모 중앙과 자식 중앙의 Y 좌표가 동일하도록 배치
           const parentCenterY = parentPosition.y + parentDimensions.height / 2;
           const newNodeDimensions = { width: 200, height: 120 }; // 새 노드 예상 크기
@@ -2017,7 +2035,15 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         // 헬퍼 메서드: 선택지 노드의 자식 위치 계산 (다중 자식)
-        _calculateChoiceNodeChildPosition: (parentNode: EditorNodeWrapper, choiceKey: string, parentPosition: { x: number; y: number }, parentDimensions: { width: number; height: number }, HORIZONTAL_SPACING: number, VERTICAL_SPACING: number, currentScene: Scene) => {
+        _calculateChoiceNodeChildPosition: (
+          parentNode: EditorNodeWrapper,
+          choiceKey: string,
+          parentPosition: { x: number; y: number },
+          parentDimensions: { width: number; height: number },
+          HORIZONTAL_SPACING: number,
+          VERTICAL_SPACING: number,
+          currentScene: Scene
+        ) => {
           const newNodeX = parentPosition.x + parentDimensions.width + HORIZONTAL_SPACING;
 
           if (parentNode.dialogue.type !== "choice") {
@@ -2710,7 +2736,7 @@ export const useEditorStore = create<EditorStore>()(
           const layoutConfigs = {
             global: { depth: null, anchorNodeId: undefined },
             descendant: { depth: null, anchorNodeId: rootNodeId },
-            child: { depth: 1, anchorNodeId: rootNodeId }
+            child: { depth: 1, anchorNodeId: rootNodeId },
           };
 
           const config = layoutConfigs[layoutType];
@@ -2759,7 +2785,12 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         // 통합 레이아웃 결과 처리 헬퍼
-        _handleLayoutSystemResult: (beforePositions: Map<string, { x: number; y: number }>, nodeKeys: string[], layoutType: "global" | "descendant" | "child", nodeCount: number) => {
+        _handleLayoutSystemResult: (
+          beforePositions: Map<string, { x: number; y: number }>,
+          nodeKeys: string[],
+          layoutType: "global" | "descendant" | "child",
+          nodeCount: number
+        ) => {
           const afterState = get();
           const afterScene = afterState.templateData[afterState.currentTemplate]?.[afterState.currentScene];
           if (!afterScene) return;
@@ -2772,7 +2803,7 @@ export const useEditorStore = create<EditorStore>()(
             const messages = {
               global: `전체 캔버스 정렬 (${nodeCount}개 노드)`,
               descendant: `후손 노드 정렬 (${nodeCount}개 노드)`,
-              child: `자식 노드 정렬 (${nodeCount}개 노드)`
+              child: `자식 노드 정렬 (${nodeCount}개 노드)`,
             };
             get().pushToHistory(messages[layoutType]);
           } else {
@@ -2953,10 +2984,10 @@ export const useEditorStore = create<EditorStore>()(
         // 통합 헬퍼 메서드: 관련 노드 탐색 (depth 제한 지원)
         _findRelatedNodes: (nodeKey: string, currentScene: Scene, maxDepth: number = Infinity) => {
           const relatedNodeKeys = new Set<string>();
-          
+
           const findNodes = (currentNodeKey: string, currentDepth: number) => {
             if (currentDepth >= maxDepth) return;
-            
+
             const node = getNode(currentScene, currentNodeKey);
             if (!node) return;
 
@@ -2972,7 +3003,7 @@ export const useEditorStore = create<EditorStore>()(
               });
             }
           };
-          
+
           findNodes(nodeKey, 0);
           return relatedNodeKeys;
         },
@@ -3103,9 +3134,9 @@ export const useEditorStore = create<EditorStore>()(
           return get()._findRelatedNodes(nodeKey, currentScene, 1);
         },
 
-                 _runChildLayoutSystem: async (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => {
-           await get()._runLayoutSystem(currentScene, nodeKey, "child");
-         },
+        _runChildLayoutSystem: async (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => {
+          await get()._runLayoutSystem(currentScene, nodeKey, "child");
+        },
 
         _handleChildLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], childCount: number) => {
           get()._handleLayoutSystemResult(beforePositions, affectedNodeKeys, "child", childCount);
