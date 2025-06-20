@@ -119,6 +119,9 @@ interface EditorStore extends EditorState {
   _buildNodeLevelMap: (rootNodeKey: string, childrenMap: Map<string, string[]>) => Map<number, string[]>;
   _updateLevelNodePositions: (levelMap: Map<number, string[]>, startX: number, rootY: number) => void;
   _updateChildNodePositions: (levelMap: Map<number, string[]>, rootNodeKey: string, startX: number, startY: number) => void;
+  _findRootNodeForLayout: (currentScene: Scene, allNodeKeys: string[]) => string;
+  _runGlobalLayoutSystem: (currentScene: Scene, rootNodeKey: string) => Promise<void>;
+  _handleLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, allNodeKeys: string[]) => void;
 
   // 새로운 레이아웃 시스템 (즉시 배치)
   arrangeAllNodes: (internal?: boolean) => Promise<void>;
@@ -2499,7 +2502,108 @@ export const useEditorStore = create<EditorStore>()(
             };
           }),
 
-        // 새로운 레이아웃 시스템 (즉시 배치)
+        // 헬퍼 메서드: 레이아웃을 위한 루트 노드 찾기
+        _findRootNodeForLayout: (currentScene: Scene, allNodeKeys: string[]) => {
+          const parentMap = new Map<string, string[]>();
+
+          // 각 노드의 부모-자식 관계 매핑
+          allNodeKeys.forEach((nodeKey) => {
+            const node = getNode(currentScene, nodeKey);
+            if (!node) return;
+
+            const children: string[] = [];
+
+            if (node.dialogue.type === "text" && node.dialogue.nextNodeKey) {
+              children.push(node.dialogue.nextNodeKey);
+            } else if (node.dialogue.type === "choice") {
+              Object.values(node.dialogue.choices).forEach((choice) => {
+                if (choice.nextNodeKey) {
+                  children.push(choice.nextNodeKey);
+                }
+              });
+            }
+
+            // 부모 관계 매핑
+            children.forEach((childKey) => {
+              if (!parentMap.has(childKey)) {
+                parentMap.set(childKey, []);
+              }
+              parentMap.get(childKey)!.push(nodeKey);
+            });
+          });
+
+          // 루트 노드들 찾기 (부모가 없는 노드들)
+          const rootNodes = allNodeKeys.filter((nodeKey) => !parentMap.has(nodeKey));
+
+          // 루트 노드가 없으면 첫 번째 노드를 루트로 사용
+          return rootNodes.length > 0 ? rootNodes[0] : allNodeKeys[0];
+        },
+
+        // 헬퍼 메서드: 글로벌 레이아웃 시스템 실행
+        _runGlobalLayoutSystem: async (currentScene: Scene, rootNodeKey: string) => {
+          const { globalLayoutSystem } = await import("../utils/layoutEngine");
+
+          await globalLayoutSystem.runLayout(
+            currentScene,
+            {
+              rootNodeId: rootNodeKey,
+              depth: null, // 무제한 깊이
+              includeRoot: true,
+              direction: "LR",
+              nodeSpacing: 50,
+              rankSpacing: 100,
+              // 전체 정렬에서는 앵커 없음 (모든 노드 자유롭게 배치)
+              anchorNodeId: undefined,
+            },
+            (nodeId, position) => {
+              // moveNode를 직접 호출하지 않고 위치만 업데이트 (히스토리 중복 방지)
+              const currentState = get();
+              const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
+              if (!currentScene) return;
+
+              const currentNode = getNode(currentScene, nodeId);
+              if (!currentNode) return;
+
+              const updatedNode = { ...currentNode, position };
+              const updatedScene = setNode(currentScene, nodeId, updatedNode);
+
+              set((state) => ({
+                ...state,
+                templateData: {
+                  ...state.templateData,
+                  [state.currentTemplate]: {
+                    ...state.templateData[state.currentTemplate],
+                    [state.currentScene]: updatedScene,
+                  },
+                },
+                lastNodePosition: position,
+              }));
+            }
+          );
+        },
+
+        // 헬퍼 메서드: 레이아웃 결과 처리 (위치 변화 감지 및 히스토리)
+        _handleLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, allNodeKeys: string[]) => {
+          const afterState = get();
+          const afterScene = afterState.templateData[afterState.currentTemplate]?.[afterState.currentScene];
+          if (!afterScene) return;
+
+          const afterPositions = captureNodePositions(afterScene, allNodeKeys);
+          const hasChanged = comparePositions(beforePositions, afterPositions);
+
+          if (hasChanged) {
+            // 변화가 있을 때만 히스토리 저장
+            get().pushToHistory(`전체 캔버스 정렬 (${allNodeKeys.length}개 노드)`);
+          } else {
+            // 변화가 없으면 토스트 메시지 표시
+            const showToast = get().showToast;
+            if (showToast) {
+              showToast("이미 정렬된 상태입니다", "info");
+            }
+          }
+        },
+
+        // 새로운 레이아웃 시스템 (즉시 배치) - 리팩터링됨
         arrangeAllNodes: async (internal = false) => {
           // 내부 호출이 아닐 때만 AsyncOperationManager 사용
           if (!internal && !globalAsyncOperationManager.startOperation("전체 캔버스 정렬")) {
@@ -2514,102 +2618,17 @@ export const useEditorStore = create<EditorStore>()(
             const allNodeKeys = Object.keys(currentScene);
             if (allNodeKeys.length === 0) return;
 
-            // 정렬 전 위치 캡처
+            // 1. 정렬 전 위치 캡처
             const beforePositions = captureNodePositions(currentScene, allNodeKeys);
 
-            // 그래프 구조 분석을 통한 올바른 루트 노드 찾기
-            const parentMap = new Map<string, string[]>();
+            // 2. 루트 노드 찾기
+            const rootNodeKey = get()._findRootNodeForLayout(currentScene, allNodeKeys);
 
-            // 각 노드의 부모-자식 관계 매핑
-            allNodeKeys.forEach((nodeKey) => {
-              const node = getNode(currentScene, nodeKey);
-              if (!node) return;
+            // 3. 글로벌 레이아웃 시스템 실행
+            await get()._runGlobalLayoutSystem(currentScene, rootNodeKey);
 
-              const children: string[] = [];
-
-              if (node.dialogue.type === "text" && node.dialogue.nextNodeKey) {
-                children.push(node.dialogue.nextNodeKey);
-              } else if (node.dialogue.type === "choice") {
-                Object.values(node.dialogue.choices).forEach((choice) => {
-                  if (choice.nextNodeKey) {
-                    children.push(choice.nextNodeKey);
-                  }
-                });
-              }
-
-              // 부모 관계 매핑
-              children.forEach((childKey) => {
-                if (!parentMap.has(childKey)) {
-                  parentMap.set(childKey, []);
-                }
-                parentMap.get(childKey)!.push(nodeKey);
-              });
-            });
-
-            // 루트 노드들 찾기 (부모가 없는 노드들)
-            const rootNodes = allNodeKeys.filter((nodeKey) => !parentMap.has(nodeKey));
-
-            // 루트 노드가 없으면 첫 번째 노드를 루트로 사용
-            const rootNodeKey = rootNodes.length > 0 ? rootNodes[0] : allNodeKeys[0];
-
-            const { globalLayoutSystem } = await import("../utils/layoutEngine");
-
-            await globalLayoutSystem.runLayout(
-              currentScene,
-              {
-                rootNodeId: rootNodeKey,
-                depth: null, // 무제한 깊이
-                includeRoot: true,
-                direction: "LR",
-                nodeSpacing: 50,
-                rankSpacing: 100,
-                // 전체 정렬에서는 앵커 없음 (모든 노드 자유롭게 배치)
-                anchorNodeId: undefined,
-              },
-              (nodeId, position) => {
-                // moveNode를 직접 호출하지 않고 위치만 업데이트 (히스토리 중복 방지)
-                const currentState = get();
-                const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
-                if (!currentScene) return;
-
-                const currentNode = getNode(currentScene, nodeId);
-                if (!currentNode) return;
-
-                const updatedNode = { ...currentNode, position };
-                const updatedScene = setNode(currentScene, nodeId, updatedNode);
-
-                set((state) => ({
-                  ...state,
-                  templateData: {
-                    ...state.templateData,
-                    [state.currentTemplate]: {
-                      ...state.templateData[state.currentTemplate],
-                      [state.currentScene]: updatedScene,
-                    },
-                  },
-                  lastNodePosition: position,
-                }));
-              }
-            );
-
-            // 정렬 후 위치 캡처 및 변화 감지
-            const afterState = get();
-            const afterScene = afterState.templateData[afterState.currentTemplate]?.[afterState.currentScene];
-            if (!afterScene) return;
-
-            const afterPositions = captureNodePositions(afterScene, allNodeKeys);
-            const hasChanged = comparePositions(beforePositions, afterPositions);
-
-            if (hasChanged) {
-              // 변화가 있을 때만 히스토리 저장
-              get().pushToHistory(`전체 캔버스 정렬 (${allNodeKeys.length}개 노드)`);
-            } else {
-              // 변화가 없으면 토스트 메시지 표시
-              const showToast = get().showToast;
-              if (showToast) {
-                showToast("이미 정렬된 상태입니다", "info");
-              }
-            }
+            // 4. 레이아웃 결과 처리
+            get()._handleLayoutResult(beforePositions, allNodeKeys);
           } catch (error) {
             console.error("[정렬 시스템] 전체 캔버스 정렬 중 오류:", error);
             if (!internal) {
