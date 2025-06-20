@@ -122,6 +122,7 @@ interface EditorStore extends EditorState {
   _findRootNodeForLayout: (currentScene: Scene, allNodeKeys: string[]) => string;
   _runGlobalLayoutSystem: (currentScene: Scene, rootNodeKey: string) => Promise<void>;
   _handleLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, allNodeKeys: string[]) => void;
+  _handleLayoutSystemResult: (beforePositions: Map<string, { x: number; y: number }>, nodeKeys: string[], layoutType: "global" | "descendant" | "child", nodeCount: number) => void;
   _validatePasteOperation: (nodesToPaste: number) => boolean;
   _setupPastedNodeLocalization: (newNode: EditorNodeWrapper) => void;
   _createPastedNodes: (startX: number, startY: number) => { newNodes: EditorNodeWrapper[]; newNodeKeys: string[] };
@@ -2744,16 +2745,26 @@ export const useEditorStore = create<EditorStore>()(
 
         // 헬퍼 메서드: 레이아웃 결과 처리 (위치 변화 감지 및 히스토리)
         _handleLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, allNodeKeys: string[]) => {
+          get()._handleLayoutSystemResult(beforePositions, allNodeKeys, "global", allNodeKeys.length);
+        },
+
+        // 통합 레이아웃 결과 처리 헬퍼
+        _handleLayoutSystemResult: (beforePositions: Map<string, { x: number; y: number }>, nodeKeys: string[], layoutType: "global" | "descendant" | "child", nodeCount: number) => {
           const afterState = get();
           const afterScene = afterState.templateData[afterState.currentTemplate]?.[afterState.currentScene];
           if (!afterScene) return;
 
-          const afterPositions = captureNodePositions(afterScene, allNodeKeys);
+          const afterPositions = captureNodePositions(afterScene, nodeKeys);
           const hasChanged = comparePositions(beforePositions, afterPositions);
 
           if (hasChanged) {
-            // 변화가 있을 때만 히스토리 저장
-            get().pushToHistory(`전체 캔버스 정렬 (${allNodeKeys.length}개 노드)`);
+            // 레이아웃 타입별 히스토리 메시지
+            const messages = {
+              global: `전체 캔버스 정렬 (${nodeCount}개 노드)`,
+              descendant: `후손 노드 정렬 (${nodeCount}개 노드)`,
+              child: `자식 노드 정렬 (${nodeCount}개 노드)`
+            };
+            get().pushToHistory(messages[layoutType]);
           } else {
             // 변화가 없으면 토스트 메시지 표시
             const showToast = get().showToast;
@@ -2994,23 +3005,7 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         _handleDescendantLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], descendantCount: number) => {
-          const afterState = get();
-          const afterScene = afterState.templateData[afterState.currentTemplate]?.[afterState.currentScene];
-          if (!afterScene) return;
-
-          const afterPositions = captureNodePositions(afterScene, affectedNodeKeys);
-          const hasChanged = comparePositions(beforePositions, afterPositions);
-
-          if (hasChanged) {
-            // 변화가 있을 때만 히스토리 저장
-            get().pushToHistory(`후손 노드 정렬 (${descendantCount}개 노드)`);
-          } else {
-            // 변화가 없으면 토스트 메시지 표시
-            const showToast = get().showToast;
-            if (showToast) {
-              showToast("이미 정렬된 상태입니다", "info");
-            }
-          }
+          get()._handleLayoutSystemResult(beforePositions, affectedNodeKeys, "descendant", descendantCount);
         },
 
         // 텍스트 노드 생성 및 연결 헬퍼 메서드들 (private)
@@ -3187,23 +3182,7 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         _handleChildLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], childCount: number) => {
-          const afterState = get();
-          const afterScene = afterState.templateData[afterState.currentTemplate]?.[afterState.currentScene];
-          if (!afterScene) return;
-
-          const afterPositions = captureNodePositions(afterScene, affectedNodeKeys);
-          const hasChanged = comparePositions(beforePositions, afterPositions);
-
-          if (hasChanged) {
-            // 변화가 있을 때만 히스토리 저장
-            get().pushToHistory(`자식 노드 정렬 (${childCount}개 노드)`);
-          } else {
-            // 변화가 없으면 토스트 메시지 표시
-            const showToast = get().showToast;
-            if (showToast) {
-              showToast("이미 정렬된 상태입니다", "info");
-            }
-          }
+          get()._handleLayoutSystemResult(beforePositions, affectedNodeKeys, "child", childCount);
         },
       };
     },
