@@ -133,6 +133,10 @@ interface EditorStore extends EditorState {
   _collectKeysForCleanup: (targetKeys: string[], currentScene: Scene) => string[];
   _performNodesDeletion: (targetKeys: string[]) => void;
   _finalizeNodesDeletion: (allKeysToCleanup: string[], targetKeys: string[]) => void;
+  _validateChoiceNodeCreation: (fromNodeKey: string, choiceKey: string) => { isValid: boolean; fromNode: EditorNodeWrapper | null; choice: any | null; currentScene: Scene | null };
+  _createNewChoiceChild: (fromNode: EditorNodeWrapper, fromNodeKey: string, choiceKey: string, nodeType: "text" | "choice") => { newNodeKey: string; newNode: EditorNodeWrapper; tempPosition: { x: number; y: number } };
+  _connectAndUpdateChoiceNode: (fromNode: EditorNodeWrapper, fromNodeKey: string, choiceKey: string, choice: any, newNodeKey: string, newNode: EditorNodeWrapper, tempPosition: { x: number; y: number }) => void;
+  _finalizeChoiceNodeCreation: (fromNodeKey: string, newNodeKey: string) => void;
 
   // 새로운 레이아웃 시스템 (즉시 배치)
   arrangeAllNodes: (internal?: boolean) => Promise<void>;
@@ -1588,44 +1592,46 @@ export const useEditorStore = create<EditorStore>()(
             };
           }),
 
-        // AC-02: 선택지별 새 노드 자동 생성 및 연결
-        createAndConnectChoiceNode: (fromNodeKey, choiceKey, nodeType = "text") => {
+        // 헬퍼 메서드: 선택지 노드 생성 유효성 검증 (복합 액션 시작 포함)
+        _validateChoiceNodeCreation: (fromNodeKey: string, choiceKey: string) => {
           // 복합 액션 시작
           get().startCompoundAction("선택지 노드 생성 및 연결");
 
           // 노드 개수 제한 체크
           if (!get().canCreateNewNode()) {
-            get().endCompoundAction(); // 복합 액션 종료
+            get().endCompoundAction();
             const state = get();
             if (state.showToast) {
               state.showToast(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`, "warning");
             }
-            return "";
+            return { isValid: false, fromNode: null, choice: null, currentScene: null };
           }
 
           const state = get();
           const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
           if (!currentScene) {
-            get().endCompoundAction(); // 복합 액션 종료
-            return "";
+            get().endCompoundAction();
+            return { isValid: false, fromNode: null, choice: null, currentScene: null };
           }
 
           const fromNode = getNode(currentScene, fromNodeKey);
           if (!fromNode || fromNode.dialogue.type !== "choice") {
-            get().endCompoundAction(); // 복합 액션 종료
-            return "";
+            get().endCompoundAction();
+            return { isValid: false, fromNode: null, choice: null, currentScene };
           }
 
           const choice = fromNode.dialogue.choices[choiceKey];
           if (!choice) {
-            get().endCompoundAction(); // 복합 액션 종료
-            return "";
+            get().endCompoundAction();
+            return { isValid: false, fromNode, choice: null, currentScene };
           }
 
-          // 새 노드 생성
-          const newNodeKey = get().generateNodeKey();
+          return { isValid: true, fromNode, choice, currentScene };
+        },
 
-          // 임시 위치 계산 (정확한 위치는 나중에 계산)
+        // 헬퍼 메서드: 새 선택지 자식 노드 생성 (화자 복사 포함)
+        _createNewChoiceChild: (fromNode: EditorNodeWrapper, fromNodeKey: string, choiceKey: string, nodeType: "text" | "choice") => {
+          const newNodeKey = get().generateNodeKey();
           const tempPosition = get().calculateChildNodePosition(fromNodeKey, choiceKey);
 
           // 화자 자동 복사: 부모 노드에 화자가 있으면 자동으로 복사
@@ -1644,6 +1650,11 @@ export const useEditorStore = create<EditorStore>()(
             newNode = createNodeWrapper(newNodeKey, dialogue, tempPosition, true);
           }
 
+          return { newNodeKey, newNode, tempPosition };
+        },
+
+        // 헬퍼 메서드: 선택지 노드 연결 및 상태 업데이트
+        _connectAndUpdateChoiceNode: (fromNode: EditorNodeWrapper, fromNodeKey: string, choiceKey: string, choice: any, newNodeKey: string, newNode: EditorNodeWrapper, tempPosition: { x: number; y: number }) => {
           // 부모 노드의 선택지 연결 업데이트
           const updatedFromNode = { ...fromNode };
           (updatedFromNode.dialogue as ChoiceDialogue).choices[choiceKey] = {
@@ -1675,7 +1686,10 @@ export const useEditorStore = create<EditorStore>()(
 
           // 복합 액션 중이므로 개별 히스토리 추가하지 않음
           updateLocalizationStoreRef();
+        },
 
+        // 헬퍼 메서드: 선택지 노드 생성 마무리 (비동기 레이아웃 + 복합 액션 종료)
+        _finalizeChoiceNodeCreation: (fromNodeKey: string, newNodeKey: string) => {
           // Dagre 레이아웃을 사용하여 정확한 위치 계산 및 배치 (DOM 렌더링 후)
           setTimeout(async () => {
             try {
@@ -1691,6 +1705,22 @@ export const useEditorStore = create<EditorStore>()(
               get().endCompoundAction();
             }
           }, 100); // DOM 렌더링 후 정렬하기 위한 지연
+        },
+
+        // AC-02: 선택지별 새 노드 자동 생성 및 연결 (리팩터링됨)
+        createAndConnectChoiceNode: (fromNodeKey, choiceKey, nodeType = "text") => {
+          // 1. 유효성 검증 (복합 액션 시작 포함)
+          const { isValid, fromNode, choice, currentScene } = get()._validateChoiceNodeCreation(fromNodeKey, choiceKey);
+          if (!isValid || !fromNode || !choice) return "";
+
+          // 2. 새 자식 노드 생성
+          const { newNodeKey, newNode, tempPosition } = get()._createNewChoiceChild(fromNode, fromNodeKey, choiceKey, nodeType);
+
+          // 3. 연결 및 상태 업데이트
+          get()._connectAndUpdateChoiceNode(fromNode, fromNodeKey, choiceKey, choice, newNodeKey, newNode, tempPosition);
+
+          // 4. 비동기 마무리 작업
+          get()._finalizeChoiceNodeCreation(fromNodeKey, newNodeKey);
 
           return newNodeKey;
         },
