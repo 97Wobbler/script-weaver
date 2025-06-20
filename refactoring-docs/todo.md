@@ -126,7 +126,7 @@
 -   [x] 메서드 분할 순서 명시
 -   [ ] 한 메서드 단위로 작업 - 커밋 - 사용자 확인 반복
     -   [x] arrangeAllNodesAsTree (155줄) - 전체 트리 정렬 ✅ **완료 (39줄로 분할)**
-    -   [ ] arrangeChildNodesAsTree (141줄) - 트리 정렬  
+    -   [x] arrangeChildNodesAsTree (141줄) - 트리 정렬 ✅ **완료 (19줄로 분할)**
     -   [ ] arrangeAllNodes (121줄) - 전체 레이아웃 정렬
     -   [ ] pasteNodes (115줄) - 복사/붙여넣기 로직
     -   [ ] calculateChildNodePosition (113줄) - 자식 위치 계산
@@ -145,7 +145,7 @@
 -   메서드별 단일 책임 명확화
 -   기능 100% 보존
 
-**진행 상황**: **1/13 완료** (7.7%)
+**진행 상황**: **2/13 완료** (15.4%)
 
 ---
 
