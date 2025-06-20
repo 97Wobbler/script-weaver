@@ -108,8 +108,8 @@
 
 #### 1.1 메서드 크기 측정 및 분류
 
--   [ ] [log.md](./log.md)에 분석된 메서드 크기 및 분류 등의 정보 확인
--   [ ] 확인한 정보에 따라, 리팩토링 순서
+-   [x] [log.md](./log.md)에 분석된 메서드 크기 및 분류 등의 정보 확인
+-   [x] 확인한 정보에 따라, 리팩토링 순서 결정
 
 #### 1.2 대형 메서드 분할
 
@@ -121,16 +121,23 @@
 3. **헬퍼 패턴**: 복잡한 로직은 private 헬퍼 메서드로 추출
 4. **최대 크기**: 모든 public 메서드는 최대 50줄 이하로 분할
 
-**주요 대상 정리**
+**주요 대상 정리** (log.md 기준 50줄+ 메서드, 라인 수 순)
 
--   [ ] 메서드 분할 순서 명시
+-   [x] 메서드 분할 순서 명시
 -   [ ] 한 메서드 단위로 작업 - 커밋 - 사용자 확인 반복
-    -   [ ] (메서드 이름)
-    -   [ ] (메서드 이름)
-    -   [ ] (메서드 이름)
-    -   [ ] (메서드 이름)
-    -   [ ] (메서드 이름)
-    -   [ ] ...
+    -   [ ] arrangeAllNodesAsTree (155줄) - 전체 트리 정렬
+    -   [ ] arrangeChildNodesAsTree (141줄) - 트리 정렬  
+    -   [ ] arrangeAllNodes (121줄) - 전체 레이아웃 정렬
+    -   [ ] pasteNodes (115줄) - 복사/붙여넣기 로직
+    -   [ ] calculateChildNodePosition (113줄) - 자식 위치 계산
+    -   [ ] deleteSelectedNodes (110줄) - 다중 노드 삭제 로직
+    -   [ ] createAndConnectChoiceNode (107줄) - 노드 생성/연결
+    -   [ ] arrangeSelectedNodeDescendants (107줄) - 후손 노드 정렬
+    -   [ ] createAndConnectTextNode (104줄) - 노드 생성/연결
+    -   [ ] arrangeSelectedNodeChildren (99줄) - 자식 노드 정렬
+    -   [ ] deleteNode (90줄) - 단일 노드 삭제
+    -   [ ] moveNode (80줄) - 노드 위치 이동
+    -   [ ] getNextNodePosition (80줄) - 위치 계산
 
 **성공 기준**:
 
