@@ -170,6 +170,7 @@ interface EditorStore extends EditorState {
   updateNodePositionAndVisibility: (nodeKey: string, position: { x: number; y: number }, hidden: boolean) => void;
 
   // 후손 노드 정렬 헬퍼 메서드들 (private)
+  _findRelatedNodes: (nodeKey: string, currentScene: Scene, maxDepth?: number) => Set<string>;
   _findDescendantNodes: (nodeKey: string, currentScene: Scene) => Set<string>;
   _runDescendantLayoutSystem: (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => Promise<void>;
   _handleDescendantLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], descendantCount: number) => void;
@@ -2927,27 +2928,36 @@ export const useEditorStore = create<EditorStore>()(
             };
           }),
 
-        // 후손 노드 정렬 헬퍼 메서드들 (private)
-        _findDescendantNodes: (nodeKey: string, currentScene: Scene) => {
-          const descendantNodeKeys = new Set<string>();
-          const findDescendants = (currentNodeKey: string) => {
+        // 통합 헬퍼 메서드: 관련 노드 탐색 (depth 제한 지원)
+        _findRelatedNodes: (nodeKey: string, currentScene: Scene, maxDepth: number = Infinity) => {
+          const relatedNodeKeys = new Set<string>();
+          
+          const findNodes = (currentNodeKey: string, currentDepth: number) => {
+            if (currentDepth >= maxDepth) return;
+            
             const node = getNode(currentScene, currentNodeKey);
             if (!node) return;
 
             if (node.dialogue.type === "text" && node.dialogue.nextNodeKey) {
-              descendantNodeKeys.add(node.dialogue.nextNodeKey);
-              findDescendants(node.dialogue.nextNodeKey);
+              relatedNodeKeys.add(node.dialogue.nextNodeKey);
+              findNodes(node.dialogue.nextNodeKey, currentDepth + 1);
             } else if (node.dialogue.type === "choice") {
               Object.values(node.dialogue.choices).forEach((choice) => {
                 if (choice.nextNodeKey) {
-                  descendantNodeKeys.add(choice.nextNodeKey);
-                  findDescendants(choice.nextNodeKey);
+                  relatedNodeKeys.add(choice.nextNodeKey);
+                  findNodes(choice.nextNodeKey, currentDepth + 1);
                 }
               });
             }
           };
-          findDescendants(nodeKey);
-          return descendantNodeKeys;
+          
+          findNodes(nodeKey, 0);
+          return relatedNodeKeys;
+        },
+
+        // 헬퍼 메서드: 후손 노드 탐색 (통합 함수 호출)
+        _findDescendantNodes: (nodeKey: string, currentScene: Scene) => {
+          return get()._findRelatedNodes(nodeKey, currentScene, Infinity);
         },
 
         _runDescendantLayoutSystem: async (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => {
@@ -3070,25 +3080,10 @@ export const useEditorStore = create<EditorStore>()(
           });
         },
 
-        // 자식 노드 정렬 헬퍼 메서드들 (private)
-                 _findChildNodes: (nodeKey: string, currentScene: Scene) => {
-           const childNodeKeys = new Set<string>();
-           const parentNode = getNode(currentScene, nodeKey);
-           if (!parentNode) return childNodeKeys;
-
-           // 직접 자식만 찾기 (재귀 없음)
-           if (parentNode.dialogue.type === "text" && parentNode.dialogue.nextNodeKey) {
-             childNodeKeys.add(parentNode.dialogue.nextNodeKey);
-           } else if (parentNode.dialogue.type === "choice") {
-             Object.values(parentNode.dialogue.choices).forEach((choice) => {
-               if (choice.nextNodeKey) {
-                 childNodeKeys.add(choice.nextNodeKey);
-               }
-             });
-           }
-
-           return childNodeKeys;
-         },
+        // 헬퍼 메서드: 직접 자식 노드 탐색 (통합 함수 호출)
+        _findChildNodes: (nodeKey: string, currentScene: Scene) => {
+          return get()._findRelatedNodes(nodeKey, currentScene, 1);
+        },
 
                  _runChildLayoutSystem: async (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => {
            await get()._runLayoutSystem(currentScene, nodeKey, "child");
