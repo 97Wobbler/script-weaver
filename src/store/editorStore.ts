@@ -195,6 +195,12 @@ interface EditorStore extends EditorState {
   _performNodeMove: (nodeKey: string, position: { x: number; y: number }, currentTime: number) => void;
   _handleContinuousDrag: (nodeKey: string, currentTime: number) => void;
   _addMoveHistory: (nodeKey: string) => void;
+
+  // 노드 위치 계산 헬퍼 메서드들 (private)
+  _initializePositionCalculation: () => any;
+  _calculateCandidatePosition: (initData: any) => { x: number; y: number };
+  _findNonOverlappingPosition: (candidatePosition: { x: number; y: number }, initData: any) => { x: number; y: number };
+  _getFallbackPosition: (lastNodePosition: { x: number; y: number }) => { x: number; y: number };
 }
 
 // 타입 안전한 헬퍼 함수들
@@ -1852,74 +1858,107 @@ export const useEditorStore = create<EditorStore>()(
 
         // 유틸리티 - 안정적인 노드 위치 계산
         getNextNodePosition: () => {
-          const state = get();
-          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-
-          if (!currentScene) {
+          // 1. 기본 설정 및 초기화
+          const initData = get()._initializePositionCalculation();
+          if (!initData.currentScene) {
             return { x: 100, y: 100 };
           }
 
-          // 현재 씬의 모든 노드 위치 확인
-          const allNodes = Object.values(currentScene);
+          // 2. 후보 위치 계산
+          const candidatePosition = get()._calculateCandidatePosition(initData);
 
-          // 기본 노드 크기 (더 안정적인 고정값 사용)
-          const DEFAULT_NODE_WIDTH = 200;
-          const DEFAULT_NODE_HEIGHT = 120;
+          // 3. 겹치지 않는 위치 찾기
+          const finalPosition = get()._findNonOverlappingPosition(candidatePosition, initData);
 
-          // 기본 간격 설정
-          const SPACING_X = 60;
-          const SPACING_Y = 40;
+          return finalPosition;
+        },
 
-          // 새 위치 후보 계산 (이전 노드 기준)
-          let candidateX = state.lastNodePosition.x + DEFAULT_NODE_WIDTH + SPACING_X;
-          let candidateY = state.lastNodePosition.y;
+        // 기본 설정 및 초기화
+        _initializePositionCalculation: () => {
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+
+          return {
+            currentScene,
+            allNodes: currentScene ? Object.values(currentScene) : [],
+            lastNodePosition: state.lastNodePosition,
+            constants: {
+              DEFAULT_NODE_WIDTH: 200,
+              DEFAULT_NODE_HEIGHT: 120,
+              SPACING_X: 60,
+              SPACING_Y: 40,
+              MAX_ATTEMPTS: 20,
+              MAX_ROWS_PER_COLUMN: 4,
+            },
+          };
+        },
+
+        // 후보 위치 계산 (이전 노드 기준)
+        _calculateCandidatePosition: (initData: any) => {
+          const { lastNodePosition, constants } = initData;
+          
+          return {
+            x: lastNodePosition.x + constants.DEFAULT_NODE_WIDTH + constants.SPACING_X,
+            y: lastNodePosition.y,
+          };
+        },
+
+        // 겹치지 않는 위치 찾기
+        _findNonOverlappingPosition: (candidatePosition: { x: number; y: number }, initData: any) => {
+          const { allNodes, lastNodePosition, constants } = initData;
+          let { x: candidateX, y: candidateY } = candidatePosition;
 
           // 겹치는 노드가 있는지 확인하는 함수 (고정 크기 기반)
           const isPositionOccupied = (x: number, y: number, newNodeWidth: number, newNodeHeight: number) => {
-            return allNodes.some((node) => {
+            return allNodes.some((node: any) => {
               // 기본 노드 크기 사용 (더 안정적)
-              const existingDimensions = { width: DEFAULT_NODE_WIDTH, height: DEFAULT_NODE_HEIGHT };
+              const existingDimensions = { width: constants.DEFAULT_NODE_WIDTH, height: constants.DEFAULT_NODE_HEIGHT };
 
               // AABB (Axis-Aligned Bounding Box) 충돌 감지
               const overlap = !(
-                x + newNodeWidth + SPACING_X < node.position.x ||
-                x > node.position.x + existingDimensions.width + SPACING_X ||
-                y + newNodeHeight + SPACING_Y < node.position.y ||
-                y > node.position.y + existingDimensions.height + SPACING_Y
+                x + newNodeWidth + constants.SPACING_X < node.position.x ||
+                x > node.position.x + existingDimensions.width + constants.SPACING_X ||
+                y + newNodeHeight + constants.SPACING_Y < node.position.y ||
+                y > node.position.y + existingDimensions.height + constants.SPACING_Y
               );
 
               return overlap;
             });
           };
 
-          // 새 노드의 예상 크기 (타입에 따라 다름)
+          // 새 노드의 예상 크기
           const estimatedNewNodeDimensions = { width: 200, height: 120 };
 
           // 겹치지 않는 위치 찾기
           let attempts = 0;
-          const maxAttempts = 20;
 
-          while (isPositionOccupied(candidateX, candidateY, estimatedNewNodeDimensions.width, estimatedNewNodeDimensions.height) && attempts < maxAttempts) {
-            candidateY += estimatedNewNodeDimensions.height + SPACING_Y;
+          while (isPositionOccupied(candidateX, candidateY, estimatedNewNodeDimensions.width, estimatedNewNodeDimensions.height) && 
+                 attempts < constants.MAX_ATTEMPTS) {
+            
+            candidateY += estimatedNewNodeDimensions.height + constants.SPACING_Y;
 
             // Y가 너무 아래로 가면 다음 열로 이동
-            if (candidateY > state.lastNodePosition.y + (estimatedNewNodeDimensions.height + SPACING_Y) * 4) {
-              candidateX += estimatedNewNodeDimensions.width + SPACING_X;
-              candidateY = state.lastNodePosition.y;
+            if (candidateY > lastNodePosition.y + (estimatedNewNodeDimensions.height + constants.SPACING_Y) * constants.MAX_ROWS_PER_COLUMN) {
+              candidateX += estimatedNewNodeDimensions.width + constants.SPACING_X;
+              candidateY = lastNodePosition.y;
             }
 
             attempts++;
           }
 
-          // 최대 시도 횟수에 도달하면 강제로 위치 지정
-          if (attempts >= maxAttempts) {
-            candidateX = state.lastNodePosition.x + 250;
-            candidateY = state.lastNodePosition.y + 150;
+          // 최대 시도 횟수에 도달하면 폴백 위치 사용
+          if (attempts >= constants.MAX_ATTEMPTS) {
+            return get()._getFallbackPosition(lastNodePosition);
           }
 
+          return { x: candidateX, y: candidateY };
+        },
+
+        // 최대 시도 후 폴백 위치
+        _getFallbackPosition: (lastNodePosition: { x: number; y: number }) => {
           return {
-            x: candidateX,
-            y: candidateY,
+            x: lastNodePosition.x + 250,
+            y: lastNodePosition.y + 150,
           };
         },
 
