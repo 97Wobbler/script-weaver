@@ -137,49 +137,74 @@
 
 ---
 
-## 📋 **다음 Phase 준비 상황** (2025-06-20 21:59)
-
-### **Phase 2: 상태 및 메서드 도메인 그룹핑** (다음 단계)
+### **Phase 2: 상태 및 메서드 도메인 그룹핑** (2025-06-20 21:45 ~ 2025-06-20 22:38) ✅ **Phase 2.1 완료**
 
 **목표**: 관련 있는 상태와 메서드들을 논리적으로 그룹화
-**예상 소요**: 1주
-**준비 상태**: ✅ 도메인 경계 이미 식별 완료
 
-#### **2.1 상태 그룹 정의**
+#### **Phase 2.1: 상태 그룹 정의** ✅ **완료 (2025-06-20 21:45 ~ 22:38)**
+
+**완료 작업**: EditorStore 인터페이스 및 초기 상태를 5개 도메인으로 논리적 그룹핑
+
+##### **📊 도메인별 상태 그룹핑 결과**
+
+**1. PROJECT DOMAIN (프로젝트/씬 관리)**
+- `templateData: TemplateDialogues` - 전체 프로젝트 데이터
+- `currentTemplate: string` - 현재 선택된 템플릿
+- `currentScene: string` - 현재 선택된 씬
+
+**2. NODE DOMAIN (노드 관리)**
+- `selectedNodeKey?: string` - 단일 선택된 노드
+- `selectedNodeKeys: Set<string>` - 다중 선택된 노드들
+- `lastDraggedNodeKey: string | null` - 연속 드래그 감지용
+- `lastDragActionTime: number` - 드래그 액션 시간
+
+**3. HISTORY DOMAIN (실행취소/재실행)**
+- `history: HistoryState[]` - 히스토리 스택
+- `historyIndex: number` - 현재 히스토리 인덱스
+- `isUndoRedoInProgress: boolean` - 실행취소/재실행 진행 중 플래그
+- `currentCompoundActionId: string | null` - 복합 액션 ID
+- `compoundActionStartState: HistoryState | null` - 복합 액션 시작 상태
+
+**4. LAYOUT DOMAIN (레이아웃/위치)**
+- `lastNodePosition: { x: number; y: number }` - 마지막 노드 위치
+
+**5. UI DOMAIN (사용자 인터페이스)**
+- `showToast?: function` - 토스트 메시지 표시 함수
+
+##### **📋 인터페이스 구조 개선 결과**
+
+**기존**: 혼재된 상태 정의 (분류 없음)
+**개선 후**: 도메인별 주석 블록으로 명확한 그룹 분리
+
 ```typescript
-// editorStore.ts 내에서 논리적 그룹핑 (주석으로 구분)
-interface EditorState {
-    // === PROJECT DOMAIN === (3개 속성)
-    templateData, currentTemplate, currentScene
+interface EditorStore extends EditorState {
+  // === PROJECT DOMAIN - 액션들 ===
+  // 기본 액션들 (7개)
+  // 템플릿/씬 관리 액션들 (2개)
+  // 검증 액션들 (2개)
+  // Import/Export 액션들 (3개)
+  // 데이터 관리 액션들 (4개)
 
-    // === NODE DOMAIN === (4개 속성)
-    selectedNodeKey, selectedNodeKeys, lastDraggedNodeKey, lastDragActionTime
+  // === NODE DOMAIN ===
+  // 상태 (4개) + 액션들 (30개)
 
-    // === HISTORY DOMAIN === (5개 속성)
-    history, historyIndex, isUndoRedoInProgress, currentCompoundActionId, compoundActionStartState
+  // === HISTORY DOMAIN ===
+  // 상태 (5개) + 액션들 (7개)
 
-    // === LAYOUT DOMAIN === (1개 속성)
-    lastNodePosition
+  // === LAYOUT DOMAIN ===
+  // 액션들 (25개)
 
-    // === UI DOMAIN === (1개 속성)
-    showToast
+  // === UI DOMAIN ===
+  // 상태 (1개)
 }
 ```
 
-#### **2.2 메서드 그룹핑 준비**
-- [ ] 각 도메인별 메서드 목록 정리 (44개 메서드 분류)
-- [ ] 도메인 간 의존성 파악
-- [ ] 분할 경계 최종 확정
+##### **✅ Phase 2.1 달성 성과**
 
-**성공 기준**:
-- 5개 도메인으로 명확히 분류
-- 도메인 간 의존성 최소화
-- 그룹별 응집도 최대화
+✅ **도메인 분리**: 5개 명확한 도메인으로 상태 그룹핑 완료  
+✅ **응집도 향상**: 관련 상태들이 논리적으로 그룹화됨  
+✅ **가독성 개선**: 주석 블록으로 구조 명확화  
+✅ **유지보수성**: 도메인별 책임 영역 명확히 구분됨  
+✅ **기능 보존**: 모든 기존 기능 100% 보존 확인
 
-### **Phase 3-5: 후속 단계**
-**Phase 3**: 인터페이스 설계 (1주)
-**Phase 4**: 물리적 파일 분할 (2주) - 최종 목표
-**Phase 5**: 코드 품질 향상 (1주)
-
-**예상 완료**: 2025년 7월 말 (약 4주)
-**최종 목표**: 단일 파일 2,941줄 → 5개 파일 각 500줄 이하
+---
