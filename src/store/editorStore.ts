@@ -129,6 +129,10 @@ interface EditorStore extends EditorState {
   _getEstimatedNodeDimensions: () => { width: number; height: number };
   _calculateTextNodeChildPosition: (parentPosition: { x: number; y: number }, parentDimensions: { width: number; height: number }, HORIZONTAL_SPACING: number) => { x: number; y: number };
   _calculateChoiceNodeChildPosition: (parentNode: EditorNodeWrapper, choiceKey: string, parentPosition: { x: number; y: number }, parentDimensions: { width: number; height: number }, HORIZONTAL_SPACING: number, VERTICAL_SPACING: number, currentScene: Scene) => { x: number; y: number };
+  _getNodesForDeletion: () => { targetKeys: string[]; currentScene: Scene | null };
+  _collectKeysForCleanup: (targetKeys: string[], currentScene: Scene) => string[];
+  _performNodesDeletion: (targetKeys: string[]) => void;
+  _finalizeNodesDeletion: (allKeysToCleanup: string[], targetKeys: string[]) => void;
 
   // 새로운 레이아웃 시스템 (즉시 배치)
   arrangeAllNodes: (internal?: boolean) => Promise<void>;
@@ -760,17 +764,25 @@ export const useEditorStore = create<EditorStore>()(
           return state.selectedNodeKeys.size > 0 ? Array.from(state.selectedNodeKeys)[0] : "";
         },
 
-        // 다중 조작
-        deleteSelectedNodes: () => {
+        // 헬퍼 메서드: 삭제 대상 노드 목록 확인
+        _getNodesForDeletion: () => {
           const state = get();
           const targetKeys = state.selectedNodeKeys.size > 0 ? Array.from(state.selectedNodeKeys) : state.selectedNodeKey ? [state.selectedNodeKey] : [];
 
-          if (targetKeys.length === 0) return;
+          if (targetKeys.length === 0) {
+            return { targetKeys: [], currentScene: null };
+          }
 
-          // 삭제 전에 모든 대상 노드의 단독 사용 키들 수집
           const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          if (!currentScene) return;
+          if (!currentScene) {
+            return { targetKeys: [], currentScene: null };
+          }
 
+          return { targetKeys, currentScene };
+        },
+
+        // 헬퍼 메서드: 로컬라이제이션 키 수집 (단독 사용 키만)
+        _collectKeysForCleanup: (targetKeys: string[], currentScene: Scene) => {
           const localizationStore = useLocalizationStore.getState();
           const allKeysToCleanup: string[] = [];
 
@@ -807,7 +819,11 @@ export const useEditorStore = create<EditorStore>()(
             }
           });
 
-          // 여러 노드를 한 번에 삭제하는 로직
+          return allKeysToCleanup;
+        },
+
+        // 헬퍼 메서드: 실제 노드 삭제 처리 (참조 정리 포함)
+        _performNodesDeletion: (targetKeys: string[]) => {
           set((currentState) => {
             let updatedState = { ...currentState };
 
@@ -857,18 +873,41 @@ export const useEditorStore = create<EditorStore>()(
               selectedNodeKeys: new Set<string>(),
             };
           });
+        },
 
-          // 노드 삭제 성공 후 단독 사용 키들 정리
+        // 헬퍼 메서드: 삭제 후 정리 작업 (키 정리, 히스토리, 토스트)
+        _finalizeNodesDeletion: (allKeysToCleanup: string[], targetKeys: string[]) => {
+          const localizationStore = useLocalizationStore.getState();
+
+          // 단독 사용 키들 정리
           allKeysToCleanup.forEach((key) => {
             localizationStore.deleteKey(key);
           });
 
-          // 상태 변경 후에 히스토리에 추가
+          // 히스토리 추가
           get().pushToHistory(`${targetKeys.length}개 노드 삭제`);
 
+          // 사용자 알림
+          const state = get();
           if (state.showToast) {
             state.showToast(`${targetKeys.length}개 노드를 삭제했습니다.`, "success");
           }
+        },
+
+        // 다중 조작 - 선택된 노드들 삭제 (리팩터링됨)
+        deleteSelectedNodes: () => {
+          // 1. 삭제 대상 노드 확인
+          const { targetKeys, currentScene } = get()._getNodesForDeletion();
+          if (targetKeys.length === 0 || !currentScene) return;
+
+          // 2. 로컬라이제이션 키 수집 (단독 사용 키만)
+          const allKeysToCleanup = get()._collectKeysForCleanup(targetKeys, currentScene);
+
+          // 3. 실제 노드 삭제 처리
+          get()._performNodesDeletion(targetKeys);
+
+          // 4. 삭제 후 정리 작업
+          get()._finalizeNodesDeletion(allKeysToCleanup, targetKeys);
         },
 
         moveSelectedNodes: (deltaX, deltaY) => {
