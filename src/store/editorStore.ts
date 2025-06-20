@@ -118,6 +118,7 @@ interface EditorStore extends EditorState {
   _buildNodeRelationMaps: (currentScene: Scene, allNodeKeys: string[]) => { childrenMap: Map<string, string[]>; parentMap: Map<string, string[]> };
   _buildNodeLevelMap: (rootNodeKey: string, childrenMap: Map<string, string[]>) => Map<number, string[]>;
   _updateLevelNodePositions: (levelMap: Map<number, string[]>, startX: number, rootY: number) => void;
+  _updateChildNodePositions: (levelMap: Map<number, string[]>, rootNodeKey: string, startX: number, startY: number) => void;
 
   // 새로운 레이아웃 시스템 (즉시 배치)
   arrangeAllNodes: (internal?: boolean) => Promise<void>;
@@ -2027,85 +2028,8 @@ export const useEditorStore = create<EditorStore>()(
           get().pushToHistory(`Dagre 레이아웃 정렬 (${allNodeKeys.length}개 노드)`);
         },
 
-        // 노드 자동 정렬 - 선택된 노드를 루트로 하여 자식 노드들을 트리 형태로 배치
-        arrangeChildNodesAsTree: (rootNodeKey) => {
-          const state = get();
-          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          if (!currentScene) return;
-
-          const rootNode = getNode(currentScene, rootNodeKey);
-          if (!rootNode) return;
-
-          // 트리 구조 분석을 위한 노드 관계 매핑
-          const childrenMap = new Map<string, string[]>();
-          const allNodeKeys = Object.keys(currentScene);
-
-          // 각 노드의 자식 노드들을 찾아서 매핑
-          allNodeKeys.forEach((nodeKey) => {
-            const node = getNode(currentScene, nodeKey);
-            if (!node) return;
-
-            const children: string[] = [];
-
-            if (node.dialogue.type === "text" && node.dialogue.nextNodeKey) {
-              children.push(node.dialogue.nextNodeKey);
-            } else if (node.dialogue.type === "choice") {
-              Object.values(node.dialogue.choices).forEach((choice) => {
-                if (choice.nextNodeKey) {
-                  children.push(choice.nextNodeKey);
-                }
-              });
-            }
-
-            if (children.length > 0) {
-              childrenMap.set(nodeKey, children);
-            }
-          });
-
-          // 개선된 BFS: 다중 부모의 경우 더 높은 depth 우선
-          const nodeLevels = new Map<string, number>();
-          const levelMap = new Map<number, string[]>();
-          const queue: { nodeKey: string; level: number }[] = [{ nodeKey: rootNodeKey, level: 0 }];
-
-          nodeLevels.set(rootNodeKey, 0);
-
-          while (queue.length > 0) {
-            const { nodeKey, level } = queue.shift()!;
-
-            // 이미 더 높은 레벨로 처리된 노드는 건너뜀
-            if (nodeLevels.has(nodeKey) && nodeLevels.get(nodeKey)! > level) {
-              continue;
-            }
-
-            // 레벨 업데이트 (더 높은 레벨 우선)
-            const currentLevel = Math.max(nodeLevels.get(nodeKey) || 0, level);
-            nodeLevels.set(nodeKey, currentLevel);
-
-            // 자식 노드들을 다음 레벨에 추가
-            const children = childrenMap.get(nodeKey) || [];
-            children.forEach((childKey) => {
-              const childNextLevel = currentLevel + 1;
-              const existingLevel = nodeLevels.get(childKey);
-
-              // 자식 노드가 더 높은 레벨로 갱신되거나 처음 방문하는 경우
-              if (!existingLevel || childNextLevel > existingLevel) {
-                nodeLevels.set(childKey, childNextLevel);
-                queue.push({ nodeKey: childKey, level: childNextLevel });
-              }
-            });
-          }
-
-          // levelMap 구성
-          nodeLevels.forEach((level, nodeKey) => {
-            if (!levelMap.has(level)) {
-              levelMap.set(level, []);
-            }
-            levelMap.get(level)!.push(nodeKey);
-          });
-
-          // 동적 노드 크기를 고려한 레벨별 위치 계산
-          const startX = rootNode.position.x;
-          const startY = rootNode.position.y;
+        // 헬퍼 메서드: 자식 노드 위치 계산 및 업데이트 (루트 노드 고정)
+        _updateChildNodePositions: (levelMap: Map<number, string[]>, rootNodeKey: string, startX: number, startY: number) => {
           const levelSpacing = 320; // 레벨 간 X축 간격
 
           // 동적 노드 크기 계산 함수
@@ -2162,8 +2086,30 @@ export const useEditorStore = create<EditorStore>()(
               }
             });
           });
+        },
 
-          // 정렬 완료 후 히스토리 추가
+        // 노드 자동 정렬 - 선택된 노드를 루트로 하여 자식 노드들을 트리 형태로 배치 (리팩터링됨)
+        arrangeChildNodesAsTree: (rootNodeKey) => {
+          const state = get();
+          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+          if (!currentScene) return;
+
+          const rootNode = getNode(currentScene, rootNodeKey);
+          if (!rootNode) return;
+
+          // 1. 노드 관계 매핑 생성 (기존 헬퍼 재사용)
+          const allNodeKeys = Object.keys(currentScene);
+          const { childrenMap } = get()._buildNodeRelationMaps(currentScene, allNodeKeys);
+
+          // 2. 노드 레벨 매핑 생성 (기존 헬퍼 재사용)
+          const levelMap = get()._buildNodeLevelMap(rootNodeKey, childrenMap);
+
+          // 3. 자식 노드 위치 업데이트 (루트 노드 고정)
+          const startX = rootNode.position.x;
+          const startY = rootNode.position.y;
+          get()._updateChildNodePositions(levelMap, rootNodeKey, startX, startY);
+
+          // 4. 정렬 완료 후 히스토리 추가
           const affectedNodeCount = Array.from(levelMap.values())
             .flat()
             .filter((nodeKey) => nodeKey !== rootNodeKey).length;
