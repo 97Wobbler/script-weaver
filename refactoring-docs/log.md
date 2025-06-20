@@ -42,16 +42,18 @@
 #### 📊 **주요 분석 결과**
 
 **1. 파일 규모**
-- **총 라인 수**: 2,941줄 (목표: 500줄 이하로 분할)
-- **총 메서드 수**: 44개 (인터페이스 정의 기준)
-- **God Object 확인**: 단일 파일에 모든 기능 집중된 상태
+
+-   **총 라인 수**: 2,941줄 (목표: 500줄 이하로 분할)
+-   **총 메서드 수**: 44개 (인터페이스 정의 기준)
+-   **God Object 확인**: 단일 파일에 모든 기능 집중된 상태
 
 **2. 대형 메서드 목록** (50줄 이상)
+
 ```
 arrangeAllNodesAsTree  : 2168~2324 (155줄) - 전체 트리 정렬
 arrangeChildNodesAsTree: 2025~2165 (141줄) - 트리 정렬
 arrangeAllNodes        : 2535~2655 (121줄) - 전체 레이아웃 정렬
-pasteNodes             : 585~699   (115줄) - 복사/붙여넣기 로직  
+pasteNodes             : 585~699   (115줄) - 복사/붙여넣기 로직
 calculateChildNodePosition: 1808~1920 (113줄) - 자식 위치 계산
 deleteSelectedNodes    : 724~834   (110줄) - 다중 노드 삭제 로직
 createAndConnectChoiceNode: 1513~1619 (107줄) - 노드 생성/연결
@@ -64,46 +66,65 @@ getNextNodePosition    : 1735~1807 (80줄)  - 위치 계산
 ```
 
 **3. 자연스러운 도메인 경계 식별**
+
 ```typescript
 // === PROJECT DOMAIN === (프로젝트/씬 관리)
-- templateData, currentTemplate, currentScene
-- createTemplate, createScene, resetEditor
-- loadFromLocalStorage, migrateToNewArchitecture
-
-// === NODE DOMAIN === (노드 CRUD 및 내용 관리)  
-- selectedNodeKey, selectedNodeKeys, lastDraggedNodeKey
-- addNode, updateNode, deleteNode, moveNode
-- updateDialogue, updateNodeText, updateChoiceText
-- createTextNode, createChoiceNode, duplicateNode
-- addChoice, removeChoice, connectNodes, disconnectNodes
-- createAndConnectChoiceNode, createAndConnectTextNode
-
-// === HISTORY DOMAIN === (실행취소/재실행)
-- history, historyIndex, isUndoRedoInProgress
-- currentCompoundActionId, compoundActionStartState
-- pushToHistory, pushToHistoryWithTextEdit
-- undo, redo, canUndo, canRedo
-- startCompoundAction, endCompoundAction
-
-// === LAYOUT DOMAIN === (노드 배치 및 정렬)
-- lastNodePosition
-- getNextNodePosition, calculateChildNodePosition
-- arrangeChildNodesAsTree, arrangeAllNodesAsTree, arrangeNodesWithDagre
-- arrangeAllNodes, arrangeSelectedNodeChildren, arrangeSelectedNodeDescendants
-
-// === UI DOMAIN === (사용자 인터페이스 상태)
-- showToast, toggleNodeSelection, clearSelection
-- selectMultipleNodes, copySelectedNodes, pasteNodes
-- deleteSelectedNodes, moveSelectedNodes
-- updateNodeKeyReference, updateChoiceKeyReference
-- updateNodeVisibility, updateNodePositionAndVisibility
+-templateData,
+    currentTemplate,
+    currentScene - createTemplate,
+    createScene,
+    resetEditor - loadFromLocalStorage,
+    migrateToNewArchitecture -
+        // === NODE DOMAIN === (노드 CRUD 및 내용 관리)
+        selectedNodeKey,
+    selectedNodeKeys,
+    lastDraggedNodeKey - addNode,
+    updateNode,
+    deleteNode,
+    moveNode - updateDialogue,
+    updateNodeText,
+    updateChoiceText - createTextNode,
+    createChoiceNode,
+    duplicateNode - addChoice,
+    removeChoice,
+    connectNodes,
+    disconnectNodes - createAndConnectChoiceNode,
+    createAndConnectTextNode -
+        // === HISTORY DOMAIN === (실행취소/재실행)
+        history,
+    historyIndex,
+    isUndoRedoInProgress - currentCompoundActionId,
+    compoundActionStartState - pushToHistory,
+    pushToHistoryWithTextEdit - undo,
+    redo,
+    canUndo,
+    canRedo - startCompoundAction,
+    endCompoundAction -
+        // === LAYOUT DOMAIN === (노드 배치 및 정렬)
+        lastNodePosition -
+        getNextNodePosition,
+    calculateChildNodePosition - arrangeChildNodesAsTree,
+    arrangeAllNodesAsTree,
+    arrangeNodesWithDagre - arrangeAllNodes,
+    arrangeSelectedNodeChildren,
+    arrangeSelectedNodeDescendants -
+        // === UI DOMAIN === (사용자 인터페이스 상태)
+        showToast,
+    toggleNodeSelection,
+    clearSelection - selectMultipleNodes,
+    copySelectedNodes,
+    pasteNodes - deleteSelectedNodes,
+    moveSelectedNodes - updateNodeKeyReference,
+    updateChoiceKeyReference - updateNodeVisibility,
+    updateNodePositionAndVisibility;
 ```
 
 **4. 컴포넌트 의존성 관계**
+
 ```
 App.tsx - 8개 메서드: 기본 상태 + Import/Export + 검증
 PropertyPanel.tsx - 11개 메서드: 텍스트 편집 + 키 관리 중심
-Canvas.tsx - 18개 메서드: 선택/이동/단축키 중심  
+Canvas.tsx - 18개 메서드: 선택/이동/단축키 중심
 TextNode.tsx - 4개 메서드: 연결/생성 중심
 ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
@@ -111,22 +132,24 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 ```
 
 **5. 메서드 간 상호 의존성**
-- **높은 결합도**: Layout 메서드들이 Node 메서드들을 내부에서 직접 호출
-- **순환 참조**: History와 다른 도메인 간 양방향 의존성
-- **공통 상태 접근**: 모든 메서드가 templateData에 직접 접근
+
+-   **높은 결합도**: Layout 메서드들이 Node 메서드들을 내부에서 직접 호출
+-   **순환 참조**: History와 다른 도메인 간 양방향 의존성
+-   **공통 상태 접근**: 모든 메서드가 templateData에 직접 접근
 
 #### 🎯 **핵심 문제점**
 
 1. **메서드 크기 초과**: 13개 메서드가 80줄 이상 (목표: 50줄 이하)
-2. **단일 책임 위반**: 레이아웃 메서드 내부에 히스토리/검증 로직 혼재  
+2. **단일 책임 위반**: 레이아웃 메서드 내부에 히스토리/검증 로직 혼재
 3. **높은 결합도**: 도메인 간 직접 호출로 분리 어려움
 4. **공통 상태**: templateData 중심의 모든 도메인 의존성
 
 #### 📋 **다음 단계 준비**
 
 **Phase 1 대상 메서드** (50줄 이상 우선 분할):
+
 1. arrangeAllNodesAsTree (155줄) - 최우선
-2. arrangeChildNodesAsTree (141줄)  
+2. arrangeChildNodesAsTree (141줄)
 3. arrangeAllNodes (121줄)
 4. pasteNodes (115줄)
 5. calculateChildNodePosition (113줄)
@@ -150,23 +173,24 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 **대상 메서드**: `arrangeChildNodesAsTree` (2029~2168줄, 141줄)
 **분할 결과**: 1개 새 헬퍼 + 기존 헬퍼 재사용으로 분할 성공
-- **메인 메서드**: `arrangeChildNodesAsTree` (19줄) ✅ 목표 달성 (50줄 이하)
-- **새 헬퍼**: `_updateChildNodePositions` (44줄) ✅ 루트 노드 고정 버전
-- **재사용 헬퍼**: `_buildNodeRelationMaps`, `_buildNodeLevelMap` 활용
+
+-   **메인 메서드**: `arrangeChildNodesAsTree` (19줄) ✅ 목표 달성 (50줄 이하)
+-   **새 헬퍼**: `_updateChildNodePositions` (44줄) ✅ 루트 노드 고정 버전
+-   **재사용 헬퍼**: `_buildNodeRelationMaps`, `_buildNodeLevelMap` 활용
 
 #### 🎯 **분할 전략**
 
 1. **헬퍼 재사용**: 기존에 만든 `_buildNodeRelationMaps`, `_buildNodeLevelMap` 활용
-2. **차별화 로직 분리**: 루트 노드 고정 로직을 `_updateChildNodePositions`로 추출  
+2. **차별화 로직 분리**: 루트 노드 고정 로직을 `_updateChildNodePositions`로 추출
 3. **코드 중복 제거**: 141줄에서 80줄 제거 (57% 감소)
 4. **메인 로직 단순화**: 4단계 명확한 흐름으로 가독성 향상
 
 #### ✅ **성공 기준 달성**
 
-- **메서드 크기**: 141줄 → 19줄 (86% 감소)
-- **코드 재사용**: 기존 헬퍼 2개 재활용으로 중복 제거
-- **단일 책임**: 루트 노드 고정 로직만 독립 추출
-- **기능 보존**: 기존 기능 100% 보존 확인
+-   **메서드 크기**: 141줄 → 19줄 (86% 감소)
+-   **코드 재사용**: 기존 헬퍼 2개 재활용으로 중복 제거
+-   **단일 책임**: 루트 노드 고정 로직만 독립 추출
+-   **기능 보존**: 기존 기능 100% 보존 확인
 
 #### 📋 **다음 대상**
 
@@ -182,10 +206,11 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 **대상 메서드**: `arrangeAllNodes` (2497~2618줄, 121줄)
 **분할 결과**: 3개 새 헬퍼 메서드로 분할 성공
-- **메인 메서드**: `arrangeAllNodes` (22줄) ✅ 목표 달성 (50줄 이하)
-- **헬퍼 1**: `_findRootNodeForLayout` (30줄) ✅ 루트 노드 찾기 로직
-- **헬퍼 2**: `_runGlobalLayoutSystem` (42줄) ✅ 레이아웃 엔진 실행
-- **헬퍼 3**: `_handleLayoutResult` (17줄) ✅ 결과 처리 및 히스토리
+
+-   **메인 메서드**: `arrangeAllNodes` (22줄) ✅ 목표 달성 (50줄 이하)
+-   **헬퍼 1**: `_findRootNodeForLayout` (30줄) ✅ 루트 노드 찾기 로직
+-   **헬퍼 2**: `_runGlobalLayoutSystem` (42줄) ✅ 레이아웃 엔진 실행
+-   **헬퍼 3**: `_handleLayoutResult` (17줄) ✅ 결과 처리 및 히스토리
 
 #### 🎯 **분할 전략**
 
@@ -196,10 +221,10 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 #### ✅ **성공 기준 달성**
 
-- **메서드 크기**: 121줄 → 22줄 (82% 감소)
-- **단일 책임**: 각 헬퍼가 명확한 단일 책임 보유
-- **비동기 처리**: 복잡한 비동기 로직이 깔끔하게 분리됨
-- **기능 보존**: 기존 기능 100% 보존 확인
+-   **메서드 크기**: 121줄 → 22줄 (82% 감소)
+-   **단일 책임**: 각 헬퍼가 명확한 단일 책임 보유
+-   **비동기 처리**: 복잡한 비동기 로직이 깔끔하게 분리됨
+-   **기능 보존**: 기존 기능 100% 보존 확인
 
 #### 📋 **다음 대상**
 
@@ -215,10 +240,11 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 **대상 메서드**: `pasteNodes` (587~693줄, 115줄)
 **분할 결과**: 3개 새 헬퍼 메서드로 분할 성공
-- **메인 메서드**: `pasteNodes` (32줄) ✅ 목표 달성 (50줄 이하)
-- **헬퍼 1**: `_validatePasteOperation` (11줄) ✅ 입력 검증 로직
-- **헬퍼 2**: `_setupPastedNodeLocalization` (37줄) ✅ 로컬라이제이션 설정
-- **헬퍼 3**: `_createPastedNodes` (24줄) ✅ 노드 생성 및 배치
+
+-   **메인 메서드**: `pasteNodes` (32줄) ✅ 목표 달성 (50줄 이하)
+-   **헬퍼 1**: `_validatePasteOperation` (11줄) ✅ 입력 검증 로직
+-   **헬퍼 2**: `_setupPastedNodeLocalization` (37줄) ✅ 로컬라이제이션 설정
+-   **헬퍼 3**: `_createPastedNodes` (24줄) ✅ 노드 생성 및 배치
 
 #### 🎯 **분할 전략**
 
@@ -229,10 +255,10 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 #### ✅ **성공 기준 달성**
 
-- **메서드 크기**: 115줄 → 32줄 (72% 감소)
-- **단일 책임**: 각 헬퍼가 명확한 단일 책임 보유
-- **복잡도 감소**: 다중 책임이 분리되어 이해하기 쉬워짐
-- **기능 보존**: 기존 기능 100% 보존 확인
+-   **메서드 크기**: 115줄 → 32줄 (72% 감소)
+-   **단일 책임**: 각 헬퍼가 명확한 단일 책임 보유
+-   **복잡도 감소**: 다중 책임이 분리되어 이해하기 쉬워짐
+-   **기능 보존**: 기존 기능 100% 보존 확인
 
 #### 📋 **다음 대상**
 
@@ -248,11 +274,12 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 **대상 메서드**: `calculateChildNodePosition` (1842~1955줄, 113줄)
 **분할 결과**: 4개 새 헬퍼 메서드로 분할 성공
-- **메인 메서드**: `calculateChildNodePosition` (15줄) ✅ 목표 달성 (50줄 이하)
-- **헬퍼 1**: `_getRealNodeDimensions` (31줄) ✅ 실제 DOM 측정 로직
-- **헬퍼 2**: `_getEstimatedNodeDimensions` (4줄) ✅ CSS 기반 폴백 크기 계산
-- **헬퍼 3**: `_calculateTextNodeChildPosition` (9줄) ✅ 텍스트 노드 자식 위치 계산
-- **헬퍼 4**: `_calculateChoiceNodeChildPosition` (39줄) ✅ 선택지 노드 다중 자식 위치 계산
+
+-   **메인 메서드**: `calculateChildNodePosition` (15줄) ✅ 목표 달성 (50줄 이하)
+-   **헬퍼 1**: `_getRealNodeDimensions` (31줄) ✅ 실제 DOM 측정 로직
+-   **헬퍼 2**: `_getEstimatedNodeDimensions` (4줄) ✅ CSS 기반 폴백 크기 계산
+-   **헬퍼 3**: `_calculateTextNodeChildPosition` (9줄) ✅ 텍스트 노드 자식 위치 계산
+-   **헬퍼 4**: `_calculateChoiceNodeChildPosition` (39줄) ✅ 선택지 노드 다중 자식 위치 계산
 
 #### 🎯 **분할 전략**
 
@@ -263,10 +290,10 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 #### ✅ **성공 기준 달성**
 
-- **메서드 크기**: 113줄 → 15줄 (87% 감소)
-- **단일 책임**: DOM 측정, 크기 계산, 위치 계산 각각 분리
-- **복잡도 감소**: 복잡한 DOM 조작 로직이 명확히 분리됨
-- **기능 보존**: 기존 기능 100% 보존 확인
+-   **메서드 크기**: 113줄 → 15줄 (87% 감소)
+-   **단일 책임**: DOM 측정, 크기 계산, 위치 계산 각각 분리
+-   **복잡도 감소**: 복잡한 DOM 조작 로직이 명확히 분리됨
+-   **기능 보존**: 기존 기능 100% 보존 확인
 
 #### 📋 **다음 대상**
 
@@ -282,11 +309,12 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 **대상 메서드**: `deleteSelectedNodes` (753~862줄, 110줄)
 **분할 결과**: 4개 새 헬퍼 메서드로 분할 성공
-- **메인 메서드**: `deleteSelectedNodes` (9줄) ✅ 목표 달성 (50줄 이하)
-- **헬퍼 1**: `_getNodesForDeletion` (14줄) ✅ 삭제 대상 노드 확인
-- **헬퍼 2**: `_collectKeysForCleanup` (33줄) ✅ 로컬라이제이션 키 수집
-- **헬퍼 3**: `_performNodesDeletion` (38줄) ✅ 실제 노드 삭제 처리
-- **헬퍼 4**: `_finalizeNodesDeletion` (15줄) ✅ 삭제 후 정리 작업
+
+-   **메인 메서드**: `deleteSelectedNodes` (9줄) ✅ 목표 달성 (50줄 이하)
+-   **헬퍼 1**: `_getNodesForDeletion` (14줄) ✅ 삭제 대상 노드 확인
+-   **헬퍼 2**: `_collectKeysForCleanup` (33줄) ✅ 로컬라이제이션 키 수집
+-   **헬퍼 3**: `_performNodesDeletion` (38줄) ✅ 실제 노드 삭제 처리
+-   **헬퍼 4**: `_finalizeNodesDeletion` (15줄) ✅ 삭제 후 정리 작업
 
 #### 🎯 **분할 전략**
 
@@ -298,10 +326,10 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 #### ✅ **성공 기준 달성**
 
-- **메서드 크기**: 110줄 → 9줄 (92% 감소)
-- **단일 책임**: 각 헬퍼가 명확한 책임 분담 (확인→수집→삭제→정리)
-- **복잡도 감소**: 다중 노드 삭제의 복잡한 로직이 명확히 분리됨
-- **기능 보존**: 기존 기능 100% 보존 확인
+-   **메서드 크기**: 110줄 → 9줄 (92% 감소)
+-   **단일 책임**: 각 헬퍼가 명확한 책임 분담 (확인→수집→삭제→정리)
+-   **복잡도 감소**: 다중 노드 삭제의 복잡한 로직이 명확히 분리됨
+-   **기능 보존**: 기존 기능 100% 보존 확인
 
 #### 📋 **다음 대상**
 
@@ -317,11 +345,12 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 **대상 메서드**: `createAndConnectChoiceNode` (1586~1693줄, 107줄)
 **분할 결과**: 4개 새 헬퍼 메서드로 분할 성공
-- **메인 메서드**: `createAndConnectChoiceNode` (13줄) ✅ 목표 달성 (50줄 이하)
-- **헬퍼 1**: `_validateChoiceNodeCreation` (32줄) ✅ 유효성 검증 및 복합 액션 시작
-- **헬퍼 2**: `_createNewChoiceChild` (21줄) ✅ 새 자식 노드 생성 및 화자 복사
-- **헬퍼 3**: `_connectAndUpdateChoiceNode` (29줄) ✅ 연결 및 상태 업데이트
-- **헬퍼 4**: `_finalizeChoiceNodeCreation` (16줄) ✅ 비동기 레이아웃 및 복합 액션 종료
+
+-   **메인 메서드**: `createAndConnectChoiceNode` (13줄) ✅ 목표 달성 (50줄 이하)
+-   **헬퍼 1**: `_validateChoiceNodeCreation` (32줄) ✅ 유효성 검증 및 복합 액션 시작
+-   **헬퍼 2**: `_createNewChoiceChild` (21줄) ✅ 새 자식 노드 생성 및 화자 복사
+-   **헬퍼 3**: `_connectAndUpdateChoiceNode` (29줄) ✅ 연결 및 상태 업데이트
+-   **헬퍼 4**: `_finalizeChoiceNodeCreation` (16줄) ✅ 비동기 레이아웃 및 복합 액션 종료
 
 #### 🎯 **분할 전략**
 
@@ -333,10 +362,10 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 #### ✅ **성공 기준 달성**
 
-- **메서드 크기**: 107줄 → 13줄 (88% 감소)
-- **단일 책임**: 각 헬퍼가 명확한 책임 분담 (검증→생성→연결→마무리)
-- **복잡도 감소**: 복합 액션과 비동기 처리가 명확히 분리됨
-- **기능 보존**: 기존 기능 100% 보존 확인
+-   **메서드 크기**: 107줄 → 13줄 (88% 감소)
+-   **단일 책임**: 각 헬퍼가 명확한 책임 분담 (검증→생성→연결→마무리)
+-   **복잡도 감소**: 복합 액션과 비동기 처리가 명확히 분리됨
+-   **기능 보존**: 기존 기능 100% 보존 확인
 
 #### 📋 **다음 대상**
 
@@ -352,10 +381,11 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 **대상 메서드**: `arrangeSelectedNodeDescendants` (2861~2893줄, 107줄)
 **분할 결과**: 3개 새 헬퍼 메서드로 분할 성공
-- **메인 메서드**: `arrangeSelectedNodeDescendants` (33줄) ✅ 목표 달성 (50줄 이하)
-- **헬퍼 1**: `_findDescendantNodes` (20줄) ✅ 후손 노드 재귀 탐색
-- **헬퍼 2**: `_runDescendantLayoutSystem` (35줄) ✅ 레이아웃 시스템 실행
-- **헬퍼 3**: `_handleDescendantLayoutResult` (16줄) ✅ 결과 처리 및 히스토리
+
+-   **메인 메서드**: `arrangeSelectedNodeDescendants` (33줄) ✅ 목표 달성 (50줄 이하)
+-   **헬퍼 1**: `_findDescendantNodes` (20줄) ✅ 후손 노드 재귀 탐색
+-   **헬퍼 2**: `_runDescendantLayoutSystem` (35줄) ✅ 레이아웃 시스템 실행
+-   **헬퍼 3**: `_handleDescendantLayoutResult` (16줄) ✅ 결과 처리 및 히스토리
 
 #### 🎯 **분할 전략**
 
@@ -366,10 +396,10 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 #### ✅ **성공 기준 달성**
 
-- **메서드 크기**: 107줄 → 33줄 (69% 감소)
-- **단일 책임**: 각 헬퍼가 명확한 책임 분담 (탐색→실행→처리)
-- **복잡도 감소**: 복잡한 재귀 로직과 레이아웃 처리가 명확히 분리됨
-- **기능 보존**: 기존 기능 100% 보존 확인
+-   **메서드 크기**: 107줄 → 33줄 (69% 감소)
+-   **단일 책임**: 각 헬퍼가 명확한 책임 분담 (탐색→실행→처리)
+-   **복잡도 감소**: 복잡한 재귀 로직과 레이아웃 처리가 명확히 분리됨
+-   **기능 보존**: 기존 기능 100% 보존 확인
 
 #### 📋 **다음 대상**
 
@@ -385,11 +415,12 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 **대상 메서드**: `createAndConnectTextNode` (1740~1753줄, 104줄)
 **분할 결과**: 4개 새 헬퍼 메서드로 분할 성공
-- **메인 메서드**: `createAndConnectTextNode` (14줄) ✅ 목표 달성 (50줄 이하)
-- **헬퍼 1**: `_validateTextNodeCreation` (32줄) ✅ 검증 및 복합 액션 시작
-- **헬퍼 2**: `_createNewTextChild` (19줄) ✅ 새 자식 노드 생성 및 화자 복사
-- **헬퍼 3**: `_connectAndUpdateTextNode` (25줄) ✅ 연결 및 상태 업데이트
-- **헬퍼 4**: `_finalizeTextNodeCreation` (17줄) ✅ 비동기 레이아웃 및 복합 액션 종료
+
+-   **메인 메서드**: `createAndConnectTextNode` (14줄) ✅ 목표 달성 (50줄 이하)
+-   **헬퍼 1**: `_validateTextNodeCreation` (32줄) ✅ 검증 및 복합 액션 시작
+-   **헬퍼 2**: `_createNewTextChild` (19줄) ✅ 새 자식 노드 생성 및 화자 복사
+-   **헬퍼 3**: `_connectAndUpdateTextNode` (25줄) ✅ 연결 및 상태 업데이트
+-   **헬퍼 4**: `_finalizeTextNodeCreation` (17줄) ✅ 비동기 레이아웃 및 복합 액션 종료
 
 #### 🎯 **분할 전략**
 
@@ -401,10 +432,10 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 #### ✅ **성공 기준 달성**
 
-- **메서드 크기**: 104줄 → 14줄 (87% 감소)
-- **단일 책임**: 각 헬퍼가 명확한 책임 분담 (검증→생성→연결→마무리)
-- **복잡도 감소**: 복합 액션과 비동기 처리가 명확히 분리됨
-- **기능 보존**: 기존 기능 100% 보존 확인
+-   **메서드 크기**: 104줄 → 14줄 (87% 감소)
+-   **단일 책임**: 각 헬퍼가 명확한 책임 분담 (검증→생성→연결→마무리)
+-   **복잡도 감소**: 복합 액션과 비동기 처리가 명확히 분리됨
+-   **기능 보존**: 기존 기능 100% 보존 확인
 
 #### 📋 **다음 대상**
 
@@ -420,10 +451,11 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 **대상 메서드**: `arrangeSelectedNodeChildren` (2687~2720줄, 99줄)
 **분할 결과**: 3개 새 헬퍼 메서드로 분할 성공
-- **메인 메서드**: `arrangeSelectedNodeChildren` (34줄) ✅ 목표 달성 (50줄 이하)
-- **헬퍼 1**: `_findChildNodes` (16줄) ✅ 직접 자식 노드 탐색 (재귀 없음)
-- **헬퍼 2**: `_runChildLayoutSystem` (35줄) ✅ 레이아웃 시스템 실행 (depth=1)
-- **헬퍼 3**: `_handleChildLayoutResult` (16줄) ✅ 결과 처리 및 히스토리
+
+-   **메인 메서드**: `arrangeSelectedNodeChildren` (34줄) ✅ 목표 달성 (50줄 이하)
+-   **헬퍼 1**: `_findChildNodes` (16줄) ✅ 직접 자식 노드 탐색 (재귀 없음)
+-   **헬퍼 2**: `_runChildLayoutSystem` (35줄) ✅ 레이아웃 시스템 실행 (depth=1)
+-   **헬퍼 3**: `_handleChildLayoutResult` (16줄) ✅ 결과 처리 및 히스토리
 
 #### 🎯 **분할 전략**
 
@@ -435,10 +467,10 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 #### ✅ **성공 기준 달성**
 
-- **메서드 크기**: 99줄 → 34줄 (66% 감소)
-- **단일 책임**: 각 헬퍼가 명확한 책임 분담 (탐색→실행→처리)
-- **기능 차별화**: 후손 노드 정렬과 자식 노드 정렬 로직 명확히 구분
-- **기능 보존**: 기존 기능 100% 보존 확인
+-   **메서드 크기**: 99줄 → 34줄 (66% 감소)
+-   **단일 책임**: 각 헬퍼가 명확한 책임 분담 (탐색→실행→처리)
+-   **기능 차별화**: 후손 노드 정렬과 자식 노드 정렬 로직 명확히 구분
+-   **기능 보존**: 기존 기능 100% 보존 확인
 
 #### 📋 **다음 대상**
 
@@ -454,11 +486,12 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 **대상 메서드**: `deleteNode` (1002~1081줄, 80줄)
 **분할 결과**: 4개 새 헬퍼 메서드로 분할 성공
-- **메인 메서드**: `deleteNode` (12줄) ✅ 목표 달성 (50줄 이하)
-- **헬퍼 1**: `_collectNodeKeysForCleanup` (31줄) ✅ 로컬라이제이션 키 수집 및 사용 횟수 확인
-- **헬퍼 2**: `_findReferencingNodes` (22줄) ✅ 삭제 대상 노드를 참조하는 다른 노드들 탐색
-- **헬퍼 3**: `_performNodeDeletion` (17줄) ✅ 실제 노드 삭제 및 상태 업데이트
-- **헬퍼 4**: `_cleanupAfterNodeDeletion` (9줄) ✅ 로컬라이제이션 키 정리 및 히스토리 추가
+
+-   **메인 메서드**: `deleteNode` (12줄) ✅ 목표 달성 (50줄 이하)
+-   **헬퍼 1**: `_collectNodeKeysForCleanup` (31줄) ✅ 로컬라이제이션 키 수집 및 사용 횟수 확인
+-   **헬퍼 2**: `_findReferencingNodes` (22줄) ✅ 삭제 대상 노드를 참조하는 다른 노드들 탐색
+-   **헬퍼 3**: `_performNodeDeletion` (17줄) ✅ 실제 노드 삭제 및 상태 업데이트
+-   **헬퍼 4**: `_cleanupAfterNodeDeletion` (9줄) ✅ 로컬라이제이션 키 정리 및 히스토리 추가
 
 #### 🎯 **분할 전략**
 
@@ -470,10 +503,10 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 #### ✅ **성공 기준 달성**
 
-- **메서드 크기**: 80줄 → 12줄 (85% 감소)
-- **단일 책임**: 각 헬퍼가 명확한 책임 분담 (수집→삭제→정리)
-- **안전성 향상**: 로컬라이제이션 키 관리가 명확히 분리되어 안전성 증대
-- **기능 보존**: 기존 기능 100% 보존 확인
+-   **메서드 크기**: 80줄 → 12줄 (85% 감소)
+-   **단일 책임**: 각 헬퍼가 명확한 책임 분담 (수집→삭제→정리)
+-   **안전성 향상**: 로컬라이제이션 키 관리가 명확히 분리되어 안전성 증대
+-   **기능 보존**: 기존 기능 100% 보존 확인
 
 #### 📋 **다음 대상**
 
@@ -489,12 +522,13 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 **대상 메서드**: `moveNode` (1124~1204줄, 80줄)
 **분할 결과**: 5개 새 헬퍼 메서드로 분할 성공
-- **메인 메서드**: `moveNode` (16줄) ✅ 목표 달성 (50줄 이하)
-- **헬퍼 1**: `_validateNodeMovement` (19줄) ✅ 노드 및 위치 변경 유효성 검사
-- **헬퍼 2**: `_checkContinuousDrag` (7줄) ✅ 연속 드래그 여부 확인
-- **헬퍼 3**: `_performNodeMove` (24줄) ✅ 실제 노드 위치 업데이트
-- **헬퍼 4**: `_handleContinuousDrag` (20줄) ✅ 연속 드래그 히스토리 처리 (덮어쓰기)
-- **헬퍼 5**: `_addMoveHistory` (3줄) ✅ 일반 이동 히스토리 추가
+
+-   **메인 메서드**: `moveNode` (16줄) ✅ 목표 달성 (50줄 이하)
+-   **헬퍼 1**: `_validateNodeMovement` (19줄) ✅ 노드 및 위치 변경 유효성 검사
+-   **헬퍼 2**: `_checkContinuousDrag` (7줄) ✅ 연속 드래그 여부 확인
+-   **헬퍼 3**: `_performNodeMove` (24줄) ✅ 실제 노드 위치 업데이트
+-   **헬퍼 4**: `_handleContinuousDrag` (20줄) ✅ 연속 드래그 히스토리 처리 (덮어쓰기)
+-   **헬퍼 5**: `_addMoveHistory` (3줄) ✅ 일반 이동 히스토리 추가
 
 #### 🎯 **분할 전략**
 
@@ -506,10 +540,10 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 #### ✅ **성공 기준 달성**
 
-- **메서드 크기**: 80줄 → 16줄 (80% 감소)
-- **단일 책임**: 각 헬퍼가 명확한 책임 분담 (검증→확인→업데이트→히스토리)
-- **복잡도 감소**: 연속 드래그 처리의 복잡한 로직이 명확히 분리됨
-- **기능 보존**: 기존 기능 100% 보존 확인
+-   **메서드 크기**: 80줄 → 16줄 (80% 감소)
+-   **단일 책임**: 각 헬퍼가 명확한 책임 분담 (검증→확인→업데이트→히스토리)
+-   **복잡도 감소**: 연속 드래그 처리의 복잡한 로직이 명확히 분리됨
+-   **기능 보존**: 기존 기능 100% 보존 확인
 
 #### 📋 **다음 대상**
 
@@ -525,11 +559,12 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 **대상 메서드**: `getNextNodePosition` (1853~1918줄, 65줄)
 **분할 결과**: 4개 새 헬퍼 메서드로 분할 성공
-- **메인 메서드**: `getNextNodePosition` (11줄) ✅ 목표 달성 (50줄 이하)
-- **헬퍼 1**: `_initializePositionCalculation` (15줄) ✅ 기본 설정 및 상수 초기화
-- **헬퍼 2**: `_calculateCandidatePosition` (6줄) ✅ 후보 위치 계산 (이전 노드 기준)
-- **헬퍼 3**: `_findNonOverlappingPosition` (29줄) ✅ 겹치지 않는 위치 찾기 및 충돌 감지
-- **헬퍼 4**: `_getFallbackPosition` (5줄) ✅ 최대 시도 후 폴백 위치
+
+-   **메인 메서드**: `getNextNodePosition` (11줄) ✅ 목표 달성 (50줄 이하)
+-   **헬퍼 1**: `_initializePositionCalculation` (15줄) ✅ 기본 설정 및 상수 초기화
+-   **헬퍼 2**: `_calculateCandidatePosition` (6줄) ✅ 후보 위치 계산 (이전 노드 기준)
+-   **헬퍼 3**: `_findNonOverlappingPosition` (29줄) ✅ 겹치지 않는 위치 찾기 및 충돌 감지
+-   **헬퍼 4**: `_getFallbackPosition` (5줄) ✅ 최대 시도 후 폴백 위치
 
 #### 🎯 **분할 전략**
 
@@ -541,14 +576,12 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 #### ✅ **성공 기준 달성**
 
-- **메서드 크기**: 65줄 → 11줄 (83% 감소)
-- **단일 책임**: 각 헬퍼가 명확한 책임 분담 (초기화→계산→탐색→폴백)
-- **복잡도 감소**: 복잡한 충돌 감지 알고리즘이 명확히 분리됨
-- **기능 보존**: 기존 기능 100% 보존 확인
+-   **메서드 크기**: 65줄 → 11줄 (83% 감소)
+-   **단일 책임**: 각 헬퍼가 명확한 책임 분담 (초기화→계산→탐색→폴백)
+-   **복잡도 감소**: 복잡한 충돌 감지 알고리즘이 명확히 분리됨
+-   **기능 보존**: 기존 기능 100% 보존 확인
 
-## 🎉 **Phase 1-2 최종 완료 보고서**
-
-### **📊 전체 성과 요약**
+#### 🎉 **Phase 1-2 최종 완료 보고서**
 
 **완료 기간**: 2025-06-20 10:30 ~ 2025-06-19 19:50
 **총 분할 메서드**: 13개 (목표 100% 달성)
@@ -556,21 +589,21 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 
 #### **분할 상세 현황**
 
-| 순서 | 메서드명 | 원본 크기 | 분할 후 | 감소율 | 헬퍼 수 |
-|------|----------|-----------|---------|--------|---------|
-| 1 | arrangeAllNodesAsTree | 155줄 | 39줄 | 75% | 4개 |
-| 2 | arrangeChildNodesAsTree | 141줄 | 19줄 | 86% | 1개(+재사용) |
-| 3 | arrangeAllNodes | 121줄 | 22줄 | 82% | 3개 |
-| 4 | pasteNodes | 115줄 | 32줄 | 72% | 3개 |
-| 5 | calculateChildNodePosition | 113줄 | 15줄 | 87% | 4개 |
-| 6 | deleteSelectedNodes | 110줄 | 9줄 | 92% | 4개 |
-| 7 | createAndConnectChoiceNode | 107줄 | 13줄 | 88% | 4개 |
-| 8 | arrangeSelectedNodeDescendants | 107줄 | 33줄 | 69% | 3개 |
-| 9 | createAndConnectTextNode | 104줄 | 14줄 | 87% | 4개 |
-| 10 | arrangeSelectedNodeChildren | 99줄 | 34줄 | 66% | 3개 |
-| 11 | deleteNode | 80줄 | 12줄 | 85% | 4개 |
-| 12 | moveNode | 80줄 | 16줄 | 80% | 5개 |
-| 13 | getNextNodePosition | 65줄 | 11줄 | 83% | 4개 |
+| 순서 | 메서드명                       | 원본 크기 | 분할 후 | 감소율 | 헬퍼 수      |
+| ---- | ------------------------------ | --------- | ------- | ------ | ------------ |
+| 1    | arrangeAllNodesAsTree          | 155줄     | 39줄    | 75%    | 4개          |
+| 2    | arrangeChildNodesAsTree        | 141줄     | 19줄    | 86%    | 1개(+재사용) |
+| 3    | arrangeAllNodes                | 121줄     | 22줄    | 82%    | 3개          |
+| 4    | pasteNodes                     | 115줄     | 32줄    | 72%    | 3개          |
+| 5    | calculateChildNodePosition     | 113줄     | 15줄    | 87%    | 4개          |
+| 6    | deleteSelectedNodes            | 110줄     | 9줄     | 92%    | 4개          |
+| 7    | createAndConnectChoiceNode     | 107줄     | 13줄    | 88%    | 4개          |
+| 8    | arrangeSelectedNodeDescendants | 107줄     | 33줄    | 69%    | 3개          |
+| 9    | createAndConnectTextNode       | 104줄     | 14줄    | 87%    | 4개          |
+| 10   | arrangeSelectedNodeChildren    | 99줄      | 34줄    | 66%    | 3개          |
+| 11   | deleteNode                     | 80줄      | 12줄    | 85%    | 4개          |
+| 12   | moveNode                       | 80줄      | 16줄    | 80%    | 5개          |
+| 13   | getNextNodePosition            | 65줄      | 11줄    | 83%    | 4개          |
 
 ### **🎯 달성한 목표**
 
@@ -578,7 +611,7 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 ✅ **단일 책임 원칙**: 각 메서드가 명확한 단일 책임 보유  
 ✅ **코드 가독성**: 평균 77% 코드 감소로 이해하기 쉬운 구조  
 ✅ **기능 보존**: 모든 기존 기능 100% 보존 확인  
-✅ **타입 안전성**: TypeScript 에러 0개 유지  
+✅ **타입 안전성**: TypeScript 에러 0개 유지
 
 ### **📋 다음 Phase 준비**
 
@@ -587,105 +620,171 @@ ChoiceNode.tsx - 4개 메서드: 연결/생성 중심
 **Phase 3**: 인터페이스 설계 (설계 단계)
 **Phase 4**: 물리적 파일 분할 (최종 목표)
 
-**예상 다음 작업**: 분할된 헬퍼 메서드들 중 공통 패턴 추출 및 중복 제거
-
 ### **Phase 1-3: 공통 로직 추출 및 단순화** (2025-06-20 16:42 ~ 16:55)
 
 **완료 작업**: Phase 1.3.1 헬퍼 메서드 현황 분석 및 패턴 식별
 
 #### 📊 **헬퍼 메서드 분석 결과**
 
-**총 헬퍼 메서드**: 35개 (Phase 1-2에서 생성)
+**총 헬퍼 메서드**: 45개 (Phase 1-2에서 생성)
 **분석 범위**: 13개 대형 메서드 분할로 생성된 모든 헬퍼
 
 #### **카테고리별 분류**
 
-| 카테고리 | 헬퍼 수 | 주요 기능 | 핵심 패턴 |
-|----------|---------|----------|----------|
-| **레이아웃 관련** | 14개 | 노드 배치, 관계 매핑, 위치 계산 | find→run→handle 워크플로우 |
-| **노드 생성/연결** | 8개 | 텍스트/선택지 노드 생성 및 연결 | validate→create→connect→finalize |
-| **노드 삭제** | 8개 | 단일/다중 노드 삭제 및 정리 | collect→perform→cleanup |
-| **노드 이동/배치** | 9개 | 드래그, 위치 계산, 충돌 감지 | validate→calculate→update |
-| **크기/차원 측정** | 3개 | DOM 측정, 크기 계산 | measure→estimate→calculate |
-| **복사/붙여넣기** | 3개 | 노드 복제 및 배치 | validate→setup→create |
+| 카테고리           | 헬퍼 수 | 주요 기능                       | 핵심 패턴                        |
+| ------------------ | ------- | ------------------------------- | -------------------------------- |
+| **레이아웃 관련**  | 14개    | 노드 배치, 관계 매핑, 위치 계산 | find→run→handle 워크플로우       |
+| **노드 생성/연결** | 8개     | 텍스트/선택지 노드 생성 및 연결 | validate→create→connect→finalize |
+| **노드 삭제**      | 8개     | 단일/다중 노드 삭제 및 정리     | collect→perform→cleanup          |
+| **노드 이동/배치** | 9개     | 드래그, 위치 계산, 충돌 감지    | validate→calculate→update        |
+| **크기/차원 측정** | 3개     | DOM 측정, 크기 계산             | measure→estimate→calculate       |
+| **복사/붙여넣기**  | 3개     | 노드 복제 및 배치               | validate→setup→create            |
+
+##### 1. 레이아웃 관련 (14개)
+
+```typescript
+// 기본 레이아웃 관리
+_buildNodeRelationMaps; // 부모-자식 관계 매핑
+_buildNodeLevelMap; // 레벨별 노드 그룹핑
+_updateLevelNodePositions; // 레벨별 위치 업데이트
+_updateChildNodePositions; // 자식 노드 위치 업데이트
+
+// 글로벌 레이아웃 시스템
+_findRootNodeForLayout; // 루트 노드 탐색
+_runGlobalLayoutSystem; // 전역 레이아웃 실행
+_handleLayoutResult; // 레이아웃 결과 처리
+
+// 특정 범위 레이아웃
+_findDescendantNodes; // 후손 노드 탐색
+_runDescendantLayoutSystem; // 후손 레이아웃 실행
+_handleDescendantLayoutResult; // 후손 레이아웃 결과 처리
+
+_findChildNodes; // 직접 자식 탐색
+_runChildLayoutSystem; // 자식 레이아웃 실행
+_handleChildLayoutResult; // 자식 레이아웃 결과 처리
+
+// 위치 계산
+_calculateTextNodeChildPosition; // 텍스트 노드 자식 위치
+```
+
+##### 2. 노드 생성/연결 (8개)
+
+```typescript
+// 선택지 노드 생성
+_validateChoiceNodeCreation; // 검증 및 복합 액션 시작
+_createNewChoiceChild; // 새 자식 노드 생성
+_connectAndUpdateChoiceNode; // 연결 및 상태 업데이트
+_finalizeChoiceNodeCreation; // 레이아웃 및 복합 액션 종료
+
+// 텍스트 노드 생성
+_validateTextNodeCreation; // 검증 및 복합 액션 시작
+_createNewTextChild; // 새 자식 노드 생성
+_connectAndUpdateTextNode; // 연결 및 상태 업데이트
+_finalizeTextNodeCreation; // 레이아웃 및 복합 액션 종료
+```
+
+##### 3. 노드 삭제 (8개)
+
+```typescript
+// 다중 노드 삭제
+_getNodesForDeletion; // 삭제 대상 확인
+_collectKeysForCleanup; // 키 수집 (다중 삭제용)
+_performNodesDeletion; // 다중 노드 삭제 실행
+_finalizeNodesDeletion; // 다중 삭제 후 정리
+
+// 단일 노드 삭제
+_collectNodeKeysForCleanup; // 키 수집 (단일 삭제용)
+_findReferencingNodes; // 참조 노드 탐색
+_performNodeDeletion; // 단일 노드 삭제 실행
+_cleanupAfterNodeDeletion; // 단일 삭제 후 정리
+```
+
+##### 4. 노드 이동/배치 (9개)
+
+```typescript
+// 노드 이동
+_validateNodeMovement; // 이동 유효성 검사
+_checkContinuousDrag; // 연속 드래그 확인
+_performNodeMove; // 위치 업데이트 실행
+_handleContinuousDrag; // 연속 드래그 처리
+_addMoveHistory; // 이동 히스토리 추가
+
+// 위치 계산
+_initializePositionCalculation; // 위치 계산 초기화
+_calculateCandidatePosition; // 후보 위치 계산
+_findNonOverlappingPosition; // 겹치지 않는 위치 탐색
+_getFallbackPosition; // 폴백 위치 생성
+```
+
+##### 5. 크기/차원 측정 (3개)
+
+```typescript
+_getRealNodeDimensions; // 실제 DOM 크기 측정
+_getEstimatedNodeDimensions; // 예상 크기 계산
+_calculateChoiceNodeChildPosition; // 선택지 노드 다중 자식 배치
+```
+
+##### 6. 복사/붙여넣기 (3개)
+
+```typescript
+_validatePasteOperation; // 붙여넣기 유효성 검사
+_setupPastedNodeLocalization; // 로컬라이제이션 설정
+_createPastedNodes; // 노드 생성 및 배치
+```
 
 #### **🔍 발견된 주요 중복 패턴**
 
 ##### **1. 결과 처리 헬퍼 (최우선 통합 대상)**
+
 ```typescript
-_handleLayoutResult          // 전역 레이아웃 (17줄)
-_handleDescendantLayoutResult // 후손 레이아웃 (16줄)  
-_handleChildLayoutResult     // 자식 레이아웃 (16줄)
+_handleLayoutResult; // 전역 레이아웃 (17줄)
+_handleDescendantLayoutResult; // 후손 레이아웃 (16줄)
+_handleChildLayoutResult; // 자식 레이아웃 (16줄)
 ```
+
 **공통 로직**: 위치 변화 감지 + 히스토리 저장 + 토스트 메시지
 **중복도**: 85% 유사 코드
 **통합 효과**: 49줄 → 15줄 (69% 감소)
 
-##### **2. 레이아웃 시스템 실행 (높은 통합 효과)**  
+##### **2. 레이아웃 시스템 실행 (높은 통합 효과)**
+
 ```typescript
-_runGlobalLayoutSystem       // 글로벌 (42줄)
-_runDescendantLayoutSystem   // 후손 (35줄)
-_runChildLayoutSystem        // 자식 (35줄)  
+_runGlobalLayoutSystem; // 글로벌 (42줄)
+_runDescendantLayoutSystem; // 후손 (35줄)
+_runChildLayoutSystem; // 자식 (35줄)
 ```
+
 **공통 로직**: 비동기 레이아웃 엔진 호출 + 위치 캡처 + 업데이트
 **중복도**: 70% 유사 코드
 **통합 효과**: 112줄 → 45줄 (60% 감소)
 
 ##### **3. 키 수집 로직 (중간 효과)**
+
 ```typescript
-_collectKeysForCleanup       // 다중 삭제 (33줄)
-_collectNodeKeysForCleanup   // 단일 삭제 (31줄)
+_collectKeysForCleanup; // 다중 삭제 (33줄)
+_collectNodeKeysForCleanup; // 단일 삭제 (31줄)
 ```
+
 **공통 로직**: 로컬라이제이션 키 사용량 체크 + 안전 삭제 대상 필터링
 **중복도**: 75% 유사 코드  
 **통합 효과**: 64줄 → 25줄 (61% 감소)
 
 ##### **4. 노드 탐색 로직 (구조 개선)**
+
 ```typescript
-_findDescendantNodes         // 재귀 후손 탐색 (20줄)
-_findChildNodes             // 직접 자식 탐색 (16줄)
+_findDescendantNodes; // 재귀 후손 탐색 (20줄)
+_findChildNodes; // 직접 자식 탐색 (16줄)
 ```
+
 **공통 로직**: 노드 타입별 관계 탐색 + Set 기반 중복 제거
 **중복도**: 60% 유사 코드
 **통합 효과**: 36줄 → 20줄 (44% 감소) + 구조 일관성
 
 #### **🎯 중복 제거 우선순위**
 
-| 순위 | 대상 | 예상 효과 | 복잡도 | 영향 범위 |
-|------|------|----------|--------|----------|
-| **1순위** | 결과 처리 헬퍼 | 69% 감소 | 낮음 | 레이아웃 시스템만 |
-| **2순위** | 레이아웃 실행 | 60% 감소 | 중간 | 모든 레이아웃 메서드 |
-| **3순위** | 키 수집 로직 | 61% 감소 | 중간 | 삭제 관련 메서드 |
-| **4순위** | 노드 탐색 | 44% 감소 | 중간 | 관계 탐색 메서드 |
-
-#### **📋 다음 단계 계획**
-
-**Phase 1.3.2**: 명확한 중복 코드 제거
-- 1순위: `_handle*LayoutResult` 3개 통합
-- 기대 효과: 추가 34줄 감소 (현재 265줄 → 231줄)
-- 목표: 단일 `_handleLayoutSystemResult` 공통 함수 생성
-
-**성공 기준**:
-- 기능 100% 보존
-- 메서드 시그니처 일관성 확보  
-- 코드 중복 최소 60% 감소
-- TypeScript 에러 0개 유지
-
-#### **예상 최종 효과** (Phase 1-3 완료 시)
-
-**전체 통합 시나리오**:
-- **현재**: 265줄 (35개 헬퍼)
-- **1-4순위 통합 후**: 190줄 (25개 헬퍼)  
-- **추가 감소**: 75줄 (28% 감소)
-- **Phase 1 총 감소**: 1,170줄 → 190줄 (84% 감소)
-
-**품질 향상**:
-- 헬퍼 메서드 수: 35개 → 25개 (29% 감소)
-- 중복 패턴 제거: 4개 주요 패턴 통합
-- 코드 일관성: 공통 인터페이스 및 명명 규칙 확립
-
-#### 📋 **다음 대상**
-
-**Phase 1.3.2**: 명확한 중복 코드 제거 - 결과 처리 헬퍼 통합
-
-**예상 완료**: Phase 1-3 진행 중 (1/4 단계 완료)
+| 순위      | 대상           | 예상 효과 | 복잡도 | 영향 범위            |
+| --------- | -------------- | --------- | ------ | -------------------- |
+| **1순위** | 결과 처리 헬퍼 | 69% 감소  | 낮음   | 레이아웃 시스템만    |
+| **2순위** | 레이아웃 실행  | 60% 감소  | 중간   | 모든 레이아웃 메서드 |
+| **3순위** | 키 수집 로직   | 61% 감소  | 중간   | 삭제 관련 메서드     |
+| **4순위** | 노드 탐색      | 44% 감소  | 중간   | 관계 탐색 메서드     |
