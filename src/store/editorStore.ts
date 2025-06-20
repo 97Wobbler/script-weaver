@@ -205,6 +205,9 @@ interface EditorStore extends EditorState {
   _calculateCandidatePosition: (initData: any) => { x: number; y: number };
   _findNonOverlappingPosition: (candidatePosition: { x: number; y: number }, initData: any) => { x: number; y: number };
   _getFallbackPosition: (lastNodePosition: { x: number; y: number }) => { x: number; y: number };
+
+  // 노드 개수 제한 검증 공통 유틸리티
+  _validateNodeCountLimit: (options?: { endCompoundAction?: boolean }) => { isValid: boolean };
 }
 
 // 타입 안전한 헬퍼 함수들
@@ -1441,11 +1444,8 @@ export const useEditorStore = create<EditorStore>()(
         // 자동 노드 생성 (실제 텍스트 기반)
         createTextNode: (contentText = "", speakerText = "") => {
           // 노드 개수 제한 체크
-          if (!get().canCreateNewNode()) {
-            const state = get();
-            if (state.showToast) {
-              state.showToast(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`, "warning");
-            }
+          const validation = get()._validateNodeCountLimit();
+          if (!validation.isValid) {
             return "";
           }
 
@@ -1479,11 +1479,8 @@ export const useEditorStore = create<EditorStore>()(
 
         createChoiceNode: (contentText = "", speakerText = "") => {
           // 노드 개수 제한 체크
-          if (!get().canCreateNewNode()) {
-            const state = get();
-            if (state.showToast) {
-              state.showToast(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`, "warning");
-            }
+          const validation = get()._validateNodeCountLimit();
+          if (!validation.isValid) {
             return "";
           }
 
@@ -1674,12 +1671,8 @@ export const useEditorStore = create<EditorStore>()(
           get().startCompoundAction("선택지 노드 생성 및 연결");
 
           // 노드 개수 제한 체크
-          if (!get().canCreateNewNode()) {
-            get().endCompoundAction();
-            const state = get();
-            if (state.showToast) {
-              state.showToast(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`, "warning");
-            }
+          const validation = get()._validateNodeCountLimit({ endCompoundAction: true });
+          if (!validation.isValid) {
             return { isValid: false, fromNode: null, choice: null, currentScene: null };
           }
 
@@ -2974,12 +2967,8 @@ export const useEditorStore = create<EditorStore>()(
           get().startCompoundAction("텍스트 노드 생성 및 연결");
 
           // 노드 개수 제한 체크
-          if (!get().canCreateNewNode()) {
-            get().endCompoundAction(); // 복합 액션 종료
-            const state = get();
-            if (state.showToast) {
-              state.showToast(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`, "warning");
-            }
+          const validation = get()._validateNodeCountLimit({ endCompoundAction: true });
+          if (!validation.isValid) {
             return { isValid: false, fromNode: null, currentScene: null };
           }
 
@@ -3091,6 +3080,26 @@ export const useEditorStore = create<EditorStore>()(
 
         _handleChildLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], childCount: number) => {
           get()._handleLayoutSystemResult(beforePositions, affectedNodeKeys, "child", childCount);
+        },
+
+        // 노드 개수 제한 검증 공통 유틸리티
+        _validateNodeCountLimit: (options?: { endCompoundAction?: boolean }) => {
+          if (get().canCreateNewNode()) {
+            return { isValid: true };
+          }
+
+          // 복합 액션 종료 (필요한 경우)
+          if (options?.endCompoundAction) {
+            get().endCompoundAction();
+          }
+
+          // 토스트 메시지 표시
+          const state = get();
+          if (state.showToast) {
+            state.showToast(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`, "warning");
+          }
+
+          return { isValid: false };
         },
       };
     },
