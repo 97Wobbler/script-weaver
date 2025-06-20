@@ -186,6 +186,7 @@ interface EditorStore extends EditorState {
   _handleChildLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], childCount: number) => void;
 
   // 단일 노드 삭제 헬퍼 메서드들 (private)
+  _collectLocalizationKeys: (nodes: EditorNodeWrapper[]) => string[];
   _collectNodeKeysForCleanup: (nodeToDelete: EditorNodeWrapper) => string[];
   _findReferencingNodes: (currentScene: Scene, nodeKey: string) => string[];
   _performNodeDeletion: (nodeKey: string) => void;
@@ -822,27 +823,25 @@ export const useEditorStore = create<EditorStore>()(
           return { targetKeys, currentScene };
         },
 
-        // 헬퍼 메서드: 로컬라이제이션 키 수집 (단독 사용 키만)
-        _collectKeysForCleanup: (targetKeys: string[], currentScene: Scene) => {
+        // 통합 헬퍼 메서드: 로컬라이제이션 키 수집 (단독 사용 키만)
+        _collectLocalizationKeys: (nodes: EditorNodeWrapper[]) => {
           const localizationStore = useLocalizationStore.getState();
-          const allKeysToCleanup: string[] = [];
+          const keysToCleanup: string[] = [];
 
-          targetKeys.forEach((nodeKey) => {
-            const nodeToDelete = getNode(currentScene, nodeKey);
-            if (!nodeToDelete) return;
-
-            // 삭제될 노드에서 단독으로 사용하는 키들 수집
+          nodes.forEach((nodeToDelete) => {
+            // 단독으로 사용하는 화자 키 수집
             if (nodeToDelete.dialogue.speakerKeyRef) {
               const usageCount = localizationStore.getKeyUsageCount(nodeToDelete.dialogue.speakerKeyRef);
               if (usageCount === 1) {
-                allKeysToCleanup.push(nodeToDelete.dialogue.speakerKeyRef);
+                keysToCleanup.push(nodeToDelete.dialogue.speakerKeyRef);
               }
             }
 
+            // 단독으로 사용하는 텍스트 키 수집
             if (nodeToDelete.dialogue.textKeyRef) {
               const usageCount = localizationStore.getKeyUsageCount(nodeToDelete.dialogue.textKeyRef);
               if (usageCount === 1) {
-                allKeysToCleanup.push(nodeToDelete.dialogue.textKeyRef);
+                keysToCleanup.push(nodeToDelete.dialogue.textKeyRef);
               }
             }
 
@@ -853,14 +852,20 @@ export const useEditorStore = create<EditorStore>()(
                 if (choice.textKeyRef) {
                   const usageCount = localizationStore.getKeyUsageCount(choice.textKeyRef);
                   if (usageCount === 1) {
-                    allKeysToCleanup.push(choice.textKeyRef);
+                    keysToCleanup.push(choice.textKeyRef);
                   }
                 }
               });
             }
           });
 
-          return allKeysToCleanup;
+          return keysToCleanup;
+        },
+
+        // 헬퍼 메서드: 로컬라이제이션 키 수집 (다중 삭제용, 통합 함수 호출)
+        _collectKeysForCleanup: (targetKeys: string[], currentScene: Scene) => {
+          const nodes = targetKeys.map(nodeKey => getNode(currentScene, nodeKey)).filter(Boolean) as EditorNodeWrapper[];
+          return get()._collectLocalizationKeys(nodes);
         },
 
         // 헬퍼 메서드: 실제 노드 삭제 처리 (참조 정리 포함)
@@ -1039,41 +1044,9 @@ export const useEditorStore = create<EditorStore>()(
           get()._cleanupAfterNodeDeletion(keysToCleanup);
         },
 
-        // 삭제할 노드의 로컬라이제이션 키 수집
+        // 헬퍼 메서드: 로컬라이제이션 키 수집 (단일 삭제용, 통합 함수 호출)
         _collectNodeKeysForCleanup: (nodeToDelete: EditorNodeWrapper): string[] => {
-          const localizationStore = useLocalizationStore.getState();
-          const keysToCleanup: string[] = [];
-
-          // 단독으로 사용하는 화자 키 수집
-          if (nodeToDelete.dialogue.speakerKeyRef) {
-            const usageCount = localizationStore.getKeyUsageCount(nodeToDelete.dialogue.speakerKeyRef);
-            if (usageCount === 1) {
-              keysToCleanup.push(nodeToDelete.dialogue.speakerKeyRef);
-            }
-          }
-
-          // 단독으로 사용하는 텍스트 키 수집
-          if (nodeToDelete.dialogue.textKeyRef) {
-            const usageCount = localizationStore.getKeyUsageCount(nodeToDelete.dialogue.textKeyRef);
-            if (usageCount === 1) {
-              keysToCleanup.push(nodeToDelete.dialogue.textKeyRef);
-            }
-          }
-
-          // ChoiceNode인 경우 선택지 키들도 확인
-          if (nodeToDelete.dialogue.type === "choice") {
-            const choiceDialogue = nodeToDelete.dialogue as ChoiceDialogue;
-            Object.values(choiceDialogue.choices).forEach((choice) => {
-              if (choice.textKeyRef) {
-                const usageCount = localizationStore.getKeyUsageCount(choice.textKeyRef);
-                if (usageCount === 1) {
-                  keysToCleanup.push(choice.textKeyRef);
-                }
-              }
-            });
-          }
-
-          return keysToCleanup;
+          return get()._collectLocalizationKeys([nodeToDelete]);
         },
 
         // 삭제 대상 노드를 참조하는 다른 노드들 찾기
