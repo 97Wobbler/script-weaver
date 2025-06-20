@@ -122,6 +122,9 @@ interface EditorStore extends EditorState {
   _findRootNodeForLayout: (currentScene: Scene, allNodeKeys: string[]) => string;
   _runGlobalLayoutSystem: (currentScene: Scene, rootNodeKey: string) => Promise<void>;
   _handleLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, allNodeKeys: string[]) => void;
+  _validatePasteOperation: (nodesToPaste: number) => boolean;
+  _setupPastedNodeLocalization: (newNode: EditorNodeWrapper) => void;
+  _createPastedNodes: (startX: number, startY: number) => { newNodes: EditorNodeWrapper[]; newNodeKeys: string[] };
 
   // 새로운 레이아웃 시스템 (즉시 배치)
   arrangeAllNodes: (internal?: boolean) => Promise<void>;
@@ -592,26 +595,62 @@ export const useEditorStore = create<EditorStore>()(
           }
         },
 
-        pasteNodes: (position) => {
-          if (clipboardData.length === 0) return;
-
+        // 헬퍼 메서드: 붙여넣기 작업 검증
+        _validatePasteOperation: (nodesToPaste: number) => {
           const state = get();
-
-          // 현재 노드 수 + 붙여넣을 노드 수가 100개를 초과하는지 체크
           const currentNodeCount = get().getCurrentNodeCount();
-          const nodesToPaste = clipboardData.length;
           const totalAfterPaste = currentNodeCount + nodesToPaste;
 
           if (totalAfterPaste > 100) {
             if (state.showToast) {
               state.showToast(`노드 개수 제한 초과: 현재 ${currentNodeCount}개 + 붙여넣기 ${nodesToPaste}개 = ${totalAfterPaste}개 (최대 100개)`, "warning");
             }
-            return;
+            return false;
+          }
+          return true;
+        },
+
+        // 헬퍼 메서드: 붙여넣을 노드의 로컬라이제이션 설정
+        _setupPastedNodeLocalization: (newNode: EditorNodeWrapper) => {
+          const localizationStore = useLocalizationStore.getState();
+
+          if (newNode.dialogue.type === "text" || newNode.dialogue.type === "choice") {
+            // 화자 텍스트가 있으면 새 키 생성
+            if (newNode.dialogue.speakerText) {
+              const result = localizationStore.generateSpeakerKey(newNode.dialogue.speakerText);
+              localizationStore.setText(result.key, newNode.dialogue.speakerText);
+              newNode.dialogue.speakerKeyRef = result.key;
+            }
+
+            // 내용 텍스트가 있으면 새 키 생성
+            if (newNode.dialogue.contentText) {
+              const result = localizationStore.generateTextKey(newNode.dialogue.contentText);
+              localizationStore.setText(result.key, newNode.dialogue.contentText);
+              newNode.dialogue.textKeyRef = result.key;
+            }
           }
 
-          const startX = position?.x ?? state.lastNodePosition.x + 50;
-          const startY = position?.y ?? state.lastNodePosition.y + 50;
+          // 선택지 텍스트들도 새 키 생성
+          if (newNode.dialogue.type === "choice" && newNode.dialogue.choices) {
+            Object.entries(newNode.dialogue.choices).forEach(([choiceKey, choice]) => {
+              if (choice.choiceText) {
+                const result = localizationStore.generateChoiceKey(choice.choiceText);
+                localizationStore.setText(result.key, choice.choiceText);
+                choice.textKeyRef = result.key;
+              }
+              // 연결된 노드 참조는 제거 (복사된 노드는 연결 없음)
+              choice.nextNodeKey = "";
+            });
+          }
 
+          // 텍스트 노드의 연결도 제거
+          if (newNode.dialogue.type === "text") {
+            newNode.dialogue.nextNodeKey = undefined;
+          }
+        },
+
+        // 헬퍼 메서드: 붙여넣을 노드들 생성
+        _createPastedNodes: (startX: number, startY: number) => {
           const newNodeKeys: string[] = [];
           const newNodes: EditorNodeWrapper[] = [];
 
@@ -627,48 +666,35 @@ export const useEditorStore = create<EditorStore>()(
               },
             };
 
-            // 새로운 localization 키 생성
-            const localizationStore = useLocalizationStore.getState();
-
-            if (newNode.dialogue.type === "text" || newNode.dialogue.type === "choice") {
-              // 화자 텍스트가 있으면 새 키 생성
-              if (newNode.dialogue.speakerText) {
-                const result = localizationStore.generateSpeakerKey(newNode.dialogue.speakerText);
-                localizationStore.setText(result.key, newNode.dialogue.speakerText);
-                newNode.dialogue.speakerKeyRef = result.key;
-              }
-
-              // 내용 텍스트가 있으면 새 키 생성
-              if (newNode.dialogue.contentText) {
-                const result = localizationStore.generateTextKey(newNode.dialogue.contentText);
-                localizationStore.setText(result.key, newNode.dialogue.contentText);
-                newNode.dialogue.textKeyRef = result.key;
-              }
-            }
-
-            // 선택지 텍스트들도 새 키 생성
-            if (newNode.dialogue.type === "choice" && newNode.dialogue.choices) {
-              Object.entries(newNode.dialogue.choices).forEach(([choiceKey, choice]) => {
-                if (choice.choiceText) {
-                  const result = localizationStore.generateChoiceKey(choice.choiceText);
-                  localizationStore.setText(result.key, choice.choiceText);
-                  choice.textKeyRef = result.key;
-                }
-                // 연결된 노드 참조는 제거 (복사된 노드는 연결 없음)
-                choice.nextNodeKey = "";
-              });
-            }
-
-            // 텍스트 노드의 연결도 제거
-            if (newNode.dialogue.type === "text") {
-              newNode.dialogue.nextNodeKey = undefined;
-            }
+            // 로컬라이제이션 설정
+            get()._setupPastedNodeLocalization(newNode);
 
             newNodes.push(newNode);
             newNodeKeys.push(newNodeKey);
           });
 
-          // 모든 노드를 한 번에 추가
+          return { newNodes, newNodeKeys };
+        },
+
+        pasteNodes: (position) => {
+          if (clipboardData.length === 0) return;
+
+          const state = get();
+          const nodesToPaste = clipboardData.length;
+
+          // 1. 붙여넣기 작업 검증
+          if (!get()._validatePasteOperation(nodesToPaste)) {
+            return;
+          }
+
+          // 2. 붙여넣기 위치 계산
+          const startX = position?.x ?? state.lastNodePosition.x + 50;
+          const startY = position?.y ?? state.lastNodePosition.y + 50;
+
+          // 3. 새 노드들 생성
+          const { newNodes, newNodeKeys } = get()._createPastedNodes(startX, startY);
+
+          // 4. 모든 노드를 한 번에 추가
           set((currentState) => {
             let updatedState = { ...currentState };
 
@@ -698,7 +724,7 @@ export const useEditorStore = create<EditorStore>()(
             };
           });
 
-          // 상태 변경 후에 히스토리에 추가
+          // 5. 상태 변경 후에 히스토리에 추가
           get().pushToHistory("노드 붙여넣기");
           updateLocalizationStoreRef();
 
