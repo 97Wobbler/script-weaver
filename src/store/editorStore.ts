@@ -125,6 +125,10 @@ interface EditorStore extends EditorState {
   _validatePasteOperation: (nodesToPaste: number) => boolean;
   _setupPastedNodeLocalization: (newNode: EditorNodeWrapper) => void;
   _createPastedNodes: (startX: number, startY: number) => { newNodes: EditorNodeWrapper[]; newNodeKeys: string[] };
+  _getRealNodeDimensions: (nodeKey: string) => { width: number; height: number };
+  _getEstimatedNodeDimensions: () => { width: number; height: number };
+  _calculateTextNodeChildPosition: (parentPosition: { x: number; y: number }, parentDimensions: { width: number; height: number }, HORIZONTAL_SPACING: number) => { x: number; y: number };
+  _calculateChoiceNodeChildPosition: (parentNode: EditorNodeWrapper, choiceKey: string, parentPosition: { x: number; y: number }, parentDimensions: { width: number; height: number }, HORIZONTAL_SPACING: number, VERTICAL_SPACING: number, currentScene: Scene) => { x: number; y: number };
 
   // 새로운 레이아웃 시스템 (즉시 배치)
   arrangeAllNodes: (internal?: boolean) => Promise<void>;
@@ -1840,7 +1844,103 @@ export const useEditorStore = create<EditorStore>()(
           };
         },
 
-        // 개선된 자식 노드 위치 계산 - 실제 동적 크기 기반
+        // 헬퍼 메서드: 실제 노드 크기 측정 (DOM 기반)
+        _getRealNodeDimensions: (nodeKey: string) => {
+          // React Flow는 노드를 .react-flow__node 클래스로 감싸고, data-id 속성을 설정
+          const nodeElement = document.querySelector(`.react-flow__node[data-id="${nodeKey}"]`) as HTMLElement;
+
+          if (nodeElement) {
+            // 방법 1: getBoundingClientRect (현재 화면상 크기 - 확대/축소 영향받음)
+            const rect = nodeElement.getBoundingClientRect();
+
+            // 방법 2: offsetWidth/Height (실제 CSS 크기 - 확대/축소 영향 안받음)
+            const offsetDimensions = {
+              width: nodeElement.offsetWidth,
+              height: nodeElement.offsetHeight,
+            };
+
+            // 방법 3: computedStyle (CSS에서 계산된 크기)
+            const computedStyle = window.getComputedStyle(nodeElement);
+            const computedDimensions = {
+              width: parseFloat(computedStyle.width),
+              height: parseFloat(computedStyle.height),
+            };
+
+            // offsetWidth가 가장 정확할 가능성이 높음 (CSS 기준, 확대/축소 무관)
+            if (offsetDimensions.width > 0 && offsetDimensions.height > 0) {
+              return offsetDimensions;
+            }
+
+            // 폴백: boundingClientRect
+            if (rect.width > 0 && rect.height > 0) {
+              return { width: rect.width, height: rect.height };
+            }
+          }
+
+          // DOM에서 측정할 수 없는 경우 폴백 (예상 크기)
+          return get()._getEstimatedNodeDimensions();
+        },
+
+        // 헬퍼 메서드: 폴백용 예상 크기 계산 (CSS 기반)
+        _getEstimatedNodeDimensions: () => {
+          // TextNode CSS: min-w-[200px] max-w-[300px]
+          // 실제 측정이 불가능한 경우 CSS 최대값 + 여유공간 사용
+          return { width: 300, height: 120 }; // CSS 최대값 기준
+        },
+
+        // 헬퍼 메서드: 텍스트 노드의 자식 위치 계산 (단일 자식)
+        _calculateTextNodeChildPosition: (parentPosition: { x: number; y: number }, parentDimensions: { width: number; height: number }, HORIZONTAL_SPACING: number) => {
+          const newNodeX = parentPosition.x + parentDimensions.width + HORIZONTAL_SPACING;
+          
+          // TextNode의 경우 (단일 자식): 부모 중앙과 자식 중앙의 Y 좌표가 동일하도록 배치
+          const parentCenterY = parentPosition.y + parentDimensions.height / 2;
+          const newNodeDimensions = { width: 200, height: 120 }; // 새 노드 예상 크기
+          const newNodeY = parentCenterY - newNodeDimensions.height / 2;
+
+          return { x: newNodeX, y: newNodeY };
+        },
+
+        // 헬퍼 메서드: 선택지 노드의 자식 위치 계산 (다중 자식)
+        _calculateChoiceNodeChildPosition: (parentNode: EditorNodeWrapper, choiceKey: string, parentPosition: { x: number; y: number }, parentDimensions: { width: number; height: number }, HORIZONTAL_SPACING: number, VERTICAL_SPACING: number, currentScene: Scene) => {
+          const newNodeX = parentPosition.x + parentDimensions.width + HORIZONTAL_SPACING;
+
+          if (parentNode.dialogue.type !== "choice") {
+            return { x: newNodeX, y: parentPosition.y };
+          }
+
+          const choiceDialogue = parentNode.dialogue as ChoiceDialogue;
+          const choices = Object.keys(choiceDialogue.choices);
+          const choiceIndex = choices.indexOf(choiceKey);
+
+          if (choiceIndex === -1) {
+            return { x: newNodeX, y: parentPosition.y };
+          }
+
+          // 이미 연결된 자식 노드들의 위치 확인
+          const connectedChildren = choices
+            .map((key) => choiceDialogue.choices[key].nextNodeKey)
+            .filter(Boolean)
+            .map((nodeKey) => getNode(currentScene, nodeKey!))
+            .filter(Boolean);
+
+          if (connectedChildren.length === 0) {
+            // 첫 번째 자식인 경우: 부모 중앙과 자식 중앙의 Y 좌표가 동일하도록 배치
+            const parentCenterY = parentPosition.y + parentDimensions.height / 2;
+            const newNodeDimensions = { width: 200, height: 120 }; // 새 노드 예상 크기
+            const newNodeY = parentCenterY - newNodeDimensions.height / 2;
+
+            return { x: newNodeX, y: newNodeY };
+          } else {
+            // 기존 자식들이 있는 경우: 가장 아래 자식 아래에 배치
+            const existingYPositions = connectedChildren.map((child) => child!.position.y);
+            const lowestY = Math.max(...existingYPositions);
+            const newNodeY = lowestY + 120 + VERTICAL_SPACING; // 120은 예상 노드 높이
+
+            return { x: newNodeX, y: newNodeY };
+          }
+        },
+
+        // 개선된 자식 노드 위치 계산 - 실제 동적 크기 기반 (리팩터링됨)
         calculateChildNodePosition: (parentNodeKey, choiceKey) => {
           const state = get();
           const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
@@ -1854,103 +1954,19 @@ export const useEditorStore = create<EditorStore>()(
             return { x: 100, y: 100 };
           }
 
-          // 실제 노드 크기 가져오기 (여러 측정 방법 시도)
-          const getRealNodeDimensions = (nodeKey: string) => {
-            // React Flow는 노드를 .react-flow__node 클래스로 감싸고, data-id 속성을 설정
-            const nodeElement = document.querySelector(`.react-flow__node[data-id="${nodeKey}"]`) as HTMLElement;
-
-            if (nodeElement) {
-              // 방법 1: getBoundingClientRect (현재 화면상 크기 - 확대/축소 영향받음)
-              const rect = nodeElement.getBoundingClientRect();
-
-              // 방법 2: offsetWidth/Height (실제 CSS 크기 - 확대/축소 영향 안받음)
-              const offsetDimensions = {
-                width: nodeElement.offsetWidth,
-                height: nodeElement.offsetHeight,
-              };
-
-              // 방법 3: computedStyle (CSS에서 계산된 크기)
-              const computedStyle = window.getComputedStyle(nodeElement);
-              const computedDimensions = {
-                width: parseFloat(computedStyle.width),
-                height: parseFloat(computedStyle.height),
-              };
-
-              // offsetWidth가 가장 정확할 가능성이 높음 (CSS 기준, 확대/축소 무관)
-              if (offsetDimensions.width > 0 && offsetDimensions.height > 0) {
-                return offsetDimensions;
-              }
-
-              // 폴백: boundingClientRect
-              if (rect.width > 0 && rect.height > 0) {
-                return { width: rect.width, height: rect.height };
-              }
-            }
-
-            // DOM에서 측정할 수 없는 경우 폴백 (예상 크기)
-            return getEstimatedNodeDimensions();
-          };
-
-          // 폴백용 예상 크기 계산 함수 (CSS 기반)
-          const getEstimatedNodeDimensions = () => {
-            // TextNode CSS: min-w-[200px] max-w-[300px]
-            // 실제 측정이 불가능한 경우 CSS 최대값 + 여유공간 사용
-            return { width: 300, height: 120 }; // CSS 최대값 기준
-          };
-
-          const parentDimensions = getRealNodeDimensions(parentNodeKey);
+          // 1. 부모 노드 크기 측정
+          const parentDimensions = get()._getRealNodeDimensions(parentNodeKey);
           const parentPosition = parentNode.position;
 
-          // 가로 간격 (사용자 요구사항: 30px)
-          const HORIZONTAL_SPACING = 50; // 30px → 50px로 변경
+          // 2. 간격 설정
+          const HORIZONTAL_SPACING = 50;
           const VERTICAL_SPACING = 30;
 
-          // 새 노드 X 위치: 부모 노드 우측 끝 + 50px
-          const newNodeX = parentPosition.x + parentDimensions.width + HORIZONTAL_SPACING;
-
+          // 3. 노드 타입에 따른 위치 계산
           if (parentNode.dialogue.type === "text" || !choiceKey) {
-            // TextNode의 경우 (단일 자식): 부모 중앙과 자식 중앙의 Y 좌표가 동일하도록 배치
-            const parentCenterY = parentPosition.y + parentDimensions.height / 2;
-            const newNodeDimensions = { width: 200, height: 120 }; // 새 노드 예상 크기
-            const newNodeY = parentCenterY - newNodeDimensions.height / 2;
-
-            return { x: newNodeX, y: newNodeY };
+            return get()._calculateTextNodeChildPosition(parentPosition, parentDimensions, HORIZONTAL_SPACING);
           } else {
-            // ChoiceNode의 경우 (다중 자식): 선택지별 개별 배치
-            if (parentNode.dialogue.type !== "choice") {
-              return { x: newNodeX, y: parentPosition.y };
-            }
-
-            const choiceDialogue = parentNode.dialogue as ChoiceDialogue;
-            const choices = Object.keys(choiceDialogue.choices);
-            const choiceIndex = choices.indexOf(choiceKey);
-
-            if (choiceIndex === -1) {
-              return { x: newNodeX, y: parentPosition.y };
-            }
-
-            // 이미 연결된 자식 노드들의 위치 확인
-            const connectedChildren = choices
-              .map((key) => choiceDialogue.choices[key].nextNodeKey)
-              .filter(Boolean)
-              .map((nodeKey) => getNode(currentScene, nodeKey!))
-              .filter(Boolean);
-
-            if (connectedChildren.length === 0) {
-              // 첫 번째 자식인 경우: 부모 중앙과 자식 중앙의 Y 좌표가 동일하도록 배치
-              const parentCenterY = parentPosition.y + parentDimensions.height / 2;
-              const newNodeDimensions = { width: 200, height: 120 }; // 새 노드 예상 크기
-              const newNodeY = parentCenterY - newNodeDimensions.height / 2;
-
-              return { x: newNodeX, y: newNodeY };
-            } else {
-              // 기존 자식들이 있는 경우: 가장 아래 자식 아래에 배치
-              const existingYPositions = connectedChildren.map((child) => child!.position.y);
-              const lowestY = Math.max(...existingYPositions);
-              const newNodeY = lowestY + 120 + VERTICAL_SPACING; // 120은 예상 노드 높이
-
-              return { x: newNodeX, y: newNodeY };
-            }
+            return get()._calculateChoiceNodeChildPosition(parentNode, choiceKey, parentPosition, parentDimensions, HORIZONTAL_SPACING, VERTICAL_SPACING, currentScene);
           }
         },
 
