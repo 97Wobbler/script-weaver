@@ -166,6 +166,11 @@ interface EditorStore extends EditorState {
 
   // 노드 위치와 숨김 상태 동시 업데이트 함수 추가
   updateNodePositionAndVisibility: (nodeKey: string, position: { x: number; y: number }, hidden: boolean) => void;
+
+  // 후손 노드 정렬 헬퍼 메서드들 (private)
+  _findDescendantNodes: (nodeKey: string, currentScene: Scene) => Set<string>;
+  _runDescendantLayoutSystem: (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => Promise<void>;
+  _handleDescendantLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], descendantCount: number) => void;
 }
 
 // 타입 안전한 헬퍼 함수들
@@ -2868,24 +2873,7 @@ export const useEditorStore = create<EditorStore>()(
             if (!parentNode) return;
 
             // 후손 노드들 찾기
-            const descendantNodeKeys = new Set<string>();
-            const findDescendants = (currentNodeKey: string) => {
-              const node = getNode(currentScene, currentNodeKey);
-              if (!node) return;
-
-              if (node.dialogue.type === "text" && node.dialogue.nextNodeKey) {
-                descendantNodeKeys.add(node.dialogue.nextNodeKey);
-                findDescendants(node.dialogue.nextNodeKey);
-              } else if (node.dialogue.type === "choice") {
-                Object.values(node.dialogue.choices).forEach((choice) => {
-                  if (choice.nextNodeKey) {
-                    descendantNodeKeys.add(choice.nextNodeKey);
-                    findDescendants(choice.nextNodeKey);
-                  }
-                });
-              }
-            };
-            findDescendants(nodeKey);
+            const descendantNodeKeys = get()._findDescendantNodes(nodeKey, currentScene);
 
             // 정렬할 노드들 (부모 + 후손)
             const affectedNodeKeys = [nodeKey, ...Array.from(descendantNodeKeys)];
@@ -2893,63 +2881,11 @@ export const useEditorStore = create<EditorStore>()(
             // 정렬 전 위치 캡처
             const beforePositions = captureNodePositions(currentScene, affectedNodeKeys);
 
-            const { globalLayoutSystem } = await import("../utils/layoutEngine");
+            // 레이아웃 시스템 실행
+            await get()._runDescendantLayoutSystem(nodeKey, currentScene, affectedNodeKeys);
 
-            await globalLayoutSystem.runLayout(
-              currentScene,
-              {
-                rootNodeId: nodeKey,
-                depth: null, // 무제한 깊이
-                includeRoot: true,
-                direction: "LR",
-                nodeSpacing: 50,
-                rankSpacing: 100,
-                anchorNodeId: nodeKey, // 선택된 노드를 앵커로 고정
-              },
-              (nodeId, position) => {
-                // moveNode를 직접 호출하지 않고 위치만 업데이트 (히스토리 중복 방지)
-                const currentState = get();
-                const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
-                if (!currentScene) return;
-
-                const currentNode = getNode(currentScene, nodeId);
-                if (!currentNode) return;
-
-                const updatedNode = { ...currentNode, position };
-                const updatedScene = setNode(currentScene, nodeId, updatedNode);
-
-                set((state) => ({
-                  ...state,
-                  templateData: {
-                    ...state.templateData,
-                    [state.currentTemplate]: {
-                      ...state.templateData[state.currentTemplate],
-                      [state.currentScene]: updatedScene,
-                    },
-                  },
-                  lastNodePosition: position,
-                }));
-              }
-            );
-
-            // 정렬 후 위치 캡처 및 변화 감지
-            const afterState = get();
-            const afterScene = afterState.templateData[afterState.currentTemplate]?.[afterState.currentScene];
-            if (!afterScene) return;
-
-            const afterPositions = captureNodePositions(afterScene, affectedNodeKeys);
-            const hasChanged = comparePositions(beforePositions, afterPositions);
-
-            if (hasChanged) {
-              // 변화가 있을 때만 히스토리 저장
-              get().pushToHistory(`후손 노드 정렬 (${descendantNodeKeys.size}개 노드)`);
-            } else {
-              // 변화가 없으면 토스트 메시지 표시
-              const showToast = get().showToast;
-              if (showToast) {
-                showToast("이미 정렬된 상태입니다", "info");
-              }
-            }
+            // 결과 처리 및 히스토리 저장
+            get()._handleDescendantLayoutResult(beforePositions, affectedNodeKeys, descendantNodeKeys.size);
           } catch (error) {
             console.error("[정렬 시스템] 후손 노드 정렬 중 오류:", error);
             if (!internal) {
@@ -3009,6 +2945,90 @@ export const useEditorStore = create<EditorStore>()(
               },
             };
           }),
+
+        // 후손 노드 정렬 헬퍼 메서드들 (private)
+        _findDescendantNodes: (nodeKey: string, currentScene: Scene) => {
+          const descendantNodeKeys = new Set<string>();
+          const findDescendants = (currentNodeKey: string) => {
+            const node = getNode(currentScene, currentNodeKey);
+            if (!node) return;
+
+            if (node.dialogue.type === "text" && node.dialogue.nextNodeKey) {
+              descendantNodeKeys.add(node.dialogue.nextNodeKey);
+              findDescendants(node.dialogue.nextNodeKey);
+            } else if (node.dialogue.type === "choice") {
+              Object.values(node.dialogue.choices).forEach((choice) => {
+                if (choice.nextNodeKey) {
+                  descendantNodeKeys.add(choice.nextNodeKey);
+                  findDescendants(choice.nextNodeKey);
+                }
+              });
+            }
+          };
+          findDescendants(nodeKey);
+          return descendantNodeKeys;
+        },
+
+        _runDescendantLayoutSystem: async (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => {
+          const { globalLayoutSystem } = await import("../utils/layoutEngine");
+
+          await globalLayoutSystem.runLayout(
+            currentScene,
+            {
+              rootNodeId: nodeKey,
+              depth: null, // 무제한 깊이
+              includeRoot: true,
+              direction: "LR",
+              nodeSpacing: 50,
+              rankSpacing: 100,
+              anchorNodeId: nodeKey, // 선택된 노드를 앵커로 고정
+            },
+            (nodeId, position) => {
+              // moveNode를 직접 호출하지 않고 위치만 업데이트 (히스토리 중복 방지)
+              const currentState = get();
+              const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
+              if (!currentScene) return;
+
+              const currentNode = getNode(currentScene, nodeId);
+              if (!currentNode) return;
+
+              const updatedNode = { ...currentNode, position };
+              const updatedScene = setNode(currentScene, nodeId, updatedNode);
+
+              set((state) => ({
+                ...state,
+                templateData: {
+                  ...state.templateData,
+                  [state.currentTemplate]: {
+                    ...state.templateData[state.currentTemplate],
+                    [state.currentScene]: updatedScene,
+                  },
+                },
+                lastNodePosition: position,
+              }));
+            }
+          );
+        },
+
+        _handleDescendantLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], descendantCount: number) => {
+          const afterState = get();
+          const afterScene = afterState.templateData[afterState.currentTemplate]?.[afterState.currentScene];
+          if (!afterScene) return;
+
+          const afterPositions = captureNodePositions(afterScene, affectedNodeKeys);
+          const hasChanged = comparePositions(beforePositions, afterPositions);
+
+          if (hasChanged) {
+            // 변화가 있을 때만 히스토리 저장
+            get().pushToHistory(`후손 노드 정렬 (${descendantCount}개 노드)`);
+          } else {
+            // 변화가 없으면 토스트 메시지 표시
+            const showToast = get().showToast;
+            if (showToast) {
+              showToast("이미 정렬된 상태입니다", "info");
+            }
+          }
+        },
       };
     },
     {
