@@ -121,6 +121,7 @@ interface EditorStore extends EditorState {
   _updateChildNodePositions: (levelMap: Map<number, string[]>, rootNodeKey: string, startX: number, startY: number) => void;
   _findRootNodeForLayout: (currentScene: Scene, allNodeKeys: string[]) => string;
   _runGlobalLayoutSystem: (currentScene: Scene, rootNodeKey: string) => Promise<void>;
+  _runLayoutSystem: (currentScene: Scene, rootNodeId: string, layoutType: "global" | "descendant" | "child") => Promise<void>;
   _handleLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, allNodeKeys: string[]) => void;
   _handleLayoutSystemResult: (beforePositions: Map<string, { x: number; y: number }>, nodeKeys: string[], layoutType: "global" | "descendant" | "child", nodeCount: number) => void;
   _validatePasteOperation: (nodesToPaste: number) => boolean;
@@ -2702,19 +2703,32 @@ export const useEditorStore = create<EditorStore>()(
 
         // 헬퍼 메서드: 글로벌 레이아웃 시스템 실행
         _runGlobalLayoutSystem: async (currentScene: Scene, rootNodeKey: string) => {
+          await get()._runLayoutSystem(currentScene, rootNodeKey, "global");
+        },
+
+        // 통합 레이아웃 시스템 실행 헬퍼
+        _runLayoutSystem: async (currentScene: Scene, rootNodeId: string, layoutType: "global" | "descendant" | "child") => {
           const { globalLayoutSystem } = await import("../utils/layoutEngine");
+
+          // 레이아웃 타입별 설정
+          const layoutConfigs = {
+            global: { depth: null, anchorNodeId: undefined },
+            descendant: { depth: null, anchorNodeId: rootNodeId },
+            child: { depth: 1, anchorNodeId: rootNodeId }
+          };
+
+          const config = layoutConfigs[layoutType];
 
           await globalLayoutSystem.runLayout(
             currentScene,
             {
-              rootNodeId: rootNodeKey,
-              depth: null, // 무제한 깊이
+              rootNodeId,
+              depth: config.depth,
               includeRoot: true,
               direction: "LR",
               nodeSpacing: 50,
               rankSpacing: 100,
-              // 전체 정렬에서는 앵커 없음 (모든 노드 자유롭게 배치)
-              anchorNodeId: undefined,
+              anchorNodeId: config.anchorNodeId,
             },
             (nodeId, position) => {
               // moveNode를 직접 호출하지 않고 위치만 업데이트 (히스토리 중복 방지)
@@ -2964,44 +2978,7 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         _runDescendantLayoutSystem: async (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => {
-          const { globalLayoutSystem } = await import("../utils/layoutEngine");
-
-          await globalLayoutSystem.runLayout(
-            currentScene,
-            {
-              rootNodeId: nodeKey,
-              depth: null, // 무제한 깊이
-              includeRoot: true,
-              direction: "LR",
-              nodeSpacing: 50,
-              rankSpacing: 100,
-              anchorNodeId: nodeKey, // 선택된 노드를 앵커로 고정
-            },
-            (nodeId, position) => {
-              // moveNode를 직접 호출하지 않고 위치만 업데이트 (히스토리 중복 방지)
-              const currentState = get();
-              const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
-              if (!currentScene) return;
-
-              const currentNode = getNode(currentScene, nodeId);
-              if (!currentNode) return;
-
-              const updatedNode = { ...currentNode, position };
-              const updatedScene = setNode(currentScene, nodeId, updatedNode);
-
-              set((state) => ({
-                ...state,
-                templateData: {
-                  ...state.templateData,
-                  [state.currentTemplate]: {
-                    ...state.templateData[state.currentTemplate],
-                    [state.currentScene]: updatedScene,
-                  },
-                },
-                lastNodePosition: position,
-              }));
-            }
-          );
+          await get()._runLayoutSystem(currentScene, nodeKey, "descendant");
         },
 
         _handleDescendantLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], descendantCount: number) => {
@@ -3141,45 +3118,8 @@ export const useEditorStore = create<EditorStore>()(
          },
 
                  _runChildLayoutSystem: async (nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]) => {
-           const { globalLayoutSystem } = await import("../utils/layoutEngine");
-
-           await globalLayoutSystem.runLayout(
-             currentScene,
-             {
-               rootNodeId: nodeKey,
-               depth: 1, // 직접 자식만
-               includeRoot: true,
-               direction: "LR",
-               nodeSpacing: 50,
-               rankSpacing: 100,
-               anchorNodeId: nodeKey, // 선택된 노드를 앵커로 고정
-             },
-            (nodeId, position) => {
-              // moveNode를 직접 호출하지 않고 위치만 업데이트 (히스토리 중복 방지)
-              const currentState = get();
-              const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
-              if (!currentScene) return;
-
-              const currentNode = getNode(currentScene, nodeId);
-              if (!currentNode) return;
-
-              const updatedNode = { ...currentNode, position };
-              const updatedScene = setNode(currentScene, nodeId, updatedNode);
-
-              set((state) => ({
-                ...state,
-                templateData: {
-                  ...state.templateData,
-                  [state.currentTemplate]: {
-                    ...state.templateData[state.currentTemplate],
-                    [state.currentScene]: updatedScene,
-                  },
-                },
-                lastNodePosition: position,
-              }));
-            }
-          );
-        },
+           await get()._runLayoutSystem(currentScene, nodeKey, "child");
+         },
 
         _handleChildLayoutResult: (beforePositions: Map<string, { x: number; y: number }>, affectedNodeKeys: string[], childCount: number) => {
           get()._handleLayoutSystemResult(beforePositions, affectedNodeKeys, "child", childCount);
