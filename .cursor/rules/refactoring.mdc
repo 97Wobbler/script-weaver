@@ -40,7 +40,7 @@ If context is missing or criteria are unclear, stop immediately and ask for clar
     - Follow the step-by-step process:
         1. Modify the code
         2. Commit the modified code with feature or refactor tag
-        3. Record relevant information for future reference in log.md
+        3. Record relevant information in log.md by **appending to the end of the file**
         4. Update progress status in todo.md
         5. Commit the updated documents with docs tag
         6. Wait for user testing and approval (user reviews rollback decision here)
