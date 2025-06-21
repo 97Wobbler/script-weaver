@@ -1,22 +1,10 @@
-import type { 
-  EditorNodeWrapper, 
-  Dialogue, 
-  Scene, 
-  TemplateDialogues,
-  TextDialogue,
-  ChoiceDialogue 
-} from "../../types/dialogue";
-import type { 
-  ICoreServices, 
-  INodeDomain,
-  NodePosition,
-  NodeUpdateOptions
-} from "../types/editorTypes";
+import type { EditorNodeWrapper, Dialogue, Scene, TextDialogue, ChoiceDialogue } from "../../types/dialogue";
+import type { ICoreServices, INodeDomain } from "../types/editorTypes";
 import { useLocalizationStore } from "../localizationStore";
 
 /**
  * Node Domain - 노드 핵심 CRUD 관리
- * 
+ *
  * ## 📋 주요 책임
  * - **선택 관리**: 단일/다중 노드 선택 상태 관리
  * - **기본 CRUD**: 노드 생성, 조회, 수정, 삭제의 핵심 연산
@@ -24,26 +12,22 @@ import { useLocalizationStore } from "../localizationStore";
  * - **연결 관리**: 노드 간 관계 설정 및 해제
  * - **위치 관리**: 노드 이동 및 가시성 제어
  * - **참조 관리**: 로컬라이제이션 키 참조 업데이트
- * 
+ *
  * ## 🔄 의존성 관리
  * - **Core Services**: 히스토리 기록, 노드 키 생성
  * - **LocalizationStore**: 텍스트 데이터 동기화 및 키 관리
  * - **독립성**: 다른 도메인과 순환 의존성 없음
- * 
+ *
  * ## 🎯 핵심 특징
  * - **연속 드래그 감지**: 마지막 드래그 시간 기반 히스토리 최적화
  * - **다중 선택 지원**: PropertyPanel 표시를 위한 대표 노드 선택
  * - **텍스트 동기화**: 실시간 로컬라이제이션 키 생성 및 업데이트
  * - **참조 무결성**: 노드 삭제 시 관련 참조 자동 정리
- * 
+ *
  * @description 20개 public 메서드 + 15개 private 헬퍼 메서드
  */
-export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'lastDragActionTime' | 'selectedNodeKeys'> {
-  constructor(
-    private getState: () => any,
-    private setState: (partial: any) => void,
-    private coreServices: ICoreServices
-  ) {}
+export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "lastDragActionTime" | "selectedNodeKeys"> {
+  constructor(private getState: () => any, private setState: (partial: any) => void, private coreServices: ICoreServices) {}
 
   // ===== 선택 관리 (4개) =====
 
@@ -52,18 +36,18 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
    */
   setSelectedNode(nodeKey?: string): void {
     const state = this.getState();
-    
+
     // 다중 선택이 있는 경우, selectedNodeKey만 변경하고 selectedNodeKeys는 유지
     const currentSelectedKeys = state.selectedNodeKeys instanceof Set ? state.selectedNodeKeys : new Set();
-    
+
     if (currentSelectedKeys.size > 1) {
       this.setState({
-        selectedNodeKey: nodeKey
+        selectedNodeKey: nodeKey,
       });
     } else {
       this.setState({
         selectedNodeKey: nodeKey,
-        selectedNodeKeys: nodeKey ? new Set([nodeKey]) : new Set()
+        selectedNodeKeys: nodeKey ? new Set([nodeKey]) : new Set(),
       });
     }
   }
@@ -74,7 +58,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   toggleNodeSelection(nodeKey: string): void {
     const state = this.getState();
     const newSelectedKeys = new Set(state.selectedNodeKeys);
-    
+
     if (newSelectedKeys.has(nodeKey)) {
       newSelectedKeys.delete(nodeKey);
     } else {
@@ -87,28 +71,28 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
       selectedNodeKey = undefined;
     } else if (newSelectedKeys.size === 1) {
       const firstKey = Array.from(newSelectedKeys)[0];
-      selectedNodeKey = typeof firstKey === 'string' ? firstKey : undefined;
+      selectedNodeKey = typeof firstKey === "string" ? firstKey : undefined;
     } else {
       // 다중 선택 시: 방금 추가된 노드를 대표로 선택
       // 만약 노드가 제거되었다면 첫 번째 노드를 선택
       const state = this.getState();
       const wasSelected = state.selectedNodeKeys instanceof Set && state.selectedNodeKeys.has(nodeKey);
-      
+
       if (!wasSelected) {
         // 노드가 새로 추가됨 - 해당 노드를 대표로 선택
         selectedNodeKey = nodeKey;
       } else {
         // 노드가 제거됨 - 첫 번째 남은 노드를 선택
         const firstKey = Array.from(newSelectedKeys)[0];
-        selectedNodeKey = typeof firstKey === 'string' ? firstKey : undefined;
+        selectedNodeKey = typeof firstKey === "string" ? firstKey : undefined;
       }
     }
 
     const newState = {
       selectedNodeKeys: newSelectedKeys,
-      selectedNodeKey: selectedNodeKey
+      selectedNodeKey: selectedNodeKey,
     };
-    
+
     this.setState(newState);
   }
 
@@ -118,7 +102,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   clearSelection(): void {
     this.setState({
       selectedNodeKey: undefined,
-      selectedNodeKeys: new Set()
+      selectedNodeKeys: new Set(),
     });
   }
 
@@ -127,10 +111,10 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
    */
   selectMultipleNodes(nodeKeys: string[]): void {
     const newSelectedKeys = new Set(nodeKeys);
-    
+
     this.setState({
       selectedNodeKeys: newSelectedKeys,
-      selectedNodeKey: newSelectedKeys.size === 1 ? Array.from(newSelectedKeys)[0] : undefined
+      selectedNodeKey: newSelectedKeys.size === 1 ? Array.from(newSelectedKeys)[0] : undefined,
     });
   }
 
@@ -142,7 +126,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   addNode(node: EditorNodeWrapper): void {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene) {
       state.showToast?.("현재 씬을 찾을 수 없습니다.", "warning");
       return;
@@ -150,17 +134,17 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
 
     // 씬에 노드 추가
     const updatedScene = { ...currentScene, [node.nodeKey]: node };
-    
+
     this.setState({
       templateData: {
         ...state.templateData,
         [state.currentTemplate]: {
           ...state.templateData[state.currentTemplate],
-          [state.currentScene]: updatedScene
-        }
+          [state.currentScene]: updatedScene,
+        },
       },
       lastNodePosition: node.position,
-      selectedNodeKey: node.nodeKey
+      selectedNodeKey: node.nodeKey,
     });
 
     this.coreServices.pushToHistory("노드 추가");
@@ -172,22 +156,22 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   updateNode(nodeKey: string, updates: Partial<EditorNodeWrapper>): void {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene || !currentScene[nodeKey]) {
       return;
     }
 
     const updatedNode = { ...currentScene[nodeKey], ...updates };
     const updatedScene = { ...currentScene, [nodeKey]: updatedNode };
-    
+
     this.setState({
       templateData: {
         ...state.templateData,
         [state.currentTemplate]: {
           ...state.templateData[state.currentTemplate],
-          [state.currentScene]: updatedScene
-        }
-      }
+          [state.currentScene]: updatedScene,
+        },
+      },
     });
   }
 
@@ -197,7 +181,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   deleteNode(nodeKey: string, skipHistory: boolean = false): void {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene || !currentScene[nodeKey]) {
       return;
     }
@@ -246,7 +230,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   updateDialogue(nodeKey: string, dialogue: Partial<Dialogue>): void {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene || !currentScene[nodeKey]) {
       return;
     }
@@ -257,8 +241,8 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
       ...existingNode,
       dialogue: {
         ...existingNode.dialogue,
-        ...dialogue
-      }
+        ...dialogue,
+      },
     };
 
     this.setState({
@@ -268,10 +252,10 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
           ...state.templateData[state.currentTemplate],
           [state.currentScene]: {
             ...currentScene,
-            [nodeKey]: updatedNode
-          }
-        }
-      }
+            [nodeKey]: updatedNode,
+          },
+        },
+      },
     });
   }
 
@@ -281,11 +265,11 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   updateNodeText(nodeKey: string, speakerText?: string, contentText?: string): void {
     const updates: Partial<Dialogue> = {};
     const localizationStore = useLocalizationStore.getState();
-    
+
     // 화자 텍스트 업데이트 및 키 생성
     if (speakerText !== undefined) {
       updates.speakerText = speakerText;
-      
+
       if (speakerText.trim()) {
         const result = localizationStore.generateSpeakerKey(speakerText);
         localizationStore.setText(result.key, speakerText);
@@ -295,11 +279,11 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
         updates.speakerKeyRef = undefined;
       }
     }
-    
+
     // 내용 텍스트 업데이트 및 키 생성
     if (contentText !== undefined) {
       updates.contentText = contentText;
-      
+
       if (contentText.trim()) {
         const result = localizationStore.generateTextKey(contentText);
         localizationStore.setText(result.key, contentText);
@@ -319,7 +303,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   updateChoiceText(nodeKey: string, choiceKey: string, choiceText: string): void {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene || !currentScene[nodeKey]) {
       return;
     }
@@ -331,10 +315,10 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
 
     const dialogue = node.dialogue as ChoiceDialogue;
     const localizationStore = useLocalizationStore.getState();
-    
+
     // 키 생성 및 설정 로직 추가
     let textKeyRef: string | undefined;
-    
+
     if (choiceText.trim()) {
       const result = localizationStore.generateChoiceKey(choiceText);
       localizationStore.setText(result.key, choiceText);
@@ -349,8 +333,8 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
       [choiceKey]: {
         ...dialogue.choices[choiceKey],
         choiceText,
-        textKeyRef
-      }
+        textKeyRef,
+      },
     };
 
     this.updateDialogue(nodeKey, { choices: updatedChoices });
@@ -364,7 +348,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   connectNodes(fromNodeKey: string, toNodeKey: string, choiceKey?: string): void {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene || !currentScene[fromNodeKey]) {
       return;
     }
@@ -381,8 +365,8 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
         ...dialogue.choices,
         [choiceKey]: {
           ...dialogue.choices[choiceKey],
-          nextNodeKey: toNodeKey
-        }
+          nextNodeKey: toNodeKey,
+        },
       };
       this.updateDialogue(fromNodeKey, { choices: updatedChoices });
     }
@@ -394,7 +378,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   disconnectNodes(fromNodeKey: string, choiceKey?: string): void {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene || !currentScene[fromNodeKey]) {
       return;
     }
@@ -404,9 +388,9 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
     if (fromNode.dialogue.type === "text") {
       // 텍스트 노드의 경우 nextNodeKey 제거
       const textDialogue = fromNode.dialogue as TextDialogue;
-      const updatedDialogue: Partial<TextDialogue> = { 
-        ...textDialogue, 
-        nextNodeKey: undefined 
+      const updatedDialogue: Partial<TextDialogue> = {
+        ...textDialogue,
+        nextNodeKey: undefined,
       };
       this.updateDialogue(fromNodeKey, updatedDialogue);
     } else if (fromNode.dialogue.type === "choice" && choiceKey) {
@@ -414,13 +398,13 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
       const dialogue = fromNode.dialogue as ChoiceDialogue;
       const currentChoice = dialogue.choices[choiceKey];
       if (currentChoice) {
-        const updatedChoice = { 
-          ...currentChoice, 
-          nextNodeKey: undefined as any // 타입 강제 캐스팅으로 임시 해결
+        const updatedChoice = {
+          ...currentChoice,
+          nextNodeKey: undefined as any, // 타입 강제 캐스팅으로 임시 해결
         };
         const updatedChoices = {
           ...dialogue.choices,
-          [choiceKey]: updatedChoice
+          [choiceKey]: updatedChoice,
         };
         this.updateDialogue(fromNodeKey, { choices: updatedChoices });
       }
@@ -459,7 +443,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
    */
   updateNodeKeyReference(nodeKey: string, keyType: "speaker" | "text", newKeyRef: string): void {
     const updates: Partial<Dialogue> = {};
-    
+
     if (keyType === "speaker") {
       updates.speakerKeyRef = newKeyRef;
     } else if (keyType === "text") {
@@ -475,7 +459,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   updateChoiceKeyReference(nodeKey: string, choiceKey: string, newKeyRef: string): void {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene || !currentScene[nodeKey]) {
       return;
     }
@@ -490,8 +474,8 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
       ...dialogue.choices,
       [choiceKey]: {
         ...dialogue.choices[choiceKey],
-        textKeyRef: newKeyRef
-      }
+        textKeyRef: newKeyRef,
+      },
     };
 
     this.updateDialogue(nodeKey, { choices: updatedChoices });
@@ -599,7 +583,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   private _performNodeDeletion(nodeKey: string): void {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene) {
       return;
     }
@@ -611,7 +595,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
     let finalScene = { ...currentScene };
 
     if (referencingNodes.length > 0) {
-      const message = `다음 노드들이 삭제 대상을 참조하고 있습니다:\n${referencingNodes.join(', ')}\n\n참조를 제거하고 삭제를 진행합니다.`;
+      const message = `다음 노드들이 삭제 대상을 참조하고 있습니다:\n${referencingNodes.join(", ")}\n\n참조를 제거하고 삭제를 진행합니다.`;
       state.showToast?.(message, "warning");
 
       for (const [key, node] of Object.entries(finalScene)) {
@@ -629,8 +613,8 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
             ...finalScene[key],
             dialogue: {
               ...textDialogue,
-              nextNodeKey: undefined
-            }
+              nextNodeKey: undefined,
+            },
           };
           nodeUpdated = true;
         }
@@ -645,7 +629,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
             if (choice.nextNodeKey === nodeKey) {
               updatedChoices[choiceKey] = {
                 ...choice,
-                nextNodeKey: undefined as any
+                nextNodeKey: undefined as any,
               };
               choicesUpdated = true;
             }
@@ -656,8 +640,8 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
               ...finalScene[key],
               dialogue: {
                 ...choiceDialogue,
-                choices: updatedChoices
-              }
+                choices: updatedChoices,
+              },
             };
             nodeUpdated = true;
           }
@@ -667,17 +651,17 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
 
     // 실제 노드 삭제 수행 (참조 정리된 씬에서)
     const { [nodeKey]: deletedNode, ...remainingNodes } = finalScene;
-    
+
     // 한 번의 setState로 참조 정리와 노드 삭제를 동시에 처리
     this.setState({
       templateData: {
         ...state.templateData,
         [state.currentTemplate]: {
           ...state.templateData[state.currentTemplate],
-          [state.currentScene]: remainingNodes
-        }
+          [state.currentScene]: remainingNodes,
+        },
       },
-      selectedNodeKey: state.selectedNodeKey === nodeKey ? undefined : state.selectedNodeKey
+      selectedNodeKey: state.selectedNodeKey === nodeKey ? undefined : state.selectedNodeKey,
     });
   }
 
@@ -688,7 +672,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
     // 로컬라이제이션 키 정리
     if (keysToCleanup.length > 0) {
       const localizationStore = useLocalizationStore.getState();
-      keysToCleanup.forEach(key => {
+      keysToCleanup.forEach((key) => {
         localizationStore.deleteKey(key);
       });
     }
@@ -702,22 +686,23 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   /**
    * 노드 이동 유효성을 검사합니다.
    */
-  private _validateNodeMovement(nodeKey: string, position: { x: number; y: number }): { 
-    isValid: boolean; 
-    currentNode: EditorNodeWrapper | null; 
-    hasPositionChanged: boolean 
+  private _validateNodeMovement(
+    nodeKey: string,
+    position: { x: number; y: number }
+  ): {
+    isValid: boolean;
+    currentNode: EditorNodeWrapper | null;
+    hasPositionChanged: boolean;
   } {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene || !currentScene[nodeKey]) {
       return { isValid: false, currentNode: null, hasPositionChanged: false };
     }
 
     const currentNode = currentScene[nodeKey];
-    const hasPositionChanged = 
-      currentNode.position.x !== position.x || 
-      currentNode.position.y !== position.y;
+    const hasPositionChanged = currentNode.position.x !== position.x || currentNode.position.y !== position.y;
 
     return { isValid: true, currentNode, hasPositionChanged };
   }
@@ -727,8 +712,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
    */
   private _checkContinuousDrag(nodeKey: string, currentTime: number): boolean {
     const state = this.getState();
-    return state.lastDraggedNodeKey === nodeKey && 
-           (currentTime - state.lastDragActionTime) < 1000;
+    return state.lastDraggedNodeKey === nodeKey && currentTime - state.lastDragActionTime < 1000;
   }
 
   /**
@@ -741,7 +725,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
     // 드래그 상태 업데이트
     this.setState({
       lastDraggedNodeKey: nodeKey,
-      lastDragActionTime: currentTime
+      lastDragActionTime: currentTime,
     });
   }
 
@@ -750,12 +734,10 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
    */
   private _handleContinuousDrag(nodeKey: string, currentTime: number): void {
     const state = this.getState();
-    
+
     // 마지막 히스토리가 같은 노드의 이동이고 2초 이내라면 새 히스토리를 추가하지 않음
     const lastHistory = state.history[state.historyIndex];
-    if (lastHistory && 
-        lastHistory.action === `노드 이동 (${nodeKey})` && 
-        currentTime - lastHistory.timestamp < 2000) {
+    if (lastHistory && lastHistory.action === `노드 이동 (${nodeKey})` && currentTime - lastHistory.timestamp < 2000) {
       return;
     }
 
@@ -773,10 +755,6 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
 /**
  * NodeDomain 인스턴스를 생성합니다.
  */
-export const createNodeDomain = (
-  getState: () => any,
-  setState: (partial: any) => void,
-  coreServices: ICoreServices
-): NodeDomain => {
+export const createNodeDomain = (getState: () => any, setState: (partial: any) => void, coreServices: ICoreServices): NodeDomain => {
   return new NodeDomain(getState, setState, coreServices);
 };

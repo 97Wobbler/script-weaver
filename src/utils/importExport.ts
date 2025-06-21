@@ -1,6 +1,6 @@
-import type { TemplateDialogues, DialogueCSVRow, LocalizationCSVRow, ValidationResult, EditorNodeWrapper, Dialogue } from "../types/dialogue";
+import type { TemplateDialogues, DialogueCSVRow, LocalizationCSVRow, ValidationResult } from "../types/dialogue";
 import type { LocalizationData } from "../store/localizationStore";
-import { TemplateDialoguesSchema, FlexibleTemplateDialoguesSchema, ValidationResultSchema } from "../schemas/dialogue";
+import { TemplateDialoguesSchema, FlexibleTemplateDialoguesSchema } from "../schemas/dialogue";
 
 // 새로운 통합 내보내기 형식
 export interface ScriptWeaverExport {

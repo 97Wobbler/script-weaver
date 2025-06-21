@@ -1,11 +1,4 @@
-import type { 
-  EditorNodeWrapper, 
-  Dialogue, 
-  Scene, 
-  TemplateDialogues,
-  TextDialogue,
-  ChoiceDialogue 
-} from "../../types/dialogue";
+import type { EditorNodeWrapper, Dialogue, Scene, TemplateDialogues, TextDialogue, ChoiceDialogue } from "../../types/dialogue";
 import type { ICoreServices } from "../types/editorTypes";
 import { useLocalizationStore } from "../localizationStore";
 
@@ -14,7 +7,7 @@ let clipboardData: EditorNodeWrapper[] = [];
 
 /**
  * Node Operations Domain - 노드 복합 연산 관리
- * 
+ *
  * ## 📋 주요 책임
  * - **노드 생성**: 텍스트/선택지 노드 생성 및 로컬라이제이션 설정
  * - **자동 연결**: 노드 생성과 동시에 부모-자식 관계 설정
@@ -22,21 +15,21 @@ let clipboardData: EditorNodeWrapper[] = [];
  * - **다중 작업**: 선택된 여러 노드의 일괄 삭제/이동
  * - **선택지 관리**: 동적 선택지 추가/제거
  * - **복합 액션**: 여러 단계 작업을 하나의 히스토리로 그룹화
- * 
+ *
  * ## 🔄 의존성 관리
  * - **Core Services**: 키 생성, 제한 검증, 복합 액션 관리
  * - **Node Core**: 기본 CRUD 연산 위임
  * - **Layout Domain**: 자동 정렬 및 위치 계산
  * - **History Domain**: 복합 액션 시작/종료
  * - **LocalizationStore**: 텍스트 키 생성 및 정리
- * 
+ *
  * ## 🎯 핵심 특징
  * - **감춤→정렬→표시**: 자연스러운 UX를 위한 노드 생성 순서
  * - **로컬라이제이션 통합**: 노드 생성 시 자동 텍스트 키 생성
  * - **클립보드 관리**: 모듈 레벨 클립보드로 복사/붙여넣기 지원
  * - **일괄 처리**: 다중 노드 작업의 효율적 처리
  * - **키 정리**: 노드 삭제 시 미사용 로컬라이제이션 키 자동 정리
- * 
+ *
  * @description 11개 public 메서드 + 15개 private 헬퍼 메서드
  */
 export class NodeOperationsDomain {
@@ -131,13 +124,13 @@ export class NodeOperationsDomain {
 
     // 기본 선택지 생성
     const defaultChoices: ChoiceDialogue["choices"] = {
-      "choice_1": {
+      choice_1: {
         choiceText: "선택지 1",
         textKeyRef: "",
         nextNodeKey: "",
       },
-      "choice_2": {
-        choiceText: "선택지 2", 
+      choice_2: {
+        choiceText: "선택지 2",
         textKeyRef: "",
         nextNodeKey: "",
       },
@@ -183,22 +176,9 @@ export class NodeOperationsDomain {
       return "";
     }
 
-    const { newNodeKey, newNode, tempPosition } = this._createNewChoiceChild(
-      validation.fromNode,
-      fromNodeKey,
-      choiceKey,
-      nodeType
-    );
+    const { newNodeKey, newNode, tempPosition } = this._createNewChoiceChild(validation.fromNode, fromNodeKey, choiceKey, nodeType);
 
-    this._connectAndUpdateChoiceNode(
-      validation.fromNode,
-      fromNodeKey,
-      choiceKey,
-      validation.choice,
-      newNodeKey,
-      newNode,
-      tempPosition
-    );
+    this._connectAndUpdateChoiceNode(validation.fromNode, fromNodeKey, choiceKey, validation.choice, newNodeKey, newNode, tempPosition);
 
     await this._finalizeChoiceNodeCreation(fromNodeKey, newNodeKey);
 
@@ -214,11 +194,7 @@ export class NodeOperationsDomain {
       return "";
     }
 
-    const { newNodeKey, newNode, tempPosition } = this._createNewTextChild(
-      validation.fromNode,
-      fromNodeKey,
-      nodeType
-    );
+    const { newNodeKey, newNode, tempPosition } = this._createNewTextChild(validation.fromNode, fromNodeKey, nodeType);
 
     this._connectAndUpdateTextNode(validation.fromNode, fromNodeKey, newNodeKey, newNode, tempPosition);
 
@@ -339,7 +315,7 @@ export class NodeOperationsDomain {
     // 클립보드 복원
     clipboardData = originalClipboard;
 
-    return state.selectedNodeKeys.size > 0 ? Array.from(state.selectedNodeKeys)[0] as string : "";
+    return state.selectedNodeKeys.size > 0 ? (Array.from(state.selectedNodeKeys)[0] as string) : "";
   }
 
   // === 다중 작업 (2개) ===
@@ -534,15 +510,13 @@ export class NodeOperationsDomain {
   }
 
   private _collectKeysForCleanup(targetKeys: string[], currentScene: Scene): string[] {
-    const allNodes = Object.values(currentScene).filter((item): item is EditorNodeWrapper => 
-      typeof item === 'object' && item !== null && 'nodeKey' in item
-    );
-    const nodesToDelete = allNodes.filter(node => targetKeys.includes(node.nodeKey));
+    const allNodes = Object.values(currentScene).filter((item): item is EditorNodeWrapper => typeof item === "object" && item !== null && "nodeKey" in item);
+    const nodesToDelete = allNodes.filter((node) => targetKeys.includes(node.nodeKey));
     return this._collectLocalizationKeys(nodesToDelete);
   }
 
   private _performNodesDeletion(targetKeys: string[]): void {
-    targetKeys.forEach(nodeKey => {
+    targetKeys.forEach((nodeKey) => {
       this.nodeDomain.deleteNode(nodeKey, true); // 개별 히스토리 기록 생략
     });
   }
@@ -550,7 +524,7 @@ export class NodeOperationsDomain {
   private _finalizeNodesDeletion(allKeysToCleanup: string[], targetKeys: string[]): void {
     // 로컬라이제이션 키 정리는 이미 개별 deleteNode에서 처리됨
     // 중복 정리 제거
-    
+
     // 선택 상태 정리
     this.nodeDomain.clearSelection();
 
@@ -560,14 +534,17 @@ export class NodeOperationsDomain {
   }
 
   // 노드 생성/연결 헬퍼들
-  private _validateChoiceNodeCreation(fromNodeKey: string, choiceKey: string): { 
-    isValid: boolean; 
-    fromNode: EditorNodeWrapper | null; 
-    choice: any | null; 
-    currentScene: Scene | null 
+  private _validateChoiceNodeCreation(
+    fromNodeKey: string,
+    choiceKey: string
+  ): {
+    isValid: boolean;
+    fromNode: EditorNodeWrapper | null;
+    choice: any | null;
+    currentScene: Scene | null;
   } {
     const compoundActionId = this.historyDomain.startCompoundAction(`선택지에서 새 노드 생성: ${fromNodeKey} -> ${choiceKey}`);
-    
+
     const validationResult = this.coreServices.validateNodeCountLimit({ endCompoundAction: true });
     if (!validationResult.isValid) {
       return { isValid: false, fromNode: null, choice: null, currentScene: null };
@@ -658,13 +635,13 @@ export class NodeOperationsDomain {
     this.coreServices.endCompoundAction();
   }
 
-  private _validateTextNodeCreation(fromNodeKey: string): { 
-    isValid: boolean; 
-    fromNode: EditorNodeWrapper | null; 
-    currentScene: Scene | null 
+  private _validateTextNodeCreation(fromNodeKey: string): {
+    isValid: boolean;
+    fromNode: EditorNodeWrapper | null;
+    currentScene: Scene | null;
   } {
     const compoundActionId = this.historyDomain.startCompoundAction(`텍스트 노드에서 새 노드 생성: ${fromNodeKey}`);
-    
+
     const validationResult = this.coreServices.validateNodeCountLimit({ endCompoundAction: true });
     if (!validationResult.isValid) {
       return { isValid: false, fromNode: null, currentScene: null };
@@ -747,14 +724,14 @@ export class NodeOperationsDomain {
   private _collectLocalizationKeys(nodes: EditorNodeWrapper[]): string[] {
     const keys: string[] = [];
 
-    nodes.forEach(node => {
+    nodes.forEach((node) => {
       if (node.dialogue.type === "text" || node.dialogue.type === "choice") {
         if (node.dialogue.speakerKeyRef) keys.push(node.dialogue.speakerKeyRef);
         if (node.dialogue.textKeyRef) keys.push(node.dialogue.textKeyRef);
       }
 
       if (node.dialogue.type === "choice" && node.dialogue.choices) {
-        Object.values(node.dialogue.choices).forEach(choice => {
+        Object.values(node.dialogue.choices).forEach((choice) => {
           if (choice.textKeyRef) keys.push(choice.textKeyRef);
         });
       }
@@ -762,8 +739,6 @@ export class NodeOperationsDomain {
 
     return keys;
   }
-
-
 
   // 유틸리티 헬퍼들
   private _ensureSceneExists(templateData: TemplateDialogues, templateKey: string, sceneKey: string): TemplateDialogues {
@@ -805,22 +780,25 @@ export class NodeOperationsDomain {
     textKeyRef?: string,
     choices: ChoiceDialogue["choices"] = {}
   ): ChoiceDialogue {
-    const defaultChoices = choices && Object.keys(choices).length > 0 ? choices : {
-      "choice_1": {
-        choiceText: "선택지 1",
-        textKeyRef: "",
-        nextNodeKey: "",
-      },
-      "choice_2": {
-        choiceText: "선택지 2",
-        textKeyRef: "",
-        nextNodeKey: "",
-      },
-    };
+    const defaultChoices =
+      choices && Object.keys(choices).length > 0
+        ? choices
+        : {
+            choice_1: {
+              choiceText: "선택지 1",
+              textKeyRef: "",
+              nextNodeKey: "",
+            },
+            choice_2: {
+              choiceText: "선택지 2",
+              textKeyRef: "",
+              nextNodeKey: "",
+            },
+          };
 
     return {
       type: "choice",
-      speakerText,  
+      speakerText,
       contentText,
       speakerKeyRef,
       textKeyRef,
@@ -842,4 +820,4 @@ export function createNodeOperationsDomain(
   historyDomain: any
 ): NodeOperationsDomain {
   return new NodeOperationsDomain(getState, setState, coreServices, updateLocalizationStoreRef, nodeDomain, layoutDomain, historyDomain);
-} 
+}
