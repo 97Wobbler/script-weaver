@@ -13,8 +13,31 @@ import { useLocalizationStore } from "../localizationStore";
 let clipboardData: EditorNodeWrapper[] = [];
 
 /**
- * Node Operations Domain
- * 복잡한 노드 연산 (생성, 복사, 다중 작업, 선택지 관리) 담당
+ * Node Operations Domain - 노드 복합 연산 관리
+ * 
+ * ## 📋 주요 책임
+ * - **노드 생성**: 텍스트/선택지 노드 생성 및 로컬라이제이션 설정
+ * - **자동 연결**: 노드 생성과 동시에 부모-자식 관계 설정
+ * - **복사/붙여넣기**: 클립보드 기반 노드 복제 및 배치
+ * - **다중 작업**: 선택된 여러 노드의 일괄 삭제/이동
+ * - **선택지 관리**: 동적 선택지 추가/제거
+ * - **복합 액션**: 여러 단계 작업을 하나의 히스토리로 그룹화
+ * 
+ * ## 🔄 의존성 관리
+ * - **Core Services**: 키 생성, 제한 검증, 복합 액션 관리
+ * - **Node Core**: 기본 CRUD 연산 위임
+ * - **Layout Domain**: 자동 정렬 및 위치 계산
+ * - **History Domain**: 복합 액션 시작/종료
+ * - **LocalizationStore**: 텍스트 키 생성 및 정리
+ * 
+ * ## 🎯 핵심 특징
+ * - **감춤→정렬→표시**: 자연스러운 UX를 위한 노드 생성 순서
+ * - **로컬라이제이션 통합**: 노드 생성 시 자동 텍스트 키 생성
+ * - **클립보드 관리**: 모듈 레벨 클립보드로 복사/붙여넣기 지원
+ * - **일괄 처리**: 다중 노드 작업의 효율적 처리
+ * - **키 정리**: 노드 삭제 시 미사용 로컬라이제이션 키 자동 정리
+ * 
+ * @description 11개 public 메서드 + 15개 private 헬퍼 메서드
  */
 export class NodeOperationsDomain {
   constructor(

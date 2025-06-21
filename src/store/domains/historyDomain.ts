@@ -1,8 +1,22 @@
 /**
  * History Domain - Undo/Redo 및 복합 액션 관리
  * 
- * 이 파일은 에디터의 히스토리 관리 기능을 제공합니다.
- * Core Services를 의존하여 순환 의존성을 방지합니다.
+ * ## 📋 주요 책임
+ * - **실행취소/재실행**: 편집 액션의 되돌리기 및 다시실행
+ * - **히스토리 스택 관리**: 50개 제한의 액션 히스토리 유지
+ * - **복합 액션 그룹화**: 여러 개별 액션을 하나의 그룹으로 관리
+ * - **상태 동기화**: EditorStore와 LocalizationStore 동시 복원
+ * - **비동기 작업 제어**: AsyncOperationManager와 연동한 안전한 히스토리 관리
+ * 
+ * ## 🔄 의존성 관리
+ * - **Core Services**: pushToHistory 위임
+ * - **LocalizationStore**: 히스토리와 함께 텍스트 데이터 동기화
+ * - **AsyncOperationManager**: 비동기 작업 진행 중 Undo/Redo 차단
+ * 
+ * ## 🎯 핵심 기능
+ * - **복합 액션**: 노드 생성+연결 등 다단계 작업을 단일 히스토리로 기록
+ * - **텍스트 편집 히스토리**: 로컬라이제이션 변경사항 포함 히스토리
+ * - **충돌 방지**: 히스토리 진행 중 중복 기록 방지
  */
 
 import type { IHistoryDomain, ICoreServices, HistoryState } from "../types/editorTypes";

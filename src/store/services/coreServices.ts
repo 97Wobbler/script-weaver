@@ -1,8 +1,24 @@
 /**
  * Core Services - 도메인 간 공통 사용 서비스
  * 
- * 이 파일은 여러 도메인에서 공통으로 사용되는 핵심 서비스들을 제공합니다.
- * 순환 의존성을 방지하기 위해 다른 도메인에 의존하지 않는 순수 함수들로 구성됩니다.
+ * ## 📋 주요 책임
+ * - **히스토리 관리**: 액션 기록 및 복합 액션 그룹 관리
+ * - **노드 키 생성**: 고유한 노드 식별자 생성
+ * - **제한 검증**: 노드 개수 제한 등 비즈니스 규칙 검증
+ * - **레이아웃 실행**: 통합 레이아웃 시스템 호출
+ * - **공통 유틸리티**: 씬/노드 조회 및 설정 헬퍼
+ * 
+ * ## 🔄 의존성 관리
+ * - **순환 의존성 방지**: 다른 도메인에 의존하지 않는 순수 함수 구조
+ * - **DI 패턴**: 모든 도메인이 coreServices에 의존하는 단방향 의존성
+ * - **상태 무관성**: Zustand 상태에만 의존, 다른 도메인 로직과 독립
+ * 
+ * ## 📊 사용 통계
+ * - pushToHistory: 9회 호출 (PROJECT, NODE, LAYOUT 도메인)
+ * - generateNodeKey: 5회 호출 (NODE OPERATIONS 도메인)
+ * - validateNodeCountLimit: 4회 호출 (NODE OPERATIONS 도메인)
+ * - endCompoundAction: 4회 호출 (NODE OPERATIONS 도메인)
+ * - runLayoutSystem: 3회 호출 (LAYOUT 도메인)
  */
 
 import type { ICoreServices, LayoutType, NodeCountValidationOptions, NodeCountValidationResult } from "../types/editorTypes";

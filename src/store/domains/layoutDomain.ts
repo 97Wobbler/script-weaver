@@ -15,12 +15,28 @@ import type {
 } from "../types/editorTypes";
 
 /**
- * 레이아웃 도메인 클래스
+ * Layout Domain - 노드 레이아웃 및 자동 정렬 관리
  * 
- * 노드 배치, 위치 계산, 자동 정렬 등 레이아웃 관련 기능을 담당합니다.
+ * ## 📋 주요 책임
+ * - **위치 계산**: 새 노드 배치 위치 및 자식 노드 위치 계산
+ * - **구 트리 정렬**: 기존 트리 구조 기반 노드 정렬 (3개 메서드)
+ * - **신 레이아웃 시스템**: 글로벌 레이아웃 엔진 기반 정렬 (3개 메서드)
+ * - **겹침 방지**: 노드 배치 시 다른 노드와의 겹침 검사 및 회피
+ * - **관계 분석**: 부모-자식, 형제 관계 기반 레이아웃 최적화
  * 
- * @description 8개 메서드 + 20개 헬퍼 메서드 포함
- * @dependencies CORE SERVICES, AsyncOperationManager (내부적)
+ * ## 🔄 의존성 관리
+ * - **Core Services**: 히스토리 기록, 레이아웃 시스템 실행
+ * - **Layout Engine**: utils/layoutEngine의 글로벌 레이아웃 시스템
+ * - **독립성**: 다른 도메인과 순환 의존성 없음
+ * 
+ * ## 🎯 핵심 특징
+ * - **이중 시스템**: 구 트리 정렬 + 신 글로벌 레이아웃 시스템 지원
+ * - **스마트 배치**: 노드 크기 추정 및 겹침 방지 알고리즘
+ * - **계층 관리**: depth 기반 부모-자식-후손 관계 처리
+ * - **비동기 처리**: 레이아웃 실행 중 상태 변경 안전성 보장
+ * - **성능 최적화**: 변경된 노드만 선별적 정렬
+ * 
+ * @description 8개 public 메서드 + 20개 private 헬퍼 메서드
  */
 export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
   constructor(

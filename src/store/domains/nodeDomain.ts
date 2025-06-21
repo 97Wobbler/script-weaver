@@ -15,12 +15,28 @@ import type {
 import { useLocalizationStore } from "../localizationStore";
 
 /**
- * 노드 핵심 도메인 클래스
+ * Node Domain - 노드 핵심 CRUD 관리
  * 
- * 노드의 기본 CRUD, 선택 관리, 내용 수정, 연결 관리 등 핵심 기능을 담당합니다.
+ * ## 📋 주요 책임
+ * - **선택 관리**: 단일/다중 노드 선택 상태 관리
+ * - **기본 CRUD**: 노드 생성, 조회, 수정, 삭제의 핵심 연산
+ * - **내용 수정**: 노드 텍스트, 화자명, 선택지 텍스트 편집
+ * - **연결 관리**: 노드 간 관계 설정 및 해제
+ * - **위치 관리**: 노드 이동 및 가시성 제어
+ * - **참조 관리**: 로컬라이제이션 키 참조 업데이트
  * 
- * @description 20개 메서드 + 15개 헬퍼 메서드 포함
- * @dependencies CORE SERVICES, LocalizationStore
+ * ## 🔄 의존성 관리
+ * - **Core Services**: 히스토리 기록, 노드 키 생성
+ * - **LocalizationStore**: 텍스트 데이터 동기화 및 키 관리
+ * - **독립성**: 다른 도메인과 순환 의존성 없음
+ * 
+ * ## 🎯 핵심 특징
+ * - **연속 드래그 감지**: 마지막 드래그 시간 기반 히스토리 최적화
+ * - **다중 선택 지원**: PropertyPanel 표시를 위한 대표 노드 선택
+ * - **텍스트 동기화**: 실시간 로컬라이제이션 키 생성 및 업데이트
+ * - **참조 무결성**: 노드 삭제 시 관련 참조 자동 정리
+ * 
+ * @description 20개 public 메서드 + 15개 private 헬퍼 메서드
  */
 export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'lastDragActionTime' | 'selectedNodeKeys'> {
   constructor(
