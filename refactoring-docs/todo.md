@@ -333,39 +333,34 @@ interface EditorState {
     -   [x] 각 도메인 인터페이스 조합
     -   [x] Zustand 스토어 설정 인터페이스 (persist, devtools)
 
-##### 3.1.4 공통 타입 및 유틸리티
+##### 3.1.4 공통 타입 및 유틸리티 **건너뛰기**
 
--   [ ] **공통 타입 정의** (`types/editorTypes.ts`)
-    -   [ ] 각 도메인별 상태 타입
-    -   [ ] 메서드 파라미터 타입
-    -   [ ] 반환 타입 및 에러 타입
-    -   [ ] 설정 및 옵션 타입
+-   [ ] ~~**공통 타입 정의** (`types/editorTypes.ts`)~~
+    -   [ ] ~~각 도메인별 상태 타입~~
+    -   [ ] ~~메서드 파라미터 타입~~
+    -   [ ] ~~반환 타입 및 에러 타입~~
+    -   [ ] ~~설정 및 옵션 타입~~
 
--   [ ] **의존성 주입 인터페이스** 설계
-    -   [ ] 도메인 간 의존성 해결을 위한 DI 컨테이너 인터페이스
-    -   [ ] 순환 의존성 방지를 위한 인터페이스 분리
+-   [ ] ~~**의존성 주입 인터페이스** 설계~~
+    -   [ ] ~~도메인 간 의존성 해결을 위한 DI 컨테이너 인터페이스~~
+    -   [ ] ~~순환 의존성 방지를 위한 인터페이스 분리~~
 
-#### 3.2 타입 정의 강화
+#### 3.2 타입 정의 강화 **건너뛰기**
 
--   [ ] **각 도메인별 상태 타입 정의**
-    -   [ ] ProjectState, HistoryState, NodeState, LayoutState 분리
-    -   [ ] 각 상태 타입의 필수/선택 속성 명확화
--   [ ] **메서드 시그니처 명확화**
-    -   [ ] 모든 public 메서드의 파라미터 타입 명시
-    -   [ ] 선택적 파라미터와 기본값 설정
--   [ ] **반환 타입 및 에러 처리 명시**
-    -   [ ] Promise 기반 메서드의 정확한 반환 타입
-    -   [ ] 에러 상황에 대한 타입 정의
--   [ ] **도메인 간 데이터 교환 타입**
-    -   [ ] 도메인 간 전달되는 데이터의 인터페이스 정의
-    -   [ ] 이벤트 및 콜백 타입 표준화
+-   [ ] ~~**각 도메인별 상태 타입 정의**~~
+    -   [ ] ~~ProjectState, HistoryState, NodeState, LayoutState 분리~~
+    -   [ ] ~~각 상태 타입의 필수/선택 속성 명확화~~
+-   [ ] ~~**메서드 시그니처 명확화**~~
+    -   [ ] ~~모든 public 메서드의 파라미터 타입 명시~~
+    -   [ ] ~~선택적 파라미터와 기본값 설정~~
+-   [ ] ~~**반환 타입 및 에러 처리 명시**~~
+    -   [ ] ~~Promise 기반 메서드의 정확한 반환 타입~~
+    -   [ ] ~~에러 상황에 대한 타입 정의~~
+-   [ ] ~~**도메인 간 데이터 교환 타입**~~ → 후순위
+    -   [ ] ~~도메인 간 전달되는 데이터의 인터페이스 정의~~
+    -   [ ] ~~이벤트 및 콜백 타입 표준화~~
 
-**성공 기준**:
-
--   [x] 7개 파일 구조에 맞는 타입 정의 완료
--   [x] 인터페이스 기반 코드 구조 확립
--   [x] TypeScript 에러 0개 달성
--   [x] 도메인 간 타입 안전성 확보
+**건너뛰기 사유**: 이미 전 단계에서 상당히 진행되었고, 긴 파일에서 미세 조정은 토큰 비효율적
 
 ---
 
@@ -373,9 +368,7 @@ interface EditorState {
 
 **목표**: 단일 파일을 7개 파일로 분할 (Phase 2.2.3 확정 구조 기준)
 
-#### 4.1 파일 분할 전략
-
-**최종 파일 구조** (Phase 2.2.3 확정):
+**파일 분할 전략: 최종 파일 구조** (Phase 2.2.3 확정 구조 기준):
 ```
 src/store/
 ├── editorStore.ts              # 메인 스토어 (통합 인터페이스, ~200줄)
@@ -394,45 +387,43 @@ src/store/
     └── asyncOperationManager.ts # 유지
 ```
 
-#### 4.2 단계별 분할 진행
+#### 4.1 기반 구조 및 독립 도메인
 
 **의존성 순서 기반 분할 계획** (Phase 2.2.3 확정):
 
-##### 4.2.1 Week 1 - 기반 구조 및 독립 도메인 (4일)
-
--   [ ] **Day 1**: 기반 구조 생성
-    -   [ ] `types/editorTypes.ts` 생성
-    -   [ ] `services/` 및 `domains/` 폴더 생성
+-   [ ] 4.1.1 기반 구조 생성
+    -   [ ] ~~`types/editorTypes.ts` 생성~~ → 이미존재
+    -   [ ] ~~`services/` 및 `domains/` 폴더 생성~~ → 추후 생성 예정
     -   [ ] 공통 타입 및 인터페이스 이동
 
--   [ ] **Day 2**: CORE SERVICES 분리 (최우선)
+-   [ ] 4.1.2 CORE SERVICES 분리 (최우선)
     -   [ ] `services/coreServices.ts` 생성
     -   [ ] 5개 공통 메서드 분리 (pushToHistory, generateNodeKey, _validateNodeCountLimit, endCompoundAction, _runLayoutSystem)
     -   [ ] 다른 도메인들이 참조할 수 있도록 export
 
--   [ ] **Day 3**: HISTORY DOMAIN 분리 (독립적)
+-   [ ] 4.1.3 HISTORY DOMAIN 분리 (독립적)
     -   [ ] `domains/historyDomain.ts` 생성
     -   [ ] 8개 히스토리 메서드 이동
     -   [ ] CORE SERVICES만 의존하도록 설정
 
--   [ ] **Day 4**: PROJECT DOMAIN 분리 (CORE에만 의존)
+-   [ ] 4.1.4 PROJECT DOMAIN 분리 (CORE에만 의존)
     -   [ ] `domains/projectDomain.ts` 생성
     -   [ ] 12개 프로젝트 메서드 이동
     -   [ ] CORE SERVICES 의존성 설정
 
-##### 4.2.2 Week 2 - 복합 도메인 및 통합 (3일)
+#### 4.2 복합 도메인 및 통합
 
--   [ ] **Day 5**: NODE CORE DOMAIN 분리
+-   [ ] 4.2.1 NODE CORE DOMAIN 분리
     -   [ ] `domains/nodeDomain.ts` 생성
     -   [ ] 25개 핵심 노드 메서드 + 15개 헬퍼 이동
     -   [ ] CORE, HISTORY 의존성 설정
 
--   [ ] **Day 6**: NODE OPERATIONS & LAYOUT 분리
+-   [ ] 4.2.2 NODE OPERATIONS & LAYOUT 분리
     -   [ ] `domains/nodeOperationsDomain.ts` 생성 (22개 메서드 + 15개 헬퍼)
     -   [ ] `domains/layoutDomain.ts` 생성 (8개 메서드 + 20개 헬퍼)
     -   [ ] 각각의 의존성 체인 설정
 
--   [ ] **Day 7**: 최종 통합 및 검증
+-   [ ] 4.2.3 최종 통합 및 검증
     -   [ ] `editorStore.ts`에서 모든 도메인 통합
     -   [ ] Zustand 스토어 설정 (persist, devtools)
     -   [ ] 전체 기능 동작 확인
