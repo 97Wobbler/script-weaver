@@ -321,10 +321,10 @@ interface EditorState {
     -   [x] 다중 작업 인터페이스 (deleteSelectedNodes, moveSelectedNodes)
     -   [x] 선택지 관리 인터페이스 (addChoice, removeChoice)
 
--   [ ] 5. **LAYOUT DOMAIN 인터페이스** (`ILayoutDomain`) 설계
-    -   [ ] 위치 계산 인터페이스 (getNextNodePosition, calculateChildNodePosition)
-    -   [ ] 구 트리 정렬 인터페이스 (arrangeChildNodesAsTree, arrangeAllNodesAsTree, arrangeNodesWithDagre)
-    -   [ ] 신 레이아웃 시스템 인터페이스 (arrangeAllNodes, arrangeSelectedNodeChildren, arrangeSelectedNodeDescendants)
+-   [x] 5. **LAYOUT DOMAIN 인터페이스** (`ILayoutDomain`) 설계 ✅ **완료**
+    -   [x] 위치 계산 인터페이스 (getNextNodePosition, calculateChildNodePosition)
+    -   [x] 구 트리 정렬 인터페이스 (arrangeChildNodesAsTree, arrangeAllNodesAsTree, arrangeNodesWithDagre)
+    -   [x] 신 레이아웃 시스템 인터페이스 (arrangeAllNodes, arrangeSelectedNodeChildren, arrangeSelectedNodeDescendants)
 
 ##### 3.1.3 통합 스토어 인터페이스
 

@@ -779,56 +779,226 @@ export interface INodeOperationsDomain {
 // ===== NODE OPERATIONS DOMAIN 관련 타입 =====
 
 /**
- * 노드 생성 옵션
+ * 노드 생성 옵션 타입
  */
 export interface NodeCreationOptions {
   contentText?: string;
   speakerText?: string;
   position?: NodePosition;
-  hidden?: boolean;
+  nodeType?: NodeType;
 }
 
 /**
- * 노드 연결 옵션
+ * 노드 연결 옵션 타입
  */
 export interface NodeConnectionOptions {
+  fromNodeKey: string;
+  choiceKey?: string;
+  nodeType?: NodeType;
   autoLayout?: boolean;
-  skipValidation?: boolean;
 }
 
 /**
- * 복사/붙여넣기 결과
+ * 복사/붙여넣기 결과 타입
  */
 export interface PasteResult {
-  newNodes: EditorNodeWrapper[];
-  newNodeKeys: string[];
-  pastedCount: number;
-}
-
-/**
- * 다중 작업 결과
- */
-export interface MultiOperationResult {
-  affectedCount: number;
-  affectedKeys: string[];
   success: boolean;
+  pastedNodeKeys: string[];
   errors?: string[];
 }
 
 /**
- * 선택지 정보
+ * 다중 작업 결과 타입
+ */
+export interface MultiOperationResult {
+  success: boolean;
+  affectedNodeKeys: string[];
+  operationType: 'delete' | 'move' | 'copy';
+  errors?: string[];
+}
+
+/**
+ * 선택지 정보 타입
  */
 export interface ChoiceInfo {
   choiceKey: string;
   choiceText: string;
-  textKeyRef?: string;
   nextNodeKey?: string;
+  textKeyRef?: string;
 }
 
 /**
  * 노드 타입 정의
  */
 export type NodeType = "text" | "choice";
+
+// ===== LAYOUT DOMAIN 인터페이스 =====
+
+/**
+ * 레이아웃 도메인 인터페이스
+ * 
+ * 노드 배치, 위치 계산, 자동 정렬 등 레이아웃 관련 기능을 담당합니다.
+ * CORE SERVICES와 HISTORY DOMAIN에 의존합니다.
+ */
+export interface ILayoutDomain {
+  // ===== 상태 =====
+  
+  /**
+   * 마지막 노드 위치 (새 노드 생성 시 참조)
+   */
+  lastNodePosition: NodePosition;
+
+  // ===== 위치 계산 =====
+
+  /**
+   * 다음 노드 위치를 계산합니다.
+   * 
+   * @returns 새 노드의 위치
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  getNextNodePosition(): NodePosition;
+
+  /**
+   * 자식 노드의 위치를 계산합니다.
+   * 
+   * @param parentNodeKey - 부모 노드 키
+   * @param choiceKey - 선택지 키 (선택지 노드인 경우)
+   * @returns 자식 노드의 위치
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  calculateChildNodePosition(parentNodeKey: string, choiceKey?: string): NodePosition;
+
+  // ===== 구 트리 정렬 시스템 =====
+
+  /**
+   * 자식 노드들을 트리 형태로 정렬합니다.
+   * 
+   * @param rootNodeKey - 루트 노드 키
+   * 
+   * **의존성**: CORE SERVICES (pushToHistory)
+   */
+  arrangeChildNodesAsTree(rootNodeKey: string): void;
+
+  /**
+   * 모든 노드를 트리 형태로 정렬합니다.
+   * 
+   * **의존성**: CORE SERVICES (pushToHistory)
+   */
+  arrangeAllNodesAsTree(): void;
+
+  /**
+   * Dagre 라이브러리를 사용하여 노드를 정렬합니다.
+   * 
+   * **의존성**: CORE SERVICES (pushToHistory)
+   */
+  arrangeNodesWithDagre(): void;
+
+  // ===== 신 레이아웃 시스템 =====
+
+  /**
+   * 전체 캔버스의 모든 노드를 정렬합니다.
+   * 
+   * @param internal - 내부 호출 여부 (AsyncOperationManager 사용 여부)
+   * @returns Promise<void>
+   * 
+   * **의존성**: CORE SERVICES (runLayoutSystem), HISTORY DOMAIN (pushToHistory)
+   */
+  arrangeAllNodes(internal?: boolean): Promise<void>;
+
+  /**
+   * 선택된 노드의 직접 자식들을 정렬합니다.
+   * 
+   * @param nodeKey - 부모 노드 키
+   * @param internal - 내부 호출 여부 (AsyncOperationManager 사용 여부)
+   * @returns Promise<void>
+   * 
+   * **의존성**: CORE SERVICES (runLayoutSystem), HISTORY DOMAIN (pushToHistory)
+   */
+  arrangeSelectedNodeChildren(nodeKey: string, internal?: boolean): Promise<void>;
+
+  /**
+   * 선택된 노드의 모든 후손들을 정렬합니다.
+   * 
+   * @param nodeKey - 루트 노드 키
+   * @param internal - 내부 호출 여부 (AsyncOperationManager 사용 여부)
+   * @returns Promise<void>
+   * 
+   * **의존성**: CORE SERVICES (runLayoutSystem), HISTORY DOMAIN (pushToHistory)
+   */
+  arrangeSelectedNodeDescendants(nodeKey: string, internal?: boolean): Promise<void>;
+}
+
+// ===== LAYOUT DOMAIN 관련 타입 =====
+
+/**
+ * 레이아웃 옵션 타입
+ */
+export interface LayoutOptions {
+  rootNodeId?: string;
+  depth?: number | null;
+  includeRoot?: boolean;
+  direction?: "LR" | "TB" | "RL" | "BT";
+  nodeSpacing?: number;
+  rankSpacing?: number;
+  anchorNodeId?: string;
+}
+
+/**
+ * 레이아웃 결과 타입
+ */
+export interface LayoutResult {
+  success: boolean;
+  affectedNodeKeys: string[];
+  layoutType: LayoutType;
+  nodeCount: number;
+  hasPositionChanged: boolean;
+  errors?: string[];
+}
+
+/**
+ * 노드 관계 매핑 타입
+ */
+export interface NodeRelationMaps {
+  childrenMap: Map<string, string[]>;
+  parentMap: Map<string, string[]>;
+}
+
+/**
+ * 레벨 매핑 타입
+ */
+export type LevelMap = Map<number, string[]>;
+
+/**
+ * 위치 초기화 데이터 타입
+ */
+export interface PositionInitData {
+  currentScene: any;
+  allNodes: any[];
+  lastNodePosition: NodePosition;
+  constants: {
+    DEFAULT_NODE_WIDTH: number;
+    DEFAULT_NODE_HEIGHT: number;
+    SPACING_X: number;
+    SPACING_Y: number;
+    MAX_ATTEMPTS: number;
+    MAX_ROWS_PER_COLUMN: number;
+  };
+}
+
+/**
+ * 노드 크기 타입
+ */
+export interface NodeDimensions {
+  width: number;
+  height: number;
+}
+
+/**
+ * 위치 캡처 결과 타입
+ */
+export type PositionMap = Map<string, NodePosition>;
 
 // ===== 의존성 주입 관련 타입 =====
 

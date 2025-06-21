@@ -1261,3 +1261,92 @@ export interface INodeOperationsDomain {
 ✅ **Phase 3.1.2.5 준비** 완료 (LAYOUT DOMAIN 인터페이스 설계를 위한 기반 확립)  
 
 **다음 단계**: Phase 3.1.2.5 LAYOUT DOMAIN 인터페이스 설계
+
+#### **Phase 3.1.2.5: LAYOUT DOMAIN 인터페이스 설계** (2025-06-21 10:00 ~ 10:03) ✅ **완료**
+
+**목표**: LAYOUT DOMAIN 인터페이스 (ILayoutDomain) 설계 및 관련 타입 정의
+
+##### **📋 Context Analysis (컨텍스트 분석)**
+
+**확인된 LAYOUT DOMAIN 메서드 시그니처** (8개):
+- **위치 계산** (2개): getNextNodePosition, calculateChildNodePosition
+- **구 트리 정렬 시스템** (3개): arrangeChildNodesAsTree, arrangeAllNodesAsTree, arrangeNodesWithDagre
+- **신 레이아웃 시스템** (3개): arrangeAllNodes, arrangeSelectedNodeChildren, arrangeSelectedNodeDescendants
+
+**확인된 LAYOUT DOMAIN 상태** (1개):
+1. **lastNodePosition**: `{ x: number; y: number }` - 마지막 노드 위치 (새 노드 생성 시 참조)
+
+**의존성 타입 확인**:
+- CORE SERVICES (runLayoutSystem), HISTORY DOMAIN (pushToHistory) 의존성
+- AsyncOperationManager 내부적 의존성
+- 복잡한 헬퍼 메서드 체인 (20개 private 헬퍼)
+
+##### **🎯 Planning (계획 수립)**
+
+**Phase 2.2.3 확정 구조 반영**:
+1. `ILayoutDomain` 인터페이스 설계 - 8개 메서드 + 1개 상태 포함
+2. 3개 기능 그룹별 체계적 분류 (위치 계산, 구 트리 정렬, 신 레이아웃 시스템)
+3. 관련 보조 타입 정의 (`LayoutOptions`, `LayoutResult`, `NodeRelationMaps`, `LevelMap`, `PositionInitData`, `NodeDimensions`, `PositionMap`)
+4. 의존성 문서화 (CORE SERVICES, HISTORY DOMAIN 의존성 명시)
+
+##### **⚡ Execution (실행)**
+
+**수정된 파일**: `src/store/types/editorTypes.ts` (+160줄)
+
+**핵심 인터페이스 정의**:
+```typescript
+export interface ILayoutDomain {
+  // 상태 (1개)
+  lastNodePosition: NodePosition;
+  
+  // 위치 계산 (2개)
+  getNextNodePosition(): NodePosition;
+  calculateChildNodePosition(parentNodeKey: string, choiceKey?: string): NodePosition;
+  
+  // 구 트리 정렬 시스템 (3개)
+  arrangeChildNodesAsTree(rootNodeKey: string): void;
+  arrangeAllNodesAsTree(): void;
+  arrangeNodesWithDagre(): void;
+  
+  // 신 레이아웃 시스템 (3개)
+  arrangeAllNodes(internal?: boolean): Promise<void>;
+  arrangeSelectedNodeChildren(nodeKey: string, internal?: boolean): Promise<void>;
+  arrangeSelectedNodeDescendants(nodeKey: string, internal?: boolean): Promise<void>;
+}
+```
+
+**주요 특징**:
+- **레이아웃 전문성**: 노드 배치, 위치 계산, 자동 정렬에 특화
+- **명확한 JSDoc**: 각 메서드의 기능, 매개변수, 의존성 관계 상세 문서화
+- **타입 안전성**: Promise 기반 비동기 메서드 포함 모든 타입 명시
+- **기능별 그룹핑**: 3개 기능 영역별 논리적 분류 (위치 계산, 구/신 정렬 시스템)
+
+**보조 타입 정의**:
+- `LayoutOptions`: 레이아웃 옵션 타입
+- `LayoutResult`: 레이아웃 결과 타입
+- `NodeRelationMaps`: 노드 관계 매핑 타입
+- `LevelMap`: 레벨 매핑 타입
+- `PositionInitData`: 위치 초기화 데이터 타입
+- `NodeDimensions`: 노드 크기 타입
+- `PositionMap`: 위치 캡처 결과 타입
+
+##### **✅ 달성 성과**
+
+**인터페이스 설계**:
+✅ **LAYOUT DOMAIN 인터페이스** 완성 (8개 메서드 + 1개 상태)  
+✅ **타입 안전성** 확보 (Promise 기반 비동기 메서드 포함 모든 시그니처 명시)  
+✅ **기능별 분류** 달성 (3개 기능 그룹)  
+✅ **문서화** 완료 (JSDoc으로 의존성까지 상세 설명)  
+
+**코드 품질**:
+✅ **TypeScript 에러 0개** 달성  
+✅ **의존성 분석** 완료 (CORE SERVICES, HISTORY DOMAIN 의존성 확인)  
+✅ **일관된 명명 규칙** 적용  
+✅ **확장 가능한 구조** 설계  
+
+**Phase 3-4 연계성**:
+✅ **도메인 분할 준비** 완료 (layoutDomain.ts 구현을 위한 명확한 가이드라인)  
+✅ **의존성 체인** 설계 (CORE SERVICES, HISTORY DOMAIN 의존)  
+✅ **Phase 3.1.3 준비** 완료 (통합 스토어 인터페이스 설계를 위한 기반 확립)  
+
+**다음 단계**: Phase 3.1.3 통합 스토어 인터페이스 설계
