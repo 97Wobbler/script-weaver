@@ -291,10 +291,47 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     removeChoice(selectedNodeKey, choiceKey);
   };
 
+  // 직접 전체 템플릿 데이터에서 키를 사용하는 노드들을 찾는 함수
+  const findDirectUsageNodes = (key: string): string[] => {
+    const nodes: string[] = [];
+    
+    // 전체 템플릿 데이터에서 검색
+    Object.entries(templateData).forEach(([templateKey, template]) => {
+      Object.entries(template).forEach(([sceneKey, scene]) => {
+        Object.entries(scene).forEach(([nodeKey, nodeWrapper]) => {
+          const dialogue = nodeWrapper.dialogue;
+          
+          // 화자 키 검증
+          if (dialogue.speakerKeyRef === key) {
+            nodes.push(`${templateKey}/${sceneKey}/${nodeKey} (화자)`);
+          }
+          
+          // 텍스트 키 검증
+          if (dialogue.textKeyRef === key) {
+            nodes.push(`${templateKey}/${sceneKey}/${nodeKey} (내용)`);
+          }
+          
+          // 선택지 키 검증
+          if (dialogue.type === "choice" && dialogue.choices) {
+            Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
+              if (choice.textKeyRef === key) {
+                nodes.push(`${templateKey}/${sceneKey}/${nodeKey} (선택지: ${choiceKey})`);
+              }
+            });
+          }
+        });
+      });
+    });
+    
+    return nodes;
+  };
+
   // 키 편집 시작
   const startKeyEdit = (keyType: "speaker" | "text" | "choice", key: string, choiceKey?: string) => {
     const text = getText(key) || "";
     const usageNodes = findNodesUsingKey(key);
+
+
 
     setKeyEditState({
       isEditing: true,
@@ -321,6 +358,8 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     const isTextChanged = keyEditState.newText !== keyEditState.originalText;
     const isKeyChanged = keyEditState.newKey !== keyEditState.originalKey;
 
+
+
     if (updateAll) {
       // 모든 위치에서 함께 변경
       if (isTextChanged) {
@@ -329,34 +368,63 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
 
         // 모든 노드의 실제 텍스트도 동기화
         const usageNodes = localizationStore.findNodesUsingKey(keyEditState.originalKey);
-        usageNodes.forEach((nodeInfo) => {
-          const match = nodeInfo.match(/^(.+)\/(.+)\/(.+) \((.+)\)$/);
-          if (match) {
-            const [, templateKey, sceneKey, nodeKey, nodeType] = match;
+        
+        // LocalizationStore에서 노드를 찾지 못한 경우, 직접 템플릿 데이터에서 찾기
+        const directUsageNodes = usageNodes.length === 0 ? findDirectUsageNodes(keyEditState.originalKey) : [];
+        
+        // usageNodes 또는 directUsageNodes를 사용하여 노드 업데이트
+        const nodesToUpdate = usageNodes.length > 0 ? usageNodes : directUsageNodes;
+        
+        if (nodesToUpdate.length > 0) {
+          nodesToUpdate.forEach((nodeInfo) => {
+            const match = nodeInfo.match(/^(.+)\/(.+)\/(.+) \((.+)\)$/);
+            if (match) {
+              const [, templateKey, sceneKey, nodeKey, nodeType] = match;
 
-            // 노드의 실제 텍스트 필드도 업데이트
-            if (nodeType === "화자") {
-              updateNodeText(nodeKey, keyEditState.newText, undefined);
-            } else if (nodeType === "내용") {
-              updateNodeText(nodeKey, undefined, keyEditState.newText);
-            } else if (nodeType.startsWith("선택지:")) {
-              const choiceKey = nodeType.split(":")[1].trim();
-              updateChoiceText(nodeKey, choiceKey, keyEditState.newText);
+              // 노드의 실제 텍스트 필드도 업데이트
+              if (nodeType === "화자") {
+                updateNodeText(nodeKey, keyEditState.newText, undefined);
+              } else if (nodeType === "내용") {
+                updateNodeText(nodeKey, undefined, keyEditState.newText);
+              } else if (nodeType.startsWith("선택지:")) {
+                const choiceKey = nodeType.split(":")[1].trim();
+                updateChoiceText(nodeKey, choiceKey, keyEditState.newText);
+              }
             }
+          });
+        } else {
+          // 노드를 찾지 못한 경우 현재 선택된 노드 직접 업데이트
+          
+          if (keyEditState.keyType === "speaker") {
+            updateNodeText(selectedNodeKey, keyEditState.newText, undefined);
+          } else if (keyEditState.keyType === "text") {
+            updateNodeText(selectedNodeKey, undefined, keyEditState.newText);
+          } else if (keyEditState.keyType === "choice" && keyEditState.choiceKey) {
+            updateChoiceText(selectedNodeKey, keyEditState.choiceKey, keyEditState.newText);
           }
-        });
+        }
       }
 
       if (isKeyChanged) {
         // 키값 변경: 모든 노드의 키 참조를 새 키로 업데이트
-        const originalText = keyEditState.newText; // 위에서 업데이트된 텍스트 사용
+        // 텍스트가 변경되지 않았다면 원래 키의 텍스트를 사용, 변경되었다면 새 텍스트 사용
+        const textToUse = isTextChanged ? keyEditState.newText : (localizationStore.getText(keyEditState.originalKey) || keyEditState.originalText);
+        
+
 
         // 새 키에 텍스트 설정
-        localizationStore.setText(keyEditState.newKey, originalText);
+        localizationStore.setText(keyEditState.newKey, textToUse);
 
         // 기존 키를 사용하는 모든 노드의 키 참조 업데이트
         const usageNodes = localizationStore.findNodesUsingKey(keyEditState.originalKey);
-        usageNodes.forEach((nodeInfo) => {
+        const directUsageNodes = findDirectUsageNodes(keyEditState.originalKey);
+        
+
+        
+        // 더 많은 노드를 찾은 방법을 우선 사용
+        const nodesToUpdateForKeyChange = directUsageNodes.length > usageNodes.length ? directUsageNodes : usageNodes;
+        
+        nodesToUpdateForKeyChange.forEach((nodeInfo) => {
           // nodeInfo 형식: "templateKey/sceneKey/nodeKey (타입)" 파싱
           const match = nodeInfo.match(/^(.+)\/(.+)\/(.+) \((.+)\)$/);
           if (match) {
@@ -427,6 +495,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     }
 
     // 로컬 텍스트 상태 업데이트 (키 편집 완료 후 blur 방지)
+    
     if (keyEditState.keyType === "choice" && keyEditState.choiceKey) {
       setLocalTextState((prev) => ({
         ...prev,
