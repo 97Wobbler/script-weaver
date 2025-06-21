@@ -178,7 +178,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   /**
    * 노드를 삭제합니다.
    */
-  deleteNode(nodeKey: string): void {
+  deleteNode(nodeKey: string, skipHistory: boolean = false): void {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
     
@@ -195,7 +195,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
     this._performNodeDeletion(nodeKey);
 
     // 3. 로컬라이제이션 정리 및 히스토리 기록
-    this._cleanupAfterNodeDeletion(keysToCleanup);
+    this._cleanupAfterNodeDeletion(keysToCleanup, skipHistory);
   }
 
   /**
@@ -668,7 +668,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   /**
    * 노드 삭제 후 정리 작업을 수행합니다.
    */
-  private _cleanupAfterNodeDeletion(keysToCleanup: string[]): void {
+  private _cleanupAfterNodeDeletion(keysToCleanup: string[], skipHistory: boolean = false): void {
     // 로컬라이제이션 키 정리
     if (keysToCleanup.length > 0) {
       const localizationStore = useLocalizationStore.getState();
@@ -677,7 +677,10 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
       });
     }
 
-    this.coreServices.pushToHistory("노드 삭제");
+    // skipHistory가 true가 아닌 경우에만 히스토리에 기록
+    if (!skipHistory) {
+      this.coreServices.pushToHistory("노드 삭제");
+    }
   }
 
   /**
