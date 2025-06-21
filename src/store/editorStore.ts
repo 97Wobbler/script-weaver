@@ -2,7 +2,8 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { EditorState, EditorNodeWrapper, Dialogue, TextDialogue, ChoiceDialogue, InputDialogue, Scene, TemplateDialogues, ValidationResult } from "../types/dialogue";
 import type { LocalizationData } from "./localizationStore";
-import type { IEditorStore, HistoryState } from "./types/editorTypes";
+import type { IEditorStore, HistoryState, ICoreServices } from "./types/editorTypes";
+import { createCoreServices } from "./services/coreServices";
 import { DialogueSpeed } from "../types/dialogue";
 import { exportToJSON as exportToJSONUtil, exportToCSV as exportToCSVUtil, importFromJSON as importFromJSONUtil, validateTemplateData } from "../utils/importExport";
 import { useLocalizationStore } from "./localizationStore";
@@ -405,6 +406,9 @@ const comparePositions = (beforePositions: Map<string, { x: number; y: number }>
 export const useEditorStore = create<EditorStore>()(
   persist(
     (set, get) => {
+      // Core Services 인스턴스 생성
+      const coreServices: ICoreServices = createCoreServices(get, set);
+
       // LocalizationStore 참조 업데이트 헬퍼
       const updateLocalizationStoreRef = () => {
         const localizationStore = useLocalizationStore.getState();
@@ -508,75 +512,12 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         endCompoundAction: () => {
-          const state = get();
-          if (!state.currentCompoundActionId || !state.compoundActionStartState) {
-            console.warn("[복합 액션] 종료 시도했으나 진행중인 복합 액션이 없음");
-            return;
-          }
-
-          // 최종 상태로 단일 히스토리 저장
-          const finalAction = state.compoundActionStartState.action.replace("복합 액션 시작:", "복합 액션:");
-
-          set((currentState) => {
-            const newHistory = currentState.history.slice(0, currentState.historyIndex + 1);
-            newHistory.push({
-              templateData: JSON.parse(JSON.stringify(currentState.templateData)),
-              localizationData: useLocalizationStore.getState().exportLocalizationData(),
-              timestamp: Date.now(),
-              action: finalAction,
-              groupId: currentState.currentCompoundActionId || undefined,
-            });
-
-            // 히스토리는 최대 50개까지만 유지
-            if (newHistory.length > 50) {
-              newHistory.shift();
-            }
-
-            return {
-              history: newHistory,
-              historyIndex: newHistory.length - 1,
-              currentCompoundActionId: null,
-              compoundActionStartState: null,
-            };
-          });
-
-          // 비동기 작업 완료
-          globalAsyncOperationManager.endOperation();
+          coreServices.endCompoundAction();
         },
 
         // Undo/Redo 액션들
         pushToHistory: (action) => {
-          const state = get();
-          if (state.isUndoRedoInProgress) return;
-
-          // 복합 액션 진행 중에는 중간 히스토리 저장하지 않음
-          if (state.currentCompoundActionId) {
-            return;
-          }
-
-          // 즉시 최신 상태를 가져와서 인덱스 충돌 방지
-          const currentState = get();
-
-          set(() => {
-            const newHistory = currentState.history.slice(0, currentState.historyIndex + 1);
-            newHistory.push({
-              templateData: JSON.parse(JSON.stringify(currentState.templateData)),
-              localizationData: useLocalizationStore.getState().exportLocalizationData(),
-              timestamp: Date.now(),
-              action,
-              groupId: undefined, // 복합 액션이 아닌 경우는 groupId 없음
-            });
-
-            // 히스토리는 최대 50개까지만 유지
-            if (newHistory.length > 50) {
-              newHistory.shift();
-            }
-
-            return {
-              history: newHistory,
-              historyIndex: newHistory.length - 1,
-            };
-          });
+          coreServices.pushToHistory(action);
         },
 
         pushToHistoryWithTextEdit: (action) => {
@@ -2107,9 +2048,7 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         generateNodeKey: () => {
-          const timestamp = Date.now();
-          const random = Math.random().toString(36).substr(2, 5);
-          return `node_${timestamp}_${random}`;
+          return coreServices.generateNodeKey();
         },
 
         getCurrentNodeCount: () => {
@@ -2724,53 +2663,7 @@ export const useEditorStore = create<EditorStore>()(
 
         // 통합 레이아웃 시스템 실행 헬퍼
         _runLayoutSystem: async (currentScene: Scene, rootNodeId: string, layoutType: "global" | "descendant" | "child") => {
-          const { globalLayoutSystem } = await import("../utils/layoutEngine");
-
-          // 레이아웃 타입별 설정
-          const layoutConfigs = {
-            global: { depth: null, anchorNodeId: undefined },
-            descendant: { depth: null, anchorNodeId: rootNodeId },
-            child: { depth: 1, anchorNodeId: rootNodeId },
-          };
-
-          const config = layoutConfigs[layoutType];
-
-          await globalLayoutSystem.runLayout(
-            currentScene,
-            {
-              rootNodeId,
-              depth: config.depth,
-              includeRoot: true,
-              direction: "LR",
-              nodeSpacing: 50,
-              rankSpacing: 100,
-              anchorNodeId: config.anchorNodeId,
-            },
-            (nodeId, position) => {
-              // moveNode를 직접 호출하지 않고 위치만 업데이트 (히스토리 중복 방지)
-              const currentState = get();
-              const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
-              if (!currentScene) return;
-
-              const currentNode = getNode(currentScene, nodeId);
-              if (!currentNode) return;
-
-              const updatedNode = { ...currentNode, position };
-              const updatedScene = setNode(currentScene, nodeId, updatedNode);
-
-              set((state) => ({
-                ...state,
-                templateData: {
-                  ...state.templateData,
-                  [state.currentTemplate]: {
-                    ...state.templateData[state.currentTemplate],
-                    [state.currentScene]: updatedScene,
-                  },
-                },
-                lastNodePosition: position,
-              }));
-            }
-          );
+          await coreServices.runLayoutSystem(currentScene, rootNodeId, layoutType);
         },
 
         // 헬퍼 메서드: 레이아웃 결과 처리 (위치 변화 감지 및 히스토리)
@@ -3138,22 +3031,7 @@ export const useEditorStore = create<EditorStore>()(
 
         // 노드 개수 제한 검증 공통 유틸리티
         _validateNodeCountLimit: (options?: { endCompoundAction?: boolean }) => {
-          if (get().canCreateNewNode()) {
-            return { isValid: true };
-          }
-
-          // 복합 액션 종료 (필요한 경우)
-          if (options?.endCompoundAction) {
-            get().endCompoundAction();
-          }
-
-          // 토스트 메시지 표시
-          const state = get();
-          if (state.showToast) {
-            state.showToast(`노드 개수가 최대 100개 제한에 도달했습니다. (현재: ${get().getCurrentNodeCount()}개)`, "warning");
-          }
-
-          return { isValid: false };
+          return coreServices.validateNodeCountLimit(options);
         },
       };
     },

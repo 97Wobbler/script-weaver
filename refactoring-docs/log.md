@@ -1540,3 +1540,70 @@ export interface IEditorStore extends
 ✅ **순환 의존성 방지**: DI 패턴 지원을 위한 타입 구조 확립  
 
 **다음 단계**: Phase 4.1.2 CORE SERVICES 분리
+
+#### **Phase 4.1.2: CORE SERVICES 분리** (2025-06-21 10:52 ~ 11:02) ✅ **완료**
+
+**목표**: 도메인 간 공통 사용 서비스 분리 및 순환 의존성 방지
+
+##### **📋 Context Analysis (컨텍스트 분석)**
+
+**분리 대상 메서드 (호출 빈도 기준)**:
+1. **pushToHistory** (9회 호출) - 모든 도메인에서 사용하는 핵심 히스토리 기능
+2. **generateNodeKey** (5회 호출) - 노드 생성 시 사용되는 핵심 유틸리티
+3. **validateNodeCountLimit** (4회 호출) - 노드 생성 전 제한 체크
+4. **endCompoundAction** (4회 호출) - 복합 액션 그룹 관리
+5. **runLayoutSystem** (3회 호출) - 레이아웃 도메인에서 사용
+
+**순환 의존성 위험**:
+- 각 도메인이 서로를 참조할 경우 발생 가능
+- Core Services를 통한 중앙 집중화로 해결 필요
+- DI 패턴 적용으로 타입 안전성 확보
+
+##### **🎯 Planning (계획 수립)**
+
+**Phase 4.1.3+ 도메인 분할을 위한 필수 준비**:
+1. `services/coreServices.ts` 파일 생성
+2. 5개 핵심 메서드를 완전히 분리
+3. ICoreServices 인터페이스 기반 DI 패턴 적용
+4. 순환 의존성 없는 순수 함수 구조 확립
+
+##### **⚡ Execution (실행)**
+
+**새로 생성된 파일**:
+```typescript
+// src/store/services/coreServices.ts (206줄)
+export class CoreServices implements ICoreServices {
+  // 5개 핵심 메서드 구현
+  pushToHistory(action: string): void
+  generateNodeKey(): string  
+  validateNodeCountLimit(options?: NodeCountValidationOptions): NodeCountValidationResult
+  endCompoundAction(): void
+  async runLayoutSystem(currentScene: Scene, rootNodeId: string, layoutType: LayoutType): Promise<void>
+}
+```
+
+**핵심 달성 사항**:
+- ✅ **완전한 메서드 분리**: 5개 메서드를 editorStore.ts에서 완전 분리
+- ✅ **순환 의존성 방지**: 다른 도메인에 의존하지 않는 순수 구조
+- ✅ **DI 패턴 적용**: ICoreServices 인터페이스 기반 의존성 주입
+- ✅ **타입 안전성**: 완전한 TypeScript 타입 정의 및 검증
+- ✅ **상세 문서화**: 각 메서드별 호출 빈도 및 용도 명시
+
+##### **📊 Impact Analysis (영향 분석)**
+
+**파일 구조 변화**:
+- **신규 생성**: `src/store/services/coreServices.ts` (206줄)
+- **폴더 생성**: `src/store/services/` 디렉토리
+- **TypeScript 에러**: 0개 (완전한 타입 안전성 유지)
+
+**Phase 4.1.3+ 분할 준비 완료**:
+- ✅ **도메인 독립성**: 각 도메인이 Core Services만 의존하면 되는 구조
+- ✅ **확장성**: 새로운 공통 서비스 추가 용이
+- ✅ **유지보수성**: 핵심 로직 중앙 집중화로 변경 영향 최소화
+
+**성능 및 품질 개선**:
+- ✅ **코드 중복 제거**: 공통 로직 중앙 집중화
+- ✅ **테스트 용이성**: 독립적인 서비스 단위 테스트 가능
+- ✅ **가독성 향상**: 도메인별 책임 명확화
+
+---

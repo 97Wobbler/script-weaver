@@ -400,10 +400,18 @@ src/store/
         -   [x] 타입 일관성 확보 및 TypeScript 에러 0개 유지
         -   [x] Phase 4.2+ 분할을 위한 깔끔한 기반 확립
 
--   [ ] 4.1.2 CORE SERVICES 분리 (최우선)
-    -   [ ] `services/coreServices.ts` 생성
-    -   [ ] 5개 공통 메서드 분리 (pushToHistory, generateNodeKey, _validateNodeCountLimit, endCompoundAction, _runLayoutSystem)
-    -   [ ] 다른 도메인들이 참조할 수 있도록 export
+-   [x] 4.1.2 CORE SERVICES 분리 ✅ **완료 (2025-06-21 11:02)**
+    -   [x] `services/coreServices.ts` 생성 (206줄)
+    -   [x] 5개 공통 메서드 분리 ✅ **완료**
+        -   [x] `pushToHistory` (9회 호출) - 모든 도메인 공통 히스토리 기능
+        -   [x] `generateNodeKey` (5회 호출) - 노드 생성 핵심 유틸리티
+        -   [x] `validateNodeCountLimit` (4회 호출) - 노드 수 제한 검증
+        -   [x] `endCompoundAction` (4회 호출) - 복합 액션 그룹 관리
+        -   [x] `runLayoutSystem` (3회 호출) - 레이아웃 시스템 실행
+    -   [x] DI 패턴 적용 및 순환 의존성 방지 ✅ **완료**
+        -   [x] ICoreServices 인터페이스 기반 의존성 주입
+        -   [x] 순수 함수 구조로 다른 도메인 의존성 제거
+        -   [x] TypeScript 타입 안전성 100% 확보
 
 -   [ ] 4.1.3 HISTORY DOMAIN 분리 (독립적)
     -   [ ] `domains/historyDomain.ts` 생성
