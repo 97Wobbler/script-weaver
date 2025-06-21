@@ -8,6 +8,7 @@ import { createHistoryDomain } from "./domains/historyDomain";
 import { createProjectDomain, type IProjectDomain } from "./domains/projectDomain";
 import { createNodeDomain } from "./domains/nodeDomain";
 import { createLayoutDomain } from "./domains/layoutDomain";
+import { createNodeOperationsDomain } from "./domains/nodeOperationsDomain";
 import { DialogueSpeed } from "../types/dialogue";
 import { useLocalizationStore } from "./localizationStore";
 import { globalAsyncOperationManager } from "./asyncOperationManager";
@@ -104,70 +105,7 @@ interface EditorStore extends IEditorStore {
   updateNodeVisibility: (nodeKey: string, hidden: boolean) => void;
   updateNodePositionAndVisibility: (nodeKey: string, position: { x: number; y: number }, hidden: boolean) => void;
 
-  // 붙여넣기 관련 헬퍼들
-  _validatePasteOperation: (nodesToPaste: number) => boolean;
-  _setupPastedNodeLocalization: (newNode: EditorNodeWrapper) => void;
-  _createPastedNodes: (startX: number, startY: number) => { newNodes: EditorNodeWrapper[]; newNodeKeys: string[] };
-
-  // 위치 계산 헬퍼들
-  _getRealNodeDimensions: (nodeKey: string) => { width: number; height: number };
-  _getEstimatedNodeDimensions: () => { width: number; height: number };
-  _calculateTextNodeChildPosition: (
-    parentPosition: { x: number; y: number },
-    parentDimensions: { width: number; height: number },
-    HORIZONTAL_SPACING: number
-  ) => { x: number; y: number };
-  _calculateChoiceNodeChildPosition: (
-    parentNode: EditorNodeWrapper,
-    choiceKey: string,
-    parentPosition: { x: number; y: number },
-    parentDimensions: { width: number; height: number },
-    HORIZONTAL_SPACING: number,
-    VERTICAL_SPACING: number,
-    currentScene: Scene
-  ) => { x: number; y: number };
-
-  // 삭제 관련 헬퍼들
-  _getNodesForDeletion: () => { targetKeys: string[]; currentScene: Scene | null };
-  _collectKeysForCleanup: (targetKeys: string[], currentScene: Scene) => string[];
-  _performNodesDeletion: (targetKeys: string[]) => void;
-  _finalizeNodesDeletion: (allKeysToCleanup: string[], targetKeys: string[]) => void;
-
-  // 노드 생성 및 연결 헬퍼들
-  _validateChoiceNodeCreation: (fromNodeKey: string, choiceKey: string) => { isValid: boolean; fromNode: EditorNodeWrapper | null; choice: any | null; currentScene: Scene | null };
-  _createNewChoiceChild: (
-    fromNode: EditorNodeWrapper,
-    fromNodeKey: string,
-    choiceKey: string,
-    nodeType: "text" | "choice"
-  ) => { newNodeKey: string; newNode: EditorNodeWrapper; tempPosition: { x: number; y: number } };
-  _connectAndUpdateChoiceNode: (
-    fromNode: EditorNodeWrapper,
-    fromNodeKey: string,
-    choiceKey: string,
-    choice: any,
-    newNodeKey: string,
-    newNode: EditorNodeWrapper,
-    tempPosition: { x: number; y: number }
-  ) => void;
-  _finalizeChoiceNodeCreation: (fromNodeKey: string, newNodeKey: string) => void;
-
-  // 텍스트 노드 생성 및 연결 헬퍼 메서드들
-  _validateTextNodeCreation: (fromNodeKey: string) => { isValid: boolean; fromNode: EditorNodeWrapper | null; currentScene: Scene | null };
-  _createNewTextChild: (
-    fromNode: EditorNodeWrapper,
-    fromNodeKey: string,
-    nodeType: "text" | "choice"
-  ) => { newNodeKey: string; newNode: EditorNodeWrapper; tempPosition: { x: number; y: number } };
-  _connectAndUpdateTextNode: (fromNode: EditorNodeWrapper, fromNodeKey: string, newNodeKey: string, newNode: EditorNodeWrapper, tempPosition: { x: number; y: number }) => void;
-  _finalizeTextNodeCreation: (fromNodeKey: string, newNodeKey: string) => Promise<void>;
-
-  // 단일 노드 삭제 헬퍼 메서드들
-  _collectLocalizationKeys: (nodes: EditorNodeWrapper[]) => string[];
-  _collectNodeKeysForCleanup: (nodeToDelete: EditorNodeWrapper) => string[];
-  _findReferencingNodes: (currentScene: Scene, nodeKey: string) => string[];
-  _performNodeDeletion: (nodeKey: string) => void;
-  _cleanupAfterNodeDeletion: (keysToCleanup: string[]) => void;
+  // === NODE OPERATIONS DOMAIN 관련 헬퍼들은 해당 도메인으로 이동 완료 ===
 
   // 노드 이동 헬퍼 메서드들
   _validateNodeMovement: (nodeKey: string, position: { x: number; y: number }) => { isValid: boolean; currentNode: EditorNodeWrapper | null; hasPositionChanged: boolean };
@@ -429,6 +367,9 @@ export const useEditorStore = create<EditorStore>()(
       // Layout Domain 인스턴스 생성
       const layoutDomain = createLayoutDomain(get, set, coreServices);
 
+      // Node Operations Domain 인스턴스 생성
+      const nodeOperationsDomain = createNodeOperationsDomain(get, set, coreServices, updateLocalizationStoreRef, nodeDomain, layoutDomain, historyDomain);
+
       return {
         ...initialState,
 
@@ -518,358 +459,26 @@ export const useEditorStore = create<EditorStore>()(
 
         // 복사/붙여넣기
         copySelectedNodes: () => {
-          const state = get();
-          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          if (!currentScene) return;
-
-          const nodesToCopy: EditorNodeWrapper[] = [];
-
-          // 선택된 노드가 있으면 선택된 노드들을, 없으면 현재 선택된 단일 노드를 복사
-          const targetKeys = state.selectedNodeKeys.size > 0 ? Array.from(state.selectedNodeKeys) : state.selectedNodeKey ? [state.selectedNodeKey] : [];
-
-          targetKeys.forEach((nodeKey) => {
-            const node = getNode(currentScene, nodeKey);
-            if (node) {
-              nodesToCopy.push(JSON.parse(JSON.stringify(node)));
-            }
-          });
-
-          clipboardData = nodesToCopy;
-
-          if (state.showToast && nodesToCopy.length > 0) {
-            state.showToast(`${nodesToCopy.length}개 노드를 복사했습니다.`, "success");
-          }
-        },
-
-        // 헬퍼 메서드: 붙여넣기 작업 검증
-        _validatePasteOperation: (nodesToPaste: number) => {
-          const state = get();
-          const currentNodeCount = get().getCurrentNodeCount();
-          const totalAfterPaste = currentNodeCount + nodesToPaste;
-
-          if (totalAfterPaste > 100) {
-            if (state.showToast) {
-              state.showToast(`노드 개수 제한 초과: 현재 ${currentNodeCount}개 + 붙여넣기 ${nodesToPaste}개 = ${totalAfterPaste}개 (최대 100개)`, "warning");
-            }
-            return false;
-          }
-          return true;
-        },
-
-        // 헬퍼 메서드: 붙여넣을 노드의 로컬라이제이션 설정
-        _setupPastedNodeLocalization: (newNode: EditorNodeWrapper) => {
-          const localizationStore = useLocalizationStore.getState();
-
-          if (newNode.dialogue.type === "text" || newNode.dialogue.type === "choice") {
-            // 화자 텍스트가 있으면 새 키 생성
-            if (newNode.dialogue.speakerText) {
-              const result = localizationStore.generateSpeakerKey(newNode.dialogue.speakerText);
-              localizationStore.setText(result.key, newNode.dialogue.speakerText);
-              newNode.dialogue.speakerKeyRef = result.key;
-            }
-
-            // 내용 텍스트가 있으면 새 키 생성
-            if (newNode.dialogue.contentText) {
-              const result = localizationStore.generateTextKey(newNode.dialogue.contentText);
-              localizationStore.setText(result.key, newNode.dialogue.contentText);
-              newNode.dialogue.textKeyRef = result.key;
-            }
-          }
-
-          // 선택지 텍스트들도 새 키 생성
-          if (newNode.dialogue.type === "choice" && newNode.dialogue.choices) {
-            Object.entries(newNode.dialogue.choices).forEach(([choiceKey, choice]) => {
-              if (choice.choiceText) {
-                const result = localizationStore.generateChoiceKey(choice.choiceText);
-                localizationStore.setText(result.key, choice.choiceText);
-                choice.textKeyRef = result.key;
-              }
-              // 연결된 노드 참조는 제거 (복사된 노드는 연결 없음)
-              choice.nextNodeKey = "";
-            });
-          }
-
-          // 텍스트 노드의 연결도 제거
-          if (newNode.dialogue.type === "text") {
-            newNode.dialogue.nextNodeKey = undefined;
-          }
-        },
-
-        // 헬퍼 메서드: 붙여넣을 노드들 생성
-        _createPastedNodes: (startX: number, startY: number) => {
-          const newNodeKeys: string[] = [];
-          const newNodes: EditorNodeWrapper[] = [];
-
-          // 새 노드들을 준비
-          clipboardData.forEach((originalNode, index) => {
-            const newNodeKey = get().generateNodeKey();
-            const newNode: EditorNodeWrapper = {
-              ...JSON.parse(JSON.stringify(originalNode)),
-              nodeKey: newNodeKey,
-              position: {
-                x: startX + index * 20,
-                y: startY + index * 20,
-              },
-            };
-
-            // 로컬라이제이션 설정
-            get()._setupPastedNodeLocalization(newNode);
-
-            newNodes.push(newNode);
-            newNodeKeys.push(newNodeKey);
-          });
-
-          return { newNodes, newNodeKeys };
+          nodeOperationsDomain.copySelectedNodes();
         },
 
         pasteNodes: (position) => {
-          if (clipboardData.length === 0) return;
-
-          const state = get();
-          const nodesToPaste = clipboardData.length;
-
-          // 1. 붙여넣기 작업 검증
-          if (!get()._validatePasteOperation(nodesToPaste)) {
-            return;
-          }
-
-          // 2. 붙여넣기 위치 계산
-          const startX = position?.x ?? state.lastNodePosition.x + 50;
-          const startY = position?.y ?? state.lastNodePosition.y + 50;
-
-          // 3. 새 노드들 생성
-          const { newNodes, newNodeKeys } = get()._createPastedNodes(startX, startY);
-
-          // 4. 모든 노드를 한 번에 추가
-          set((currentState) => {
-            let updatedState = { ...currentState };
-
-            newNodes.forEach((node) => {
-              const newTemplateData = ensureSceneExists(updatedState.templateData, updatedState.currentTemplate, updatedState.currentScene);
-
-              const currentScene = newTemplateData[updatedState.currentTemplate][updatedState.currentScene];
-              const updatedScene = setNode(currentScene, node.nodeKey, node);
-
-              updatedState = {
-                ...updatedState,
-                templateData: {
-                  ...newTemplateData,
-                  [updatedState.currentTemplate]: {
-                    ...newTemplateData[updatedState.currentTemplate],
-                    [updatedState.currentScene]: updatedScene,
-                  },
-                },
-                lastNodePosition: node.position,
-                selectedNodeKey: node.nodeKey,
-              };
-            });
-
-            return {
-              ...updatedState,
-              selectedNodeKeys: new Set(newNodeKeys),
-            };
-          });
-
-          // 5. 상태 변경 후에 히스토리에 추가
-          get().pushToHistory("노드 붙여넣기");
-          updateLocalizationStoreRef();
-
-          if (state.showToast) {
-            state.showToast(`${clipboardData.length}개 노드를 붙여넣었습니다.`, "success");
-          }
+          nodeOperationsDomain.pasteNodes(position);
         },
 
         duplicateNode: (nodeKey) => {
-          const state = get();
-          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          if (!currentScene) return "";
-
-          const originalNode = getNode(currentScene, nodeKey);
-          if (!originalNode) return "";
-
-          // 임시로 클립보드에 저장하고 붙여넣기
-          const originalClipboard = [...clipboardData];
-          clipboardData = [originalNode];
-
-          get().pasteNodes({
-            x: originalNode.position.x + 50,
-            y: originalNode.position.y + 50,
-          });
-
-          // 클립보드 복원
-          clipboardData = originalClipboard;
-
-          return state.selectedNodeKeys.size > 0 ? Array.from(state.selectedNodeKeys)[0] : "";
+          return nodeOperationsDomain.duplicateNode(nodeKey);
         },
 
-        // 헬퍼 메서드: 삭제 대상 노드 목록 확인
-        _getNodesForDeletion: () => {
-          const state = get();
-          const targetKeys = state.selectedNodeKeys.size > 0 ? Array.from(state.selectedNodeKeys) : state.selectedNodeKey ? [state.selectedNodeKey] : [];
 
-          if (targetKeys.length === 0) {
-            return { targetKeys: [], currentScene: null };
-          }
-
-          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          if (!currentScene) {
-            return { targetKeys: [], currentScene: null };
-          }
-
-          return { targetKeys, currentScene };
-        },
-
-        // 통합 헬퍼 메서드: 로컬라이제이션 키 수집 (단독 사용 키만)
-        _collectLocalizationKeys: (nodes: EditorNodeWrapper[]) => {
-          const localizationStore = useLocalizationStore.getState();
-          const keysToCleanup: string[] = [];
-
-          nodes.forEach((nodeToDelete) => {
-            // 단독으로 사용하는 화자 키 수집
-            if (nodeToDelete.dialogue.speakerKeyRef) {
-              const usageCount = localizationStore.getKeyUsageCount(nodeToDelete.dialogue.speakerKeyRef);
-              if (usageCount === 1) {
-                keysToCleanup.push(nodeToDelete.dialogue.speakerKeyRef);
-              }
-            }
-
-            // 단독으로 사용하는 텍스트 키 수집
-            if (nodeToDelete.dialogue.textKeyRef) {
-              const usageCount = localizationStore.getKeyUsageCount(nodeToDelete.dialogue.textKeyRef);
-              if (usageCount === 1) {
-                keysToCleanup.push(nodeToDelete.dialogue.textKeyRef);
-              }
-            }
-
-            // ChoiceNode인 경우 선택지 키들도 확인
-            if (nodeToDelete.dialogue.type === "choice") {
-              const choiceDialogue = nodeToDelete.dialogue as ChoiceDialogue;
-              Object.values(choiceDialogue.choices).forEach((choice) => {
-                if (choice.textKeyRef) {
-                  const usageCount = localizationStore.getKeyUsageCount(choice.textKeyRef);
-                  if (usageCount === 1) {
-                    keysToCleanup.push(choice.textKeyRef);
-                  }
-                }
-              });
-            }
-          });
-
-          return keysToCleanup;
-        },
-
-        // 헬퍼 메서드: 로컬라이제이션 키 수집 (다중 삭제용, 통합 함수 호출)
-        _collectKeysForCleanup: (targetKeys: string[], currentScene: Scene) => {
-          const nodes = targetKeys.map((nodeKey) => getNode(currentScene, nodeKey)).filter(Boolean) as EditorNodeWrapper[];
-          return get()._collectLocalizationKeys(nodes);
-        },
-
-        // 헬퍼 메서드: 실제 노드 삭제 처리 (참조 정리 포함)
-        _performNodesDeletion: (targetKeys: string[]) => {
-          set((currentState) => {
-            let updatedState = { ...currentState };
-
-            targetKeys.forEach((nodeKey) => {
-              const currentScene = updatedState.templateData[updatedState.currentTemplate]?.[updatedState.currentScene];
-              if (!currentScene) return;
-
-              // 삭제할 노드를 참조하는 다른 노드들 찾기
-              const referencingNodes: string[] = [];
-              Object.entries(currentScene).forEach(([key, nodeWrapper]) => {
-                if (key === nodeKey) return; // 자기 자신은 제외
-
-                const { dialogue } = nodeWrapper;
-
-                // TextDialogue 참조 확인
-                if (dialogue.type === "text" && dialogue.nextNodeKey === nodeKey) {
-                  referencingNodes.push(`${key} (텍스트 노드)`);
-                }
-
-                // ChoiceDialogue 참조 확인
-                if (dialogue.type === "choice" && dialogue.choices) {
-                  Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
-                    if (choice.nextNodeKey === nodeKey) {
-                      referencingNodes.push(`${key} (선택지 "${choice.choiceText || choice.textKeyRef || choiceKey}")`);
-                    }
-                  });
-                }
-              });
-
-              const updatedScene = deleteNodeFromScene(currentScene, nodeKey);
-
-              updatedState = {
-                ...updatedState,
-                templateData: {
-                  ...updatedState.templateData,
-                  [updatedState.currentTemplate]: {
-                    ...updatedState.templateData[updatedState.currentTemplate],
-                    [updatedState.currentScene]: updatedScene,
-                  },
-                },
-                selectedNodeKey: updatedState.selectedNodeKey === nodeKey ? undefined : updatedState.selectedNodeKey,
-              };
-            });
-
-            return {
-              ...updatedState,
-              selectedNodeKeys: new Set<string>(),
-            };
-          });
-        },
-
-        // 헬퍼 메서드: 삭제 후 정리 작업 (키 정리, 히스토리, 토스트)
-        _finalizeNodesDeletion: (allKeysToCleanup: string[], targetKeys: string[]) => {
-          const localizationStore = useLocalizationStore.getState();
-
-          // 단독 사용 키들 정리
-          allKeysToCleanup.forEach((key) => {
-            localizationStore.deleteKey(key);
-          });
-
-          // 히스토리 추가
-          get().pushToHistory(`${targetKeys.length}개 노드 삭제`);
-
-          // 사용자 알림
-          const state = get();
-          if (state.showToast) {
-            state.showToast(`${targetKeys.length}개 노드를 삭제했습니다.`, "success");
-          }
-        },
 
         // 다중 조작 - 선택된 노드들 삭제 (리팩터링됨)
         deleteSelectedNodes: () => {
-          // 1. 삭제 대상 노드 확인
-          const { targetKeys, currentScene } = get()._getNodesForDeletion();
-          if (targetKeys.length === 0 || !currentScene) return;
-
-          // 2. 로컬라이제이션 키 수집 (단독 사용 키만)
-          const allKeysToCleanup = get()._collectKeysForCleanup(targetKeys, currentScene);
-
-          // 3. 실제 노드 삭제 처리
-          get()._performNodesDeletion(targetKeys);
-
-          // 4. 삭제 후 정리 작업
-          get()._finalizeNodesDeletion(allKeysToCleanup, targetKeys);
+          nodeOperationsDomain.deleteSelectedNodes();
         },
 
         moveSelectedNodes: (deltaX, deltaY) => {
-          const state = get();
-          const targetKeys = state.selectedNodeKeys.size > 0 ? Array.from(state.selectedNodeKeys) : state.selectedNodeKey ? [state.selectedNodeKey] : [];
-
-          if (targetKeys.length === 0) return;
-
-          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          if (!currentScene) return;
-
-          targetKeys.forEach((nodeKey) => {
-            const node = getNode(currentScene, nodeKey);
-            if (node) {
-              get().moveNode(nodeKey, {
-                x: node.position.x + deltaX,
-                y: node.position.y + deltaY,
-              });
-            }
-          });
+          nodeOperationsDomain.moveSelectedNodes(deltaX, deltaY);
         },
 
         // 노드 관리
@@ -887,71 +496,9 @@ export const useEditorStore = create<EditorStore>()(
           nodeDomain.deleteNode(nodeKey);
         },
 
-        // 헬퍼 메서드: 로컬라이제이션 키 수집 (단일 삭제용, 통합 함수 호출)
-        _collectNodeKeysForCleanup: (nodeToDelete: EditorNodeWrapper): string[] => {
-          return get()._collectLocalizationKeys([nodeToDelete]);
-        },
 
-        // 삭제 대상 노드를 참조하는 다른 노드들 찾기
-        _findReferencingNodes: (currentScene: Scene, nodeKey: string): string[] => {
-          const referencingNodes: string[] = [];
 
-          Object.entries(currentScene).forEach(([key, nodeWrapper]) => {
-            if (key === nodeKey) return; // 자기 자신은 제외
 
-            const { dialogue } = nodeWrapper;
-
-            // TextDialogue 참조 확인
-            if (dialogue.type === "text" && dialogue.nextNodeKey === nodeKey) {
-              referencingNodes.push(`${key} (텍스트 노드)`);
-            }
-
-            // ChoiceDialogue 참조 확인
-            if (dialogue.type === "choice" && dialogue.choices) {
-              Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
-                if (choice.nextNodeKey === nodeKey) {
-                  referencingNodes.push(`${key} (선택지 "${choice.choiceText || choice.textKeyRef || choiceKey}")`);
-                }
-              });
-            }
-          });
-
-          return referencingNodes;
-        },
-
-        // 실제 노드 삭제 수행
-        _performNodeDeletion: (nodeKey: string) => {
-          set((currentState) => {
-            const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
-            if (!currentScene) return currentState;
-
-            const updatedScene = deleteNodeFromScene(currentScene, nodeKey);
-
-            return {
-              templateData: {
-                ...currentState.templateData,
-                [currentState.currentTemplate]: {
-                  ...currentState.templateData[currentState.currentTemplate],
-                  [currentState.currentScene]: updatedScene,
-                },
-              },
-              selectedNodeKey: currentState.selectedNodeKey === nodeKey ? undefined : currentState.selectedNodeKey,
-            };
-          });
-        },
-
-        // 삭제 후 정리 작업
-        _cleanupAfterNodeDeletion: (keysToCleanup: string[]) => {
-          const localizationStore = useLocalizationStore.getState();
-
-          // 단독 사용 키들 정리
-          keysToCleanup.forEach((key) => {
-            localizationStore.deleteKey(key);
-          });
-
-          // 히스토리에 추가
-          get().pushToHistory("노드 삭제");
-        },
 
         moveNode: (nodeKey, position) => {
           nodeDomain.moveNode(nodeKey, position);
@@ -1127,141 +674,21 @@ export const useEditorStore = create<EditorStore>()(
 
         // 자동 노드 생성 (실제 텍스트 기반)
         createTextNode: (contentText = "", speakerText = "") => {
-          // 노드 개수 제한 체크
-          const validation = get()._validateNodeCountLimit();
-          if (!validation.isValid) {
-            return "";
-          }
-
-          const nodeKey = get().generateNodeKey();
-          const position = get().getNextNodePosition();
-
-          // LocalizationStore와 연동하여 키 생성 및 텍스트 저장
-          const localizationStore = useLocalizationStore.getState();
-
-          let speakerKeyRef: string | undefined;
-          let textKeyRef: string | undefined;
-
-          if (speakerText && speakerText.trim()) {
-            const speakerKeyResult = localizationStore.generateSpeakerKey(speakerText);
-            speakerKeyRef = speakerKeyResult.key;
-            localizationStore.setText(speakerKeyResult.key, speakerText);
-          }
-
-          if (contentText && contentText.trim()) {
-            const textKeyResult = localizationStore.generateTextKey(contentText);
-            textKeyRef = textKeyResult.key;
-            localizationStore.setText(textKeyResult.key, contentText);
-          }
-
-          const dialogue = createBaseTextDialogue(speakerText, contentText, speakerKeyRef, textKeyRef);
-          const node = createNodeWrapper(nodeKey, dialogue, position);
-
-          get().addNode(node);
-          return nodeKey;
+          return nodeOperationsDomain.createTextNode(contentText, speakerText);
         },
 
         createChoiceNode: (contentText = "", speakerText = "") => {
-          // 노드 개수 제한 체크
-          const validation = get()._validateNodeCountLimit();
-          if (!validation.isValid) {
-            return "";
-          }
-
-          const nodeKey = get().generateNodeKey();
-          const position = get().getNextNodePosition();
-
-          // LocalizationStore와 연동하여 키 생성 및 텍스트 저장
-          const localizationStore = useLocalizationStore.getState();
-
-          let speakerKeyRef: string | undefined;
-          let textKeyRef: string | undefined;
-
-          if (speakerText && speakerText.trim()) {
-            const speakerKeyResult = localizationStore.generateSpeakerKey(speakerText);
-            speakerKeyRef = speakerKeyResult.key;
-            localizationStore.setText(speakerKeyResult.key, speakerText);
-          }
-
-          if (contentText && contentText.trim()) {
-            const textKeyResult = localizationStore.generateTextKey(contentText);
-            textKeyRef = textKeyResult.key;
-            localizationStore.setText(textKeyResult.key, contentText);
-          }
-
-          const dialogue = createBaseChoiceDialogue(speakerText, contentText, speakerKeyRef, textKeyRef, getDefaultChoices());
-          const node = createNodeWrapper(nodeKey, dialogue, position);
-
-          get().addNode(node);
-          return nodeKey;
+          return nodeOperationsDomain.createChoiceNode(contentText, speakerText);
         },
 
         // 선택지 관리 (실제 텍스트 기반)
-        addChoice: (nodeKey, choiceKey, choiceText, nextNodeKey = "") =>
-          set((state) => {
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return state;
+        addChoice: (nodeKey, choiceKey, choiceText, nextNodeKey = "") => {
+          nodeOperationsDomain.addChoice(nodeKey, choiceKey, choiceText, nextNodeKey);
+        },
 
-            const currentNode = getNode(currentScene, nodeKey);
-            if (!currentNode || currentNode.dialogue.type !== "choice") return state;
-
-            // LocalizationStore와 연동하여 키 생성 및 텍스트 저장
-            const localizationStore = useLocalizationStore.getState();
-
-            let textKeyRef: string | undefined;
-
-            // 빈 텍스트가 아닐 때만 키 생성
-            if (choiceText && choiceText.trim()) {
-              const choiceKeyResult = localizationStore.generateChoiceKey(choiceText);
-              localizationStore.setText(choiceKeyResult.key, choiceText);
-              textKeyRef = choiceKeyResult.key;
-            }
-
-            const updatedDialogue = { ...currentNode.dialogue };
-            updatedDialogue.choices[choiceKey] = {
-              choiceText,
-              textKeyRef,
-              nextNodeKey,
-            };
-
-            const updatedNode = { ...currentNode, dialogue: updatedDialogue };
-            const updatedScene = setNode(currentScene, nodeKey, updatedNode);
-
-            return {
-              templateData: {
-                ...state.templateData,
-                [state.currentTemplate]: {
-                  ...state.templateData[state.currentTemplate],
-                  [state.currentScene]: updatedScene,
-                },
-              },
-            };
-          }),
-
-        removeChoice: (nodeKey, choiceKey) =>
-          set((state) => {
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return state;
-
-            const currentNode = getNode(currentScene, nodeKey);
-            if (!currentNode || currentNode.dialogue.type !== "choice") return state;
-
-            const updatedDialogue = { ...currentNode.dialogue };
-            delete updatedDialogue.choices[choiceKey];
-
-            const updatedNode = { ...currentNode, dialogue: updatedDialogue };
-            const updatedScene = setNode(currentScene, nodeKey, updatedNode);
-
-            return {
-              templateData: {
-                ...state.templateData,
-                [state.currentTemplate]: {
-                  ...state.templateData[state.currentTemplate],
-                  [state.currentScene]: updatedScene,
-                },
-              },
-            };
-          }),
+        removeChoice: (nodeKey, choiceKey) => {
+          nodeOperationsDomain.removeChoice(nodeKey, choiceKey);
+        },
 
         // 연결 관리
         connectNodes: (fromNodeKey, toNodeKey, choiceKey) => {
@@ -1273,161 +700,14 @@ export const useEditorStore = create<EditorStore>()(
           nodeDomain.disconnectNodes(fromNodeKey, choiceKey);
         },
 
-        // 헬퍼 메서드: 선택지 노드 생성 유효성 검증 (복합 액션 시작 포함)
-        _validateChoiceNodeCreation: (fromNodeKey: string, choiceKey: string) => {
-          // 복합 액션 시작
-          get().startCompoundAction("선택지 노드 생성 및 연결");
-
-          // 노드 개수 제한 체크
-          const validation = get()._validateNodeCountLimit({ endCompoundAction: true });
-          if (!validation.isValid) {
-            return { isValid: false, fromNode: null, choice: null, currentScene: null };
-          }
-
-          const state = get();
-          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          if (!currentScene) {
-            get().endCompoundAction();
-            return { isValid: false, fromNode: null, choice: null, currentScene: null };
-          }
-
-          const fromNode = getNode(currentScene, fromNodeKey);
-          if (!fromNode || fromNode.dialogue.type !== "choice") {
-            get().endCompoundAction();
-            return { isValid: false, fromNode: null, choice: null, currentScene };
-          }
-
-          const choice = fromNode.dialogue.choices[choiceKey];
-          if (!choice) {
-            get().endCompoundAction();
-            return { isValid: false, fromNode, choice: null, currentScene };
-          }
-
-          return { isValid: true, fromNode, choice, currentScene };
-        },
-
-        // 헬퍼 메서드: 새 선택지 자식 노드 생성 (화자 복사 포함)
-        _createNewChoiceChild: (fromNode: EditorNodeWrapper, fromNodeKey: string, choiceKey: string, nodeType: "text" | "choice") => {
-          const newNodeKey = get().generateNodeKey();
-          const tempPosition = get().calculateChildNodePosition(fromNodeKey, choiceKey);
-
-          // 화자 자동 복사: 부모 노드에 화자가 있으면 자동으로 복사
-          const parentSpeakerText = fromNode.dialogue.speakerText || "";
-          const parentSpeakerKeyRef = fromNode.dialogue.speakerKeyRef;
-
-          let newNode: EditorNodeWrapper;
-
-          if (nodeType === "choice") {
-            // 선택지 노드 생성
-            const dialogue = createBaseChoiceDialogue(parentSpeakerText, "", parentSpeakerKeyRef, undefined, getDefaultChoices());
-            newNode = createNodeWrapper(newNodeKey, dialogue, tempPosition, true);
-          } else {
-            // 텍스트 노드 생성 (기본값)
-            const dialogue = createBaseTextDialogue(parentSpeakerText, "", parentSpeakerKeyRef);
-            newNode = createNodeWrapper(newNodeKey, dialogue, tempPosition, true);
-          }
-
-          return { newNodeKey, newNode, tempPosition };
-        },
-
-        // 헬퍼 메서드: 선택지 노드 연결 및 상태 업데이트
-        _connectAndUpdateChoiceNode: (
-          fromNode: EditorNodeWrapper,
-          fromNodeKey: string,
-          choiceKey: string,
-          choice: any,
-          newNodeKey: string,
-          newNode: EditorNodeWrapper,
-          tempPosition: { x: number; y: number }
-        ) => {
-          // 부모 노드의 선택지 연결 업데이트
-          const updatedFromNode = { ...fromNode };
-          (updatedFromNode.dialogue as ChoiceDialogue).choices[choiceKey] = {
-            ...choice,
-            nextNodeKey: newNodeKey,
-          };
-
-          // 스토어 업데이트
-          set((currentState) => {
-            const newTemplateData = ensureSceneExists(currentState.templateData, currentState.currentTemplate, currentState.currentScene);
-
-            const currentScene = newTemplateData[currentState.currentTemplate][currentState.currentScene];
-            const updatedSceneWithNew = setNode(currentScene, newNodeKey, newNode);
-            const updatedSceneWithParent = setNode(updatedSceneWithNew, fromNodeKey, updatedFromNode);
-
-            return {
-              ...currentState,
-              templateData: {
-                ...newTemplateData,
-                [currentState.currentTemplate]: {
-                  ...newTemplateData[currentState.currentTemplate],
-                  [currentState.currentScene]: updatedSceneWithParent,
-                },
-              },
-              lastNodePosition: tempPosition,
-              selectedNodeKey: newNodeKey,
-            };
-          });
-
-          // 복합 액션 중이므로 개별 히스토리 추가하지 않음
-          updateLocalizationStoreRef();
-        },
-
-        // 헬퍼 메서드: 선택지 노드 생성 마무리 (비동기 레이아웃 + 복합 액션 종료)
-        _finalizeChoiceNodeCreation: (fromNodeKey: string, newNodeKey: string) => {
-          // Dagre 레이아웃을 사용하여 정확한 위치 계산 및 배치 (DOM 렌더링 후)
-          setTimeout(async () => {
-            try {
-              // 부모 노드의 자식들을 정렬 (새로 생성된 노드 포함)
-              await get().arrangeSelectedNodeChildren(fromNodeKey, true);
-
-              // 정렬 완료 후 숨김 해제
-              get().updateNodeVisibility(newNodeKey, false);
-            } catch (error) {
-              get().updateNodeVisibility(newNodeKey, false);
-            } finally {
-              // 복합 액션 종료
-              get().endCompoundAction();
-            }
-          }, 100); // DOM 렌더링 후 정렬하기 위한 지연
-        },
-
         // AC-02: 선택지별 새 노드 자동 생성 및 연결 (리팩터링됨)
         createAndConnectChoiceNode: (fromNodeKey, choiceKey, nodeType = "text") => {
-          // 1. 유효성 검증 (복합 액션 시작 포함)
-          const { isValid, fromNode, choice, currentScene } = get()._validateChoiceNodeCreation(fromNodeKey, choiceKey);
-          if (!isValid || !fromNode || !choice) return "";
-
-          // 2. 새 자식 노드 생성
-          const { newNodeKey, newNode, tempPosition } = get()._createNewChoiceChild(fromNode, fromNodeKey, choiceKey, nodeType);
-
-          // 3. 연결 및 상태 업데이트
-          get()._connectAndUpdateChoiceNode(fromNode, fromNodeKey, choiceKey, choice, newNodeKey, newNode, tempPosition);
-
-          // 4. 비동기 마무리 작업
-          get()._finalizeChoiceNodeCreation(fromNodeKey, newNodeKey);
-
-          return newNodeKey;
+          return nodeOperationsDomain.createAndConnectChoiceNode(fromNodeKey, choiceKey, nodeType);
         },
 
         // 텍스트 노드에서 새 노드 자동 생성 및 연결
         createAndConnectTextNode: (fromNodeKey, nodeType = "text") => {
-          // 검증 및 복합 액션 시작
-          const validation = get()._validateTextNodeCreation(fromNodeKey);
-          if (!validation.isValid) {
-            return "";
-          }
-
-          // 새 자식 노드 생성
-          const { newNodeKey, newNode, tempPosition } = get()._createNewTextChild(validation.fromNode!, fromNodeKey, nodeType);
-
-          // 연결 및 상태 업데이트
-          get()._connectAndUpdateTextNode(validation.fromNode!, fromNodeKey, newNodeKey, newNode, tempPosition);
-
-          // 비동기 마무리 작업 (레이아웃 정렬 및 복합 액션 종료)
-          get()._finalizeTextNodeCreation(fromNodeKey, newNodeKey);
-
-          return newNodeKey;
+          return nodeOperationsDomain.createAndConnectTextNode(fromNodeKey, nodeType);
         },
 
         // 템플릿/씬 관리
@@ -1531,109 +811,7 @@ export const useEditorStore = create<EditorStore>()(
           };
         },
 
-        // 헬퍼 메서드: 실제 노드 크기 측정 (DOM 기반)
-        _getRealNodeDimensions: (nodeKey: string) => {
-          // React Flow는 노드를 .react-flow__node 클래스로 감싸고, data-id 속성을 설정
-          const nodeElement = document.querySelector(`.react-flow__node[data-id="${nodeKey}"]`) as HTMLElement;
 
-          if (nodeElement) {
-            // 방법 1: getBoundingClientRect (현재 화면상 크기 - 확대/축소 영향받음)
-            const rect = nodeElement.getBoundingClientRect();
-
-            // 방법 2: offsetWidth/Height (실제 CSS 크기 - 확대/축소 영향 안받음)
-            const offsetDimensions = {
-              width: nodeElement.offsetWidth,
-              height: nodeElement.offsetHeight,
-            };
-
-            // 방법 3: computedStyle (CSS에서 계산된 크기)
-            const computedStyle = window.getComputedStyle(nodeElement);
-            const computedDimensions = {
-              width: parseFloat(computedStyle.width),
-              height: parseFloat(computedStyle.height),
-            };
-
-            // offsetWidth가 가장 정확할 가능성이 높음 (CSS 기준, 확대/축소 무관)
-            if (offsetDimensions.width > 0 && offsetDimensions.height > 0) {
-              return offsetDimensions;
-            }
-
-            // 폴백: boundingClientRect
-            if (rect.width > 0 && rect.height > 0) {
-              return { width: rect.width, height: rect.height };
-            }
-          }
-
-          // DOM에서 측정할 수 없는 경우 폴백 (예상 크기)
-          return get()._getEstimatedNodeDimensions();
-        },
-
-        // 헬퍼 메서드: 폴백용 예상 크기 계산 (CSS 기반)
-        _getEstimatedNodeDimensions: () => {
-          // TextNode CSS: min-w-[200px] max-w-[300px]
-          // 실제 측정이 불가능한 경우 CSS 최대값 + 여유공간 사용
-          return { width: 300, height: 120 }; // CSS 최대값 기준
-        },
-
-        // 헬퍼 메서드: 텍스트 노드의 자식 위치 계산 (단일 자식)
-        _calculateTextNodeChildPosition: (parentPosition: { x: number; y: number }, parentDimensions: { width: number; height: number }, HORIZONTAL_SPACING: number) => {
-          const newNodeX = parentPosition.x + parentDimensions.width + HORIZONTAL_SPACING;
-
-          // TextNode의 경우 (단일 자식): 부모 중앙과 자식 중앙의 Y 좌표가 동일하도록 배치
-          const parentCenterY = parentPosition.y + parentDimensions.height / 2;
-          const newNodeDimensions = { width: 200, height: 120 }; // 새 노드 예상 크기
-          const newNodeY = parentCenterY - newNodeDimensions.height / 2;
-
-          return { x: newNodeX, y: newNodeY };
-        },
-
-        // 헬퍼 메서드: 선택지 노드의 자식 위치 계산 (다중 자식)
-        _calculateChoiceNodeChildPosition: (
-          parentNode: EditorNodeWrapper,
-          choiceKey: string,
-          parentPosition: { x: number; y: number },
-          parentDimensions: { width: number; height: number },
-          HORIZONTAL_SPACING: number,
-          VERTICAL_SPACING: number,
-          currentScene: Scene
-        ) => {
-          const newNodeX = parentPosition.x + parentDimensions.width + HORIZONTAL_SPACING;
-
-          if (parentNode.dialogue.type !== "choice") {
-            return { x: newNodeX, y: parentPosition.y };
-          }
-
-          const choiceDialogue = parentNode.dialogue as ChoiceDialogue;
-          const choices = Object.keys(choiceDialogue.choices);
-          const choiceIndex = choices.indexOf(choiceKey);
-
-          if (choiceIndex === -1) {
-            return { x: newNodeX, y: parentPosition.y };
-          }
-
-          // 이미 연결된 자식 노드들의 위치 확인
-          const connectedChildren = choices
-            .map((key) => choiceDialogue.choices[key].nextNodeKey)
-            .filter(Boolean)
-            .map((nodeKey) => getNode(currentScene, nodeKey!))
-            .filter(Boolean);
-
-          if (connectedChildren.length === 0) {
-            // 첫 번째 자식인 경우: 부모 중앙과 자식 중앙의 Y 좌표가 동일하도록 배치
-            const parentCenterY = parentPosition.y + parentDimensions.height / 2;
-            const newNodeDimensions = { width: 200, height: 120 }; // 새 노드 예상 크기
-            const newNodeY = parentCenterY - newNodeDimensions.height / 2;
-
-            return { x: newNodeX, y: newNodeY };
-          } else {
-            // 기존 자식들이 있는 경우: 가장 아래 자식 아래에 배치
-            const existingYPositions = connectedChildren.map((child) => child!.position.y);
-            const lowestY = Math.max(...existingYPositions);
-            const newNodeY = lowestY + 120 + VERTICAL_SPACING; // 120은 예상 노드 높이
-
-            return { x: newNodeX, y: newNodeY };
-          }
-        },
 
         // 개선된 자식 노드 위치 계산 - 실제 동적 크기 기반 (리팩터링됨)
         calculateChildNodePosition: (parentNodeKey, choiceKey) => {
@@ -2054,113 +1232,7 @@ export const useEditorStore = create<EditorStore>()(
           get()._handleLayoutSystemResult(beforePositions, affectedNodeKeys, "descendant", descendantCount);
         },
 
-        // 텍스트 노드 생성 및 연결 헬퍼 메서드들 (private)
-        _validateTextNodeCreation: (fromNodeKey: string) => {
-          // 복합 액션 시작
-          get().startCompoundAction("텍스트 노드 생성 및 연결");
 
-          // 노드 개수 제한 체크
-          const validation = get()._validateNodeCountLimit({ endCompoundAction: true });
-          if (!validation.isValid) {
-            return { isValid: false, fromNode: null, currentScene: null };
-          }
-
-          const state = get();
-          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          if (!currentScene) {
-            get().endCompoundAction(); // 복합 액션 종료
-            return { isValid: false, fromNode: null, currentScene: null };
-          }
-
-          const fromNode = getNode(currentScene, fromNodeKey);
-          if (!fromNode || fromNode.dialogue.type !== "text") {
-            get().endCompoundAction(); // 복합 액션 종료
-            return { isValid: false, fromNode: null, currentScene: null };
-          }
-
-          // 이미 연결된 노드가 있으면 생성하지 않음
-          if (fromNode.dialogue.nextNodeKey) {
-            get().endCompoundAction(); // 복합 액션 종료
-            return { isValid: false, fromNode: null, currentScene: null };
-          }
-
-          return { isValid: true, fromNode, currentScene };
-        },
-
-        _createNewTextChild: (fromNode: EditorNodeWrapper, fromNodeKey: string, nodeType: "text" | "choice") => {
-          const newNodeKey = get().generateNodeKey();
-          const tempPosition = get().calculateChildNodePosition(fromNodeKey, nodeType);
-
-          // 화자 자동 복사: 부모 노드에 화자가 있으면 자동으로 복사
-          const parentSpeakerText = fromNode.dialogue.speakerText || "";
-          const parentSpeakerKeyRef = fromNode.dialogue.speakerKeyRef;
-
-          let newNode: EditorNodeWrapper;
-
-          if (nodeType === "choice") {
-            // 선택지 노드 생성
-            const dialogue = createBaseChoiceDialogue(parentSpeakerText, "", parentSpeakerKeyRef, undefined, getDefaultChoices());
-            newNode = createNodeWrapper(newNodeKey, dialogue, tempPosition, true);
-          } else {
-            // 텍스트 노드 생성 (기본값)
-            const dialogue = createBaseTextDialogue(parentSpeakerText, "", parentSpeakerKeyRef);
-            newNode = createNodeWrapper(newNodeKey, dialogue, tempPosition, true);
-          }
-
-          return { newNodeKey, newNode, tempPosition };
-        },
-
-        _connectAndUpdateTextNode: (fromNode: EditorNodeWrapper, fromNodeKey: string, newNodeKey: string, newNode: EditorNodeWrapper, tempPosition: { x: number; y: number }) => {
-          // 부모 노드의 텍스트 연결 업데이트
-          const updatedFromNode = { ...fromNode };
-          (updatedFromNode.dialogue as TextDialogue).nextNodeKey = newNodeKey;
-
-          // 스토어 업데이트
-          set((currentState) => {
-            const newTemplateData = ensureSceneExists(currentState.templateData, currentState.currentTemplate, currentState.currentScene);
-
-            const currentScene = newTemplateData[currentState.currentTemplate][currentState.currentScene];
-            const updatedSceneWithNew = setNode(currentScene, newNodeKey, newNode);
-            const updatedSceneWithParent = setNode(updatedSceneWithNew, fromNodeKey, updatedFromNode);
-
-            return {
-              ...currentState,
-              templateData: {
-                ...newTemplateData,
-                [currentState.currentTemplate]: {
-                  ...newTemplateData[currentState.currentTemplate],
-                  [currentState.currentScene]: updatedSceneWithParent,
-                },
-              },
-              lastNodePosition: tempPosition,
-              selectedNodeKey: newNodeKey,
-            };
-          });
-
-          // 복합 액션 중이므로 개별 히스토리 추가하지 않음
-          updateLocalizationStoreRef();
-        },
-
-        _finalizeTextNodeCreation: async (fromNodeKey: string, newNodeKey: string) => {
-          // Dagre 레이아웃을 사용하여 정확한 위치 계산 및 배치 (DOM 렌더링 후)
-          return new Promise<void>((resolve) => {
-            setTimeout(async () => {
-              try {
-                // 부모 노드의 자식들을 정렬 (새로 생성된 노드 포함)
-                await get().arrangeSelectedNodeChildren(fromNodeKey, true);
-
-                // 정렬 완료 후 숨김 해제
-                get().updateNodeVisibility(newNodeKey, false);
-              } catch (error) {
-                get().updateNodeVisibility(newNodeKey, false);
-              } finally {
-                // 복합 액션 종료
-                get().endCompoundAction();
-                resolve();
-              }
-            }, 100); // DOM 렌더링 후 정렬하기 위한 지연
-          });
-        },
 
         // 헬퍼 메서드: 직접 자식 노드 탐색 (통합 함수 호출)
         _findChildNodes: (nodeKey: string, currentScene: Scene) => {
