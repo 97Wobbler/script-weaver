@@ -448,17 +448,22 @@ src/store/
     -   [x] CORE, HISTORY 의존성 설정
     -   [x] 린터 오류 수정 (타입 안전성 확보)
 
--   [ ] 4.2.2 NODE OPERATIONS & LAYOUT 분리
-    -   [ ] `domains/nodeOperationsDomain.ts` 생성 (22개 메서드 + 15개 헬퍼)
+-   [ ] 4.2.2 LAYOUT DOMAIN 분리
     -   [ ] `domains/layoutDomain.ts` 생성 (8개 메서드 + 20개 헬퍼)
-    -   [ ] 각각의 의존성 체인 설정
+    -   [ ] 위치 계산, 자동 정렬 기능 분리
+    -   [ ] CORE SERVICES, HISTORY 의존성 설정
 
--   [ ] 4.2.3 최종 통합 및 검증
+-   [ ] 4.2.3 NODE OPERATIONS DOMAIN 분리
+    -   [ ] `domains/nodeOperationsDomain.ts` 생성 (22개 메서드 + 15개 헬퍼)
+    -   [ ] 복잡한 노드 연산 (생성, 복사, 다중 작업) 분리
+    -   [ ] CORE, HISTORY, NODE CORE, LAYOUT 의존성 설정
+
+-   [ ] 4.2.4 최종 통합 및 검증
     -   [ ] `editorStore.ts`에서 모든 도메인 통합
     -   [ ] Zustand 스토어 설정 (persist, devtools)
     -   [ ] 전체 기능 동작 확인
 
-#### 4.3 검증 및 최적화
+#### 4.3 최종 통합 후 검증 및 최적화
 
 -   [ ] **기능 검증**
     -   [ ] 모든 기존 기능 정상 동작 확인
