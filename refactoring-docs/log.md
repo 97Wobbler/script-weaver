@@ -1171,3 +1171,93 @@ export interface INodeDomain {
 ✅ **Phase 3.1.2.4 준비** 완료 (NODE OPERATIONS DOMAIN 인터페이스 설계를 위한 기반 확립)  
 
 **다음 단계**: Phase 3.1.2.4 NODE OPERATIONS DOMAIN 인터페이스 설계
+
+#### **Phase 3.1.2.4: NODE OPERATIONS DOMAIN 인터페이스 설계** (2025-06-21 09:59) ✅ **완료**
+
+**목표**: NODE OPERATIONS DOMAIN 인터페이스 (INodeOperationsDomain) 설계 및 관련 타입 정의
+
+##### **📋 Context Analysis (컨텍스트 분석)**
+
+**확인된 NODE OPERATIONS DOMAIN 메서드 시그니처** (11개):
+- **노드 생성** (2개): createTextNode, createChoiceNode
+- **자동 생성/연결** (2개): createAndConnectChoiceNode, createAndConnectTextNode
+- **복사/붙여넣기** (3개): copySelectedNodes, pasteNodes, duplicateNode
+- **다중 작업** (2개): deleteSelectedNodes, moveSelectedNodes
+- **선택지 관리** (2개): addChoice, removeChoice
+
+**의존성 타입 확인**:
+- 복잡한 의존성 체인: CORE SERVICES, HISTORY DOMAIN, NODE CORE DOMAIN, LAYOUT DOMAIN
+- LocalizationStore 내부적 의존성
+
+##### **🎯 Planning (계획 수립)**
+
+**Phase 2.2.3 확정 구조 반영**:
+1. `INodeOperationsDomain` 인터페이스 설계 - 11개 메서드 포함
+2. 5개 기능 그룹별 체계적 분류 (노드 생성, 자동 생성/연결, 복사/붙여넣기, 다중 작업, 선택지 관리)
+3. 관련 보조 타입 정의 (`NodeCreationOptions`, `NodeConnectionOptions`, `PasteResult`, `MultiOperationResult`, `ChoiceInfo`, `NodeType`)
+4. 의존성 문서화 (CORE SERVICES, HISTORY, NODE CORE, LAYOUT DOMAIN 의존성 명시)
+
+##### **⚡ Execution (실행)**
+
+**수정된 파일**: `src/store/types/editorTypes.ts` (+184줄)
+
+**핵심 인터페이스 정의**:
+```typescript
+export interface INodeOperationsDomain {
+  // 노드 생성 (2개)
+  createTextNode(contentText?: string, speakerText?: string): string;
+  createChoiceNode(contentText?: string, speakerText?: string): string;
+  
+  // 자동 생성/연결 (2개)
+  createAndConnectChoiceNode(fromNodeKey: string, choiceKey: string, nodeType?: "text" | "choice"): string;
+  createAndConnectTextNode(fromNodeKey: string, nodeType?: "text" | "choice"): string;
+  
+  // 복사/붙여넣기 (3개)
+  copySelectedNodes(): void;
+  pasteNodes(position?: { x: number; y: number }): void;
+  duplicateNode(nodeKey: string): string;
+  
+  // 다중 작업 (2개)
+  deleteSelectedNodes(): void;
+  moveSelectedNodes(deltaX: number, deltaY: number): void;
+  
+  // 선택지 관리 (2개)
+  addChoice(nodeKey: string, choiceKey: string, choiceText: string, nextNodeKey?: string): void;
+  removeChoice(nodeKey: string, choiceKey: string): void;
+}
+```
+
+**주요 특징**:
+- **복잡한 연산 집중**: 노드의 복잡한 생성, 복사, 연결 등 고급 기능에 집중
+- **명확한 JSDoc**: 각 메서드의 기능, 매개변수, 의존성 관계 상세 문서화
+- **타입 안전성**: 모든 매개변수 및 반환 타입 명시
+- **기능별 그룹핑**: 5개 기능 영역별 논리적 분류
+
+**보조 타입 정의**:
+- `NodeCreationOptions`: 노드 생성 옵션 타입
+- `NodeConnectionOptions`: 노드 연결 옵션 타입
+- `PasteResult`: 복사/붙여넣기 결과 타입
+- `MultiOperationResult`: 다중 작업 결과 타입
+- `ChoiceInfo`: 선택지 정보 타입
+- `NodeType`: 노드 타입 정의
+
+##### **✅ 달성 성과**
+
+**인터페이스 설계**:
+✅ **NODE OPERATIONS DOMAIN 인터페이스** 완성 (11개 메서드)  
+✅ **타입 안전성** 확보 (모든 시그니처 명시)  
+✅ **기능별 분류** 달성 (5개 기능 그룹)  
+✅ **문서화** 완료 (JSDoc으로 의존성까지 상세 설명)  
+
+**코드 품질**:
+✅ **TypeScript 에러 0개** 달성  
+✅ **의존성 분석** 완료 (CORE SERVICES, HISTORY, NODE CORE, LAYOUT DOMAIN 의존성 확인)  
+✅ **일관된 명명 규칙** 적용  
+✅ **확장 가능한 구조** 설계  
+
+**Phase 3-4 연계성**:
+✅ **도메인 분할 준비** 완료 (nodeOperationsDomain.ts 구현을 위한 명확한 가이드라인)  
+✅ **의존성 체인** 설계 (복잡한 도메인 간 의존성 해결)  
+✅ **Phase 3.1.2.5 준비** 완료 (LAYOUT DOMAIN 인터페이스 설계를 위한 기반 확립)  
+
+**다음 단계**: Phase 3.1.2.5 LAYOUT DOMAIN 인터페이스 설계

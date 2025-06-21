@@ -646,6 +646,190 @@ export interface NodeUpdateOptions {
  */
 export type KeyType = "speaker" | "text";
 
+// ===== NODE OPERATIONS DOMAIN 인터페이스 =====
+
+/**
+ * 노드 연산 도메인 인터페이스
+ * 
+ * 노드의 복잡한 연산 (생성, 복사, 삭제, 자동 연결 등)을 담당합니다.
+ * CORE SERVICES, HISTORY DOMAIN, NODE CORE DOMAIN에 의존합니다.
+ */
+export interface INodeOperationsDomain {
+  // ===== 노드 생성 =====
+
+  /**
+   * 새 텍스트 노드를 생성합니다.
+   * 
+   * @param contentText - 내용 텍스트 (선택적)
+   * @param speakerText - 화자 텍스트 (선택적)
+   * @returns 생성된 노드 키
+   * 
+   * **의존성**: CORE SERVICES (validateNodeCountLimit, generateNodeKey), NODE CORE (getNextNodePosition, addNode)
+   */
+  createTextNode(contentText?: string, speakerText?: string): string;
+
+  /**
+   * 새 선택지 노드를 생성합니다.
+   * 
+   * @param contentText - 내용 텍스트 (선택적)
+   * @param speakerText - 화자 텍스트 (선택적)
+   * @returns 생성된 노드 키
+   * 
+   * **의존성**: CORE SERVICES (validateNodeCountLimit, generateNodeKey), NODE CORE (getNextNodePosition, addNode)
+   */
+  createChoiceNode(contentText?: string, speakerText?: string): string;
+
+  // ===== 자동 생성/연결 =====
+
+  /**
+   * 선택지에 연결된 새 노드를 생성하고 자동 연결합니다.
+   * 
+   * @param fromNodeKey - 출발 노드 키
+   * @param choiceKey - 선택지 키
+   * @param nodeType - 생성할 노드 타입 (기본값: "text")
+   * @returns 생성된 노드 키
+   * 
+   * **의존성**: CORE SERVICES (startCompoundAction, generateNodeKey, endCompoundAction), LAYOUT (calculateChildNodePosition, arrangeSelectedNodeChildren)
+   */
+  createAndConnectChoiceNode(fromNodeKey: string, choiceKey: string, nodeType?: "text" | "choice"): string;
+
+  /**
+   * 텍스트 노드에 연결된 새 노드를 생성하고 자동 연결합니다.
+   * 
+   * @param fromNodeKey - 출발 노드 키
+   * @param nodeType - 생성할 노드 타입 (기본값: "text")
+   * @returns 생성된 노드 키
+   * 
+   * **의존성**: CORE SERVICES (startCompoundAction, generateNodeKey, endCompoundAction), LAYOUT (calculateChildNodePosition, arrangeSelectedNodeChildren)
+   */
+  createAndConnectTextNode(fromNodeKey: string, nodeType?: "text" | "choice"): string;
+
+  // ===== 복사/붙여넣기 =====
+
+  /**
+   * 선택된 노드들을 클립보드에 복사합니다.
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  copySelectedNodes(): void;
+
+  /**
+   * 클립보드의 노드들을 붙여넣습니다.
+   * 
+   * @param position - 붙여넣을 위치 (선택적)
+   * 
+   * **의존성**: CORE SERVICES (generateNodeKey, pushToHistory), LocalizationStore (내부적)
+   */
+  pasteNodes(position?: { x: number; y: number }): void;
+
+  /**
+   * 특정 노드를 복제합니다.
+   * 
+   * @param nodeKey - 복제할 노드 키
+   * @returns 복제된 노드 키
+   * 
+   * **의존성**: pasteNodes
+   */
+  duplicateNode(nodeKey: string): string;
+
+  // ===== 다중 작업 =====
+
+  /**
+   * 선택된 모든 노드를 삭제합니다.
+   * 
+   * **의존성**: CORE SERVICES (pushToHistory), LocalizationStore (내부적)
+   */
+  deleteSelectedNodes(): void;
+
+  /**
+   * 선택된 모든 노드를 이동합니다.
+   * 
+   * @param deltaX - X축 이동량
+   * @param deltaY - Y축 이동량
+   * 
+   * **의존성**: NODE CORE (moveNode)
+   */
+  moveSelectedNodes(deltaX: number, deltaY: number): void;
+
+  // ===== 선택지 관리 =====
+
+  /**
+   * 노드에 새 선택지를 추가합니다.
+   * 
+   * @param nodeKey - 대상 노드 키
+   * @param choiceKey - 선택지 키
+   * @param choiceText - 선택지 텍스트
+   * @param nextNodeKey - 연결할 노드 키 (선택적)
+   * 
+   * **의존성**: LocalizationStore (내부적)
+   */
+  addChoice(nodeKey: string, choiceKey: string, choiceText: string, nextNodeKey?: string): void;
+
+  /**
+   * 노드에서 선택지를 제거합니다.
+   * 
+   * @param nodeKey - 대상 노드 키
+   * @param choiceKey - 제거할 선택지 키
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  removeChoice(nodeKey: string, choiceKey: string): void;
+}
+
+// ===== NODE OPERATIONS DOMAIN 관련 타입 =====
+
+/**
+ * 노드 생성 옵션
+ */
+export interface NodeCreationOptions {
+  contentText?: string;
+  speakerText?: string;
+  position?: NodePosition;
+  hidden?: boolean;
+}
+
+/**
+ * 노드 연결 옵션
+ */
+export interface NodeConnectionOptions {
+  autoLayout?: boolean;
+  skipValidation?: boolean;
+}
+
+/**
+ * 복사/붙여넣기 결과
+ */
+export interface PasteResult {
+  newNodes: EditorNodeWrapper[];
+  newNodeKeys: string[];
+  pastedCount: number;
+}
+
+/**
+ * 다중 작업 결과
+ */
+export interface MultiOperationResult {
+  affectedCount: number;
+  affectedKeys: string[];
+  success: boolean;
+  errors?: string[];
+}
+
+/**
+ * 선택지 정보
+ */
+export interface ChoiceInfo {
+  choiceKey: string;
+  choiceText: string;
+  textKeyRef?: string;
+  nextNodeKey?: string;
+}
+
+/**
+ * 노드 타입 정의
+ */
+export type NodeType = "text" | "choice";
+
 // ===== 의존성 주입 관련 타입 =====
 
 /**

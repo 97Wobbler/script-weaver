@@ -314,12 +314,12 @@ interface EditorState {
     -   [x] 유틸리티 인터페이스 (generateNodeKey, getCurrentNodeCount, canCreateNewNode)
     -   [x] 참조/상태 업데이트 인터페이스
 
--   [ ] 4. **NODE OPERATIONS DOMAIN 인터페이스** (`INodeOperationsDomain`) 설계
-    -   [ ] 노드 생성 인터페이스 (createTextNode, createChoiceNode)
-    -   [ ] 자동 생성/연결 인터페이스 (createAndConnectChoiceNode, createAndConnectTextNode)
-    -   [ ] 복사/붙여넣기 인터페이스 (copySelectedNodes, pasteNodes, duplicateNode)
-    -   [ ] 다중 작업 인터페이스 (deleteSelectedNodes, moveSelectedNodes)
-    -   [ ] 선택지 관리 인터페이스 (addChoice, removeChoice)
+-   [x] 4. **NODE OPERATIONS DOMAIN 인터페이스** (`INodeOperationsDomain`) 설계 ✅ **완료**
+    -   [x] 노드 생성 인터페이스 (createTextNode, createChoiceNode)
+    -   [x] 자동 생성/연결 인터페이스 (createAndConnectChoiceNode, createAndConnectTextNode)
+    -   [x] 복사/붙여넣기 인터페이스 (copySelectedNodes, pasteNodes, duplicateNode)
+    -   [x] 다중 작업 인터페이스 (deleteSelectedNodes, moveSelectedNodes)
+    -   [x] 선택지 관리 인터페이스 (addChoice, removeChoice)
 
 -   [ ] 5. **LAYOUT DOMAIN 인터페이스** (`ILayoutDomain`) 설계
     -   [ ] 위치 계산 인터페이스 (getNextNodePosition, calculateChildNodePosition)
