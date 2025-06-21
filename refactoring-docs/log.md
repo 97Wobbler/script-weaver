@@ -882,7 +882,7 @@ export interface ICoreServices {
 
 **다음 단계**: Phase 3.1.2 PROJECT DOMAIN 인터페이스 설계
 
-#### **Phase 3.1.2: PROJECT DOMAIN 인터페이스 설계** (2025-06-21 09:40) ✅ **완료**
+#### **Phase 3.1.2.1: PROJECT DOMAIN 인터페이스 설계** (2025-06-21 09:40) ✅ **완료**
 
 **목표**: PROJECT DOMAIN 인터페이스 (IProjectDomain) 설계 및 관련 타입 정의
 
@@ -973,11 +973,11 @@ export interface IProjectDomain {
 **Phase 3-4 연계성**:
 ✅ **도메인 분할 준비** 완료 (projectDomain.ts 구현을 위한 명확한 가이드라인)  
 ✅ **독립적 운영** 가능 (순환 의존성 없음)  
-✅ **Phase 3.1.3 준비** 완료 (HISTORY DOMAIN 인터페이스 설계를 위한 기반 확립)  
+✅ **Phase 3.1.2.2 준비** 완료 (HISTORY DOMAIN 인터페이스 설계를 위한 기반 확립)  
 
-**다음 단계**: Phase 3.1.3 HISTORY DOMAIN 인터페이스 설계
+**다음 단계**: Phase 3.1.2.2 HISTORY DOMAIN 인터페이스 설계
 
-#### **Phase 3.1.3: HISTORY DOMAIN 인터페이스 설계** (2025-06-21 09:45) ✅ **완료**
+#### **Phase 3.1.2.2: HISTORY DOMAIN 인터페이스 설계** (2025-06-21 09:45) ✅ **완료**
 
 **목표**: HISTORY DOMAIN 인터페이스 (IHistoryDomain) 설계 및 관련 타입 정의
 
@@ -1071,11 +1071,11 @@ export interface IHistoryDomain {
 **Phase 3-4 연계성**:
 ✅ **도메인 분할 준비** 완료 (historyDomain.ts 구현을 위한 명확한 가이드라인)  
 ✅ **독립적 운영** 가능 (다른 도메인과 의존성 없음)  
-✅ **Phase 3.1.4 준비** 완료 (NODE CORE DOMAIN 인터페이스 설계를 위한 기반 확립)  
+✅ **Phase 3.1.2.3 준비** 완료 (NODE CORE DOMAIN 인터페이스 설계를 위한 기반 확립)  
 
-**다음 단계**: Phase 3.1.4 NODE CORE DOMAIN 인터페이스 설계
+**다음 단계**: Phase 3.1.2.3 NODE CORE DOMAIN 인터페이스 설계
 
-#### **Phase 3.1.4: NODE CORE DOMAIN 인터페이스 설계** (2025-06-21 09:51) ✅ **완료**
+#### **Phase 3.1.2.3: NODE CORE DOMAIN 인터페이스 설계** (2025-06-21 09:51) ✅ **완료**
 
 **목표**: NODE CORE DOMAIN 인터페이스 (INodeDomain) 설계 및 관련 타입 정의
 
@@ -1168,6 +1168,6 @@ export interface INodeDomain {
 **Phase 3-4 연계성**:
 ✅ **도메인 분할 준비** 완료 (nodeDomain.ts 구현을 위한 명확한 가이드라인)  
 ✅ **의존성 체인** 설계 (CORE SERVICES, HISTORY DOMAIN 의존)  
-✅ **Phase 3.1.5 준비** 완료 (NODE OPERATIONS DOMAIN 인터페이스 설계를 위한 기반 확립)  
+✅ **Phase 3.1.2.4 준비** 완료 (NODE OPERATIONS DOMAIN 인터페이스 설계를 위한 기반 확립)  
 
-**다음 단계**: Phase 3.1.5 NODE OPERATIONS DOMAIN 인터페이스 설계
+**다음 단계**: Phase 3.1.2.4 NODE OPERATIONS DOMAIN 인터페이스 설계

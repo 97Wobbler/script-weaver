@@ -294,19 +294,19 @@ interface EditorState {
 
 ##### 3.1.2 도메인별 인터페이스
 
--   [x] **PROJECT DOMAIN 인터페이스** (`IProjectDomain`) 설계
+-   [x] 1. **PROJECT DOMAIN 인터페이스** (`IProjectDomain`) 설계 ✅ **완료**
     -   [x] 기본 액션 인터페이스 (setCurrentTemplate, setCurrentScene)
     -   [x] 생성 액션 인터페이스 (createTemplate, createScene)
     -   [x] 검증 액션 인터페이스 (validateCurrentScene, validateAllData)
     -   [x] Import/Export 인터페이스 (exportToJSON, exportToCSV, importFromJSON)
     -   [x] 데이터 관리 인터페이스 (resetEditor, loadFromLocalStorage, migrateToNewArchitecture)
 
--   [x] **HISTORY DOMAIN 인터페이스** (`IHistoryDomain`) 설계 ✅ **완료**
+-   [x] 2. **HISTORY DOMAIN 인터페이스** (`IHistoryDomain`) 설계 ✅ **완료**
     -   [x] 복합 액션 관리 (startCompoundAction, endCompoundAction)
     -   [x] 히스토리 관리 (pushToHistory, pushToHistoryWithTextEdit)
     -   [x] Undo/Redo 액션 (undo, redo, canUndo, canRedo)
 
--   [x] **NODE CORE DOMAIN 인터페이스** (`INodeDomain`) 설계 ✅ **완료**
+-   [x] 3. **NODE CORE DOMAIN 인터페이스** (`INodeDomain`) 설계 ✅ **완료**
     -   [x] 선택 관리 인터페이스 (setSelectedNode, toggleNodeSelection, clearSelection, selectMultipleNodes)
     -   [x] 기본 CRUD 인터페이스 (addNode, updateNode, deleteNode, moveNode)
     -   [x] 내용 수정 인터페이스 (updateDialogue, updateNodeText, updateChoiceText)
@@ -314,14 +314,14 @@ interface EditorState {
     -   [x] 유틸리티 인터페이스 (generateNodeKey, getCurrentNodeCount, canCreateNewNode)
     -   [x] 참조/상태 업데이트 인터페이스
 
--   [ ] **NODE OPERATIONS DOMAIN 인터페이스** (`INodeOperationsDomain`) 설계
+-   [ ] 4. **NODE OPERATIONS DOMAIN 인터페이스** (`INodeOperationsDomain`) 설계
     -   [ ] 노드 생성 인터페이스 (createTextNode, createChoiceNode)
     -   [ ] 자동 생성/연결 인터페이스 (createAndConnectChoiceNode, createAndConnectTextNode)
     -   [ ] 복사/붙여넣기 인터페이스 (copySelectedNodes, pasteNodes, duplicateNode)
     -   [ ] 다중 작업 인터페이스 (deleteSelectedNodes, moveSelectedNodes)
     -   [ ] 선택지 관리 인터페이스 (addChoice, removeChoice)
 
--   [ ] **LAYOUT DOMAIN 인터페이스** (`ILayoutDomain`) 설계
+-   [ ] 5. **LAYOUT DOMAIN 인터페이스** (`ILayoutDomain`) 설계
     -   [ ] 위치 계산 인터페이스 (getNextNodePosition, calculateChildNodePosition)
     -   [ ] 구 트리 정렬 인터페이스 (arrangeChildNodesAsTree, arrangeAllNodesAsTree, arrangeNodesWithDagre)
     -   [ ] 신 레이아웃 시스템 인터페이스 (arrangeAllNodes, arrangeSelectedNodeChildren, arrangeSelectedNodeDescendants)
