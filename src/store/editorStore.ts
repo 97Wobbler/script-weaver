@@ -6,6 +6,7 @@ import type { IEditorStore, HistoryState, ICoreServices } from "./types/editorTy
 import { createCoreServices } from "./services/coreServices";
 import { createHistoryDomain } from "./domains/historyDomain";
 import { createProjectDomain, type IProjectDomain } from "./domains/projectDomain";
+import { createNodeDomain } from "./domains/nodeDomain";
 import { DialogueSpeed } from "../types/dialogue";
 import { useLocalizationStore } from "./localizationStore";
 import { globalAsyncOperationManager } from "./asyncOperationManager";
@@ -421,6 +422,9 @@ export const useEditorStore = create<EditorStore>()(
       // Project Domain 인스턴스 생성
       const projectDomain = createProjectDomain(get, set, coreServices, updateLocalizationStoreRef, initialState);
 
+      // Node Domain 인스턴스 생성
+      const nodeDomain = createNodeDomain(get, set, coreServices);
+
       return {
         ...initialState,
 
@@ -457,35 +461,21 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         setSelectedNode: (nodeKey) => {
-          set(() => ({ selectedNodeKey: nodeKey }));
+          nodeDomain.setSelectedNode(nodeKey);
           updateLocalizationStoreRef();
         },
 
         // 다중 선택 액션들
         toggleNodeSelection: (nodeKey) => {
-          set((state) => {
-            const newSelection = new Set(state.selectedNodeKeys);
-
-            // 현재 단일 선택된 노드가 있지만 다중 선택에 없는 경우, 먼저 추가
-            if (state.selectedNodeKey && !newSelection.has(state.selectedNodeKey)) {
-              newSelection.add(state.selectedNodeKey);
-            }
-
-            if (newSelection.has(nodeKey)) {
-              newSelection.delete(nodeKey);
-            } else {
-              newSelection.add(nodeKey);
-            }
-            return { selectedNodeKeys: newSelection };
-          });
+          nodeDomain.toggleNodeSelection(nodeKey);
         },
 
         clearSelection: () => {
-          set(() => ({ selectedNodeKeys: new Set<string>() }));
+          nodeDomain.clearSelection();
         },
 
         selectMultipleNodes: (nodeKeys) => {
-          set(() => ({ selectedNodeKeys: new Set(nodeKeys) }));
+          nodeDomain.selectMultipleNodes(nodeKeys);
         },
 
         // 복합 액션 그룹 관리
@@ -880,70 +870,17 @@ export const useEditorStore = create<EditorStore>()(
 
         // 노드 관리
         addNode: (node) => {
-          set((state) => {
-            const newTemplateData = ensureSceneExists(state.templateData, state.currentTemplate, state.currentScene);
-
-            const currentScene = newTemplateData[state.currentTemplate][state.currentScene];
-            const updatedScene = setNode(currentScene, node.nodeKey, node);
-
-            return {
-              templateData: {
-                ...newTemplateData,
-                [state.currentTemplate]: {
-                  ...newTemplateData[state.currentTemplate],
-                  [state.currentScene]: updatedScene,
-                },
-              },
-              lastNodePosition: node.position,
-              selectedNodeKey: node.nodeKey,
-            };
-          });
-
-          // 상태 변경 후에 히스토리에 추가
-          get().pushToHistory("노드 추가");
+          nodeDomain.addNode(node);
           updateLocalizationStoreRef();
         },
 
         updateNode: (nodeKey, updates) => {
-          set((state) => {
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return state;
-
-            const currentNode = getNode(currentScene, nodeKey);
-            if (!currentNode) return state;
-
-            const updatedNode = { ...currentNode, ...updates };
-            const updatedScene = setNode(currentScene, nodeKey, updatedNode);
-
-            return {
-              templateData: {
-                ...state.templateData,
-                [state.currentTemplate]: {
-                  ...state.templateData[state.currentTemplate],
-                  [state.currentScene]: updatedScene,
-                },
-              },
-            };
-          });
+          nodeDomain.updateNode(nodeKey, updates);
           updateLocalizationStoreRef();
         },
 
         deleteNode: (nodeKey) => {
-          const state = get();
-          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          if (!currentScene) return;
-
-          const nodeToDelete = getNode(currentScene, nodeKey);
-          if (!nodeToDelete) return;
-
-          // 1. 로컬라이제이션 키 수집
-          const keysToCleanup = get()._collectNodeKeysForCleanup(nodeToDelete);
-
-          // 2. 실제 노드 삭제 수행
-          get()._performNodeDeletion(nodeKey);
-
-          // 3. 삭제 후 정리 작업
-          get()._cleanupAfterNodeDeletion(keysToCleanup);
+          nodeDomain.deleteNode(nodeKey);
         },
 
         // 헬퍼 메서드: 로컬라이제이션 키 수집 (단일 삭제용, 통합 함수 호출)
@@ -1013,24 +950,7 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         moveNode: (nodeKey, position) => {
-          const currentTime = Date.now();
-
-          // 1. 노드 및 위치 변경 유효성 검사
-          const validationResult = get()._validateNodeMovement(nodeKey, position);
-          if (!validationResult.isValid) return;
-
-          // 2. 연속 드래그 여부 확인
-          const isContinuousDrag = get()._checkContinuousDrag(nodeKey, currentTime);
-
-          // 3. 실제 노드 위치 업데이트
-          get()._performNodeMove(nodeKey, position, currentTime);
-
-          // 4. 히스토리 처리 (연속 드래그 vs 일반)
-          if (isContinuousDrag) {
-            get()._handleContinuousDrag(nodeKey, currentTime);
-          } else {
-            get()._addMoveHistory(nodeKey);
-          }
+          nodeDomain.moveNode(nodeKey, position);
         },
 
         // 노드 이동 유효성 검사
@@ -1126,146 +1046,12 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         // 대화 내용 수정 (실제 텍스트 기반)
-        updateDialogue: (nodeKey, dialogue) =>
-          set((state) => {
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return state;
-
-            const currentNode = getNode(currentScene, nodeKey);
-            if (!currentNode) return state;
-
-            let updatedDialogue: Dialogue;
-
-            if (currentNode.dialogue.type === "text") {
-              updatedDialogue = {
-                ...currentNode.dialogue,
-                ...dialogue,
-              } as TextDialogue;
-            } else if (currentNode.dialogue.type === "choice") {
-              updatedDialogue = {
-                ...currentNode.dialogue,
-                ...dialogue,
-              } as ChoiceDialogue;
-            } else {
-              updatedDialogue = {
-                ...currentNode.dialogue,
-                ...dialogue,
-              } as InputDialogue;
-            }
-
-            const updatedNode = {
-              ...currentNode,
-              dialogue: updatedDialogue,
-            };
-            const updatedScene = setNode(currentScene, nodeKey, updatedNode);
-
-            return {
-              templateData: {
-                ...state.templateData,
-                [state.currentTemplate]: {
-                  ...state.templateData[state.currentTemplate],
-                  [state.currentScene]: updatedScene,
-                },
-              },
-            };
-          }),
+        updateDialogue: (nodeKey, dialogue) => {
+          nodeDomain.updateDialogue(nodeKey, dialogue);
+        },
 
         updateNodeText: (nodeKey, speakerText, contentText) => {
-          set((state) => {
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return state;
-
-            const currentNode = getNode(currentScene, nodeKey);
-            if (!currentNode) return state;
-
-            // LocalizationStore와 연동하여 키 생성 및 텍스트 저장
-            const localizationStore = useLocalizationStore.getState();
-
-            let speakerKeyRef = currentNode.dialogue.speakerKeyRef;
-            let textKeyRef = currentNode.dialogue.textKeyRef;
-
-            // 화자 텍스트 처리
-            if (speakerText !== undefined) {
-              if (speakerText && speakerText.trim()) {
-                const currentSpeakerKey = currentNode.dialogue.speakerKeyRef;
-                const currentUsageCount = currentSpeakerKey ? localizationStore.getKeyUsageCount(currentSpeakerKey) : 0;
-
-                if (currentSpeakerKey && currentUsageCount === 1) {
-                  // 단일 사용 키: 기존 키 유지, 텍스트만 업데이트
-                  localizationStore.setText(currentSpeakerKey, speakerText);
-                  speakerKeyRef = currentSpeakerKey;
-                } else {
-                  // 다중 사용 키 또는 새 키: 기존 로직 사용
-                  const speakerKeyResult = localizationStore.generateSpeakerKey(speakerText);
-                  speakerKeyRef = speakerKeyResult.key;
-                  localizationStore.setText(speakerKeyResult.key, speakerText);
-                }
-              } else {
-                // 빈 문자열인 경우: 단일 사용 키만 삭제
-                if (currentNode.dialogue.speakerKeyRef) {
-                  const currentUsageCount = localizationStore.getKeyUsageCount(currentNode.dialogue.speakerKeyRef);
-                  if (currentUsageCount === 1) {
-                    // 단일 사용 키만 삭제
-                    localizationStore.deleteKey(currentNode.dialogue.speakerKeyRef);
-                  }
-                  // 다중 사용 키는 삭제하지 않고 현재 노드의 참조만 제거
-                }
-                speakerKeyRef = undefined;
-              }
-            }
-
-            // 내용 텍스트 처리
-            if (contentText !== undefined) {
-              if (contentText?.trim()) {
-                const currentTextKey = currentNode.dialogue.textKeyRef;
-                const currentUsageCount = currentTextKey ? localizationStore.getKeyUsageCount(currentTextKey) : 0;
-
-                if (currentTextKey && currentUsageCount === 1) {
-                  // 단일 사용 키: 기존 키 유지, 텍스트만 업데이트
-                  localizationStore.setText(currentTextKey, contentText);
-                  textKeyRef = currentTextKey;
-                } else {
-                  // 다중 사용 키 또는 새 키: 기존 로직 사용
-                  const textKeyResult = localizationStore.generateTextKey(contentText);
-                  textKeyRef = textKeyResult.key;
-                  localizationStore.setText(textKeyResult.key, contentText);
-                }
-              } else {
-                // 빈 문자열인 경우: 단일 사용 키만 삭제
-                if (currentNode.dialogue.textKeyRef) {
-                  const currentUsageCount = localizationStore.getKeyUsageCount(currentNode.dialogue.textKeyRef);
-                  if (currentUsageCount === 1) {
-                    // 단일 사용 키만 삭제
-                    localizationStore.deleteKey(currentNode.dialogue.textKeyRef);
-                  }
-                  // 다중 사용 키는 삭제하지 않고 현재 노드의 참조만 제거
-                }
-                textKeyRef = undefined;
-              }
-            }
-
-            const updatedDialogue = {
-              ...currentNode.dialogue,
-              speakerText: speakerText !== undefined ? speakerText : currentNode.dialogue.speakerText,
-              contentText: contentText !== undefined ? contentText : currentNode.dialogue.contentText,
-              speakerKeyRef,
-              textKeyRef,
-            };
-
-            const updatedNode = { ...currentNode, dialogue: updatedDialogue };
-            const updatedScene = setNode(currentScene, nodeKey, updatedNode);
-
-            return {
-              templateData: {
-                ...state.templateData,
-                [state.currentTemplate]: {
-                  ...state.templateData[state.currentTemplate],
-                  [state.currentScene]: updatedScene,
-                },
-              },
-            };
-          });
-          updateLocalizationStoreRef();
+          nodeDomain.updateNodeText(nodeKey, speakerText, contentText);
         },
 
         updateChoiceText: (nodeKey, choiceKey, choiceText) => {
@@ -1474,90 +1260,14 @@ export const useEditorStore = create<EditorStore>()(
           }),
 
         // 연결 관리
-        connectNodes: (fromNodeKey, toNodeKey, choiceKey) =>
-          set((state) => {
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return state;
-
-            const fromNode = getNode(currentScene, fromNodeKey);
-            if (!fromNode) return state;
-
-            let updatedNode: EditorNodeWrapper;
-
-            if (fromNode.dialogue.type === "text") {
-              // 텍스트 노드의 경우 nextNodeKey 설정
-              const updatedDialogue = { ...fromNode.dialogue };
-              updatedDialogue.nextNodeKey = toNodeKey;
-              updatedNode = { ...fromNode, dialogue: updatedDialogue };
-            } else if (fromNode.dialogue.type === "choice" && choiceKey) {
-              // 선택지 노드의 경우 특정 선택지의 nextNodeKey 설정
-              const updatedDialogue = { ...fromNode.dialogue };
-              if (updatedDialogue.choices[choiceKey]) {
-                updatedDialogue.choices[choiceKey] = {
-                  ...updatedDialogue.choices[choiceKey],
-                  nextNodeKey: toNodeKey,
-                };
-              }
-              updatedNode = { ...fromNode, dialogue: updatedDialogue };
-            } else {
-              return state;
-            }
-
-            const updatedScene = setNode(currentScene, fromNodeKey, updatedNode);
-
-            return {
-              templateData: {
-                ...state.templateData,
-                [state.currentTemplate]: {
-                  ...state.templateData[state.currentTemplate],
-                  [state.currentScene]: updatedScene,
-                },
-              },
-            };
-          }),
+        connectNodes: (fromNodeKey, toNodeKey, choiceKey) => {
+          nodeDomain.connectNodes(fromNodeKey, toNodeKey, choiceKey);
+        },
 
         // 연결 끊기
-        disconnectNodes: (fromNodeKey, choiceKey) =>
-          set((state) => {
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return state;
-
-            const fromNode = getNode(currentScene, fromNodeKey);
-            if (!fromNode) return state;
-
-            let updatedNode: EditorNodeWrapper;
-
-            if (fromNode.dialogue.type === "text") {
-              // 텍스트 노드의 경우 nextNodeKey 제거
-              const updatedDialogue = { ...fromNode.dialogue };
-              delete updatedDialogue.nextNodeKey;
-              updatedNode = { ...fromNode, dialogue: updatedDialogue };
-            } else if (fromNode.dialogue.type === "choice" && choiceKey) {
-              // 선택지 노드의 경우 특정 선택지의 nextNodeKey 제거
-              const updatedDialogue = { ...fromNode.dialogue };
-              if (updatedDialogue.choices[choiceKey]) {
-                updatedDialogue.choices[choiceKey] = {
-                  ...updatedDialogue.choices[choiceKey],
-                  nextNodeKey: "",
-                };
-              }
-              updatedNode = { ...fromNode, dialogue: updatedDialogue };
-            } else {
-              return state;
-            }
-
-            const updatedScene = setNode(currentScene, fromNodeKey, updatedNode);
-
-            return {
-              templateData: {
-                ...state.templateData,
-                [state.currentTemplate]: {
-                  ...state.templateData[state.currentTemplate],
-                  [state.currentScene]: updatedScene,
-                },
-              },
-            };
-          }),
+        disconnectNodes: (fromNodeKey, choiceKey) => {
+          nodeDomain.disconnectNodes(fromNodeKey, choiceKey);
+        },
 
         // 헬퍼 메서드: 선택지 노드 생성 유효성 검증 (복합 액션 시작 포함)
         _validateChoiceNodeCreation: (fromNodeKey: string, choiceKey: string) => {
@@ -1964,18 +1674,15 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         generateNodeKey: () => {
-          return coreServices.generateNodeKey();
+          return nodeDomain.generateNodeKey();
         },
 
         getCurrentNodeCount: () => {
-          const state = get();
-          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          return currentScene ? Object.keys(currentScene).length : 0;
+          return nodeDomain.getCurrentNodeCount();
         },
 
         canCreateNewNode: () => {
-          const MAX_NODES = 100;
-          return get().getCurrentNodeCount() < MAX_NODES;
+          return nodeDomain.canCreateNewNode();
         },
 
         // Dagre 기반 자동 정렬 (향상된 버전)
@@ -2362,73 +2069,13 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         // 키 참조 업데이트
-        updateNodeKeyReference: (nodeKey, keyType, newKeyRef) =>
-          set((state) => {
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return state;
+        updateNodeKeyReference: (nodeKey, keyType, newKeyRef) => {
+          nodeDomain.updateNodeKeyReference(nodeKey, keyType, newKeyRef);
+        },
 
-            const currentNode = getNode(currentScene, nodeKey);
-            if (!currentNode) return state;
-
-            const localizationStore = useLocalizationStore.getState();
-            const newText = localizationStore.getText(newKeyRef) || "";
-
-            const updatedDialogue = { ...currentNode.dialogue };
-            if (keyType === "speaker") {
-              updatedDialogue.speakerKeyRef = newKeyRef;
-              updatedDialogue.speakerText = newText; // 실제 텍스트도 동기화
-            } else if (keyType === "text") {
-              updatedDialogue.textKeyRef = newKeyRef;
-              updatedDialogue.contentText = newText; // 실제 텍스트도 동기화
-            }
-
-            const updatedNode = { ...currentNode, dialogue: updatedDialogue };
-            const updatedScene = setNode(currentScene, nodeKey, updatedNode);
-
-            return {
-              templateData: {
-                ...state.templateData,
-                [state.currentTemplate]: {
-                  ...state.templateData[state.currentTemplate],
-                  [state.currentScene]: updatedScene,
-                },
-              },
-            };
-          }),
-
-        updateChoiceKeyReference: (nodeKey, choiceKey, newKeyRef) =>
-          set((state) => {
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return state;
-
-            const currentNode = getNode(currentScene, nodeKey);
-            if (!currentNode || currentNode.dialogue.type !== "choice") return state;
-
-            const localizationStore = useLocalizationStore.getState();
-            const newText = localizationStore.getText(newKeyRef) || "";
-
-            const updatedDialogue = { ...currentNode.dialogue };
-            if (updatedDialogue.choices[choiceKey]) {
-              updatedDialogue.choices[choiceKey] = {
-                ...updatedDialogue.choices[choiceKey],
-                textKeyRef: newKeyRef,
-                choiceText: newText, // 실제 텍스트도 동기화
-              };
-            }
-
-            const updatedNode = { ...currentNode, dialogue: updatedDialogue };
-            const updatedScene = setNode(currentScene, nodeKey, updatedNode);
-
-            return {
-              templateData: {
-                ...state.templateData,
-                [state.currentTemplate]: {
-                  ...state.templateData[state.currentTemplate],
-                  [state.currentScene]: updatedScene,
-                },
-              },
-            };
-          }),
+        updateChoiceKeyReference: (nodeKey, choiceKey, newKeyRef) => {
+          nodeDomain.updateChoiceKeyReference(nodeKey, choiceKey, newKeyRef);
+        },
 
         // 헬퍼 메서드: 레이아웃을 위한 루트 노드 찾기
         _findRootNodeForLayout: (currentScene: Scene, allNodeKeys: string[]) => {
@@ -2632,52 +2279,14 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         // 노드 숨김 상태 업데이트 함수 추가
-        updateNodeVisibility: (nodeKey: string, hidden: boolean) =>
-          set((state) => {
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return state;
-
-            const currentNode = getNode(currentScene, nodeKey);
-            if (!currentNode) return state;
-
-            const updatedNode = { ...currentNode, hidden };
-            const updatedScene = setNode(currentScene, nodeKey, updatedNode);
-
-            return {
-              ...state,
-              templateData: {
-                ...state.templateData,
-                [state.currentTemplate]: {
-                  ...state.templateData[state.currentTemplate],
-                  [state.currentScene]: updatedScene,
-                },
-              },
-            };
-          }),
+        updateNodeVisibility: (nodeKey: string, hidden: boolean) => {
+          nodeDomain.updateNodeVisibility(nodeKey, hidden);
+        },
 
         // 노드 위치와 숨김 상태 동시 업데이트 함수 추가
-        updateNodePositionAndVisibility: (nodeKey: string, position: { x: number; y: number }, hidden: boolean) =>
-          set((state) => {
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return state;
-
-            const currentNode = getNode(currentScene, nodeKey);
-            if (!currentNode) return state;
-
-            const updatedNode = { ...currentNode, position, hidden };
-            const updatedScene = setNode(currentScene, nodeKey, updatedNode);
-
-            return {
-              ...state,
-              templateData: {
-                ...state.templateData,
-                [state.currentTemplate]: {
-                  ...state.templateData[state.currentTemplate],
-                  [state.currentScene]: updatedScene,
-                },
-              },
-            };
-          }),
+        updateNodePositionAndVisibility: (nodeKey: string, position: { x: number; y: number }, hidden: boolean) => {
+          nodeDomain.updateNodePositionAndVisibility(nodeKey, position, hidden);
+        },
 
         // 통합 헬퍼 메서드: 관련 노드 탐색 (depth 제한 지원)
         _findRelatedNodes: (nodeKey: string, currentScene: Scene, maxDepth: number = Infinity) => {
