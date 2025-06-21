@@ -1,0 +1,53 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Bug Fix Workflow
+
+1. 🛠 Receive Bug Information
+
+    - Require the user to provide:
+        - Expected behavior vs. actual behavior
+        - Clear reproduction steps
+    - If the information is missing or vague, stop and ask for clarification.
+
+2. 🔍 Analyze Code and Insert Logs
+
+    - Identify relevant modules/components
+    - Trace key state changes and event flows
+    - Add temporary logs to narrow down the problem area
+
+3. 🔁 Ask the user to reproduce the issue and provide logs
+
+4. 🧩 Fix the root cause with minimal code changes
+
+    - Focus on fixing the **underlying cause**, not just the symptoms
+    - Make the **smallest possible change**
+    - **Avoid side effects** to unrelated features
+    - **Keep TypeScript error-free** (type safety is mandatory)
+
+5. 🔨 Build the project and fix any errors
+
+6. 🧪 Ask the user to test the fix and wait
+
+    - Provide regression test cases if needed
+
+7. ✅ If the issue is resolved, remove all debugging logs
+
+8. And commit the fix:
+
+```
+fix: F00 [한국어로 문제 내용 요약] 문제 수정
+```
+
+9. 📝 Update documentation:
+
+    - `todo.md`: Update task status
+    - `log.md`: Document cause and solution clearly in log.md by **appending to the end of the file**
+
+10. 🗃 Commit documentation update:
+
+```
+docs: F00 [한국어로 문제 내용 요약] 문제 수정 기록
+```
