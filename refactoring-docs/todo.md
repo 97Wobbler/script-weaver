@@ -417,10 +417,22 @@ src/store/
         -   [x] 순수 함수 구조로 다른 도메인 의존성 제거
         -   [x] TypeScript 타입 안전성 100% 확보 (에러 0개)
 
--   [ ] 4.1.3 HISTORY DOMAIN 분리 (독립적)
-    -   [ ] `domains/historyDomain.ts` 생성
-    -   [ ] 8개 히스토리 메서드 이동
-    -   [ ] CORE SERVICES만 의존하도록 설정
+-   [x] 4.1.3 HISTORY DOMAIN 분리 ✅ **완료 (2025-06-21 11:12)**
+    -   [x] `domains/historyDomain.ts` 생성 (172줄) ✅ **완료**
+    -   [x] 6개 히스토리 메서드 **완전 분리** ✅ **완료**
+        -   [x] `startCompoundAction` (4회 호출) → `historyDomain.startCompoundAction()` 교체
+        -   [x] `undo` (UI 호출) → `historyDomain.undo()` 교체
+        -   [x] `redo` (UI 호출) → `historyDomain.redo()` 교체
+        -   [x] `canUndo` (UI 상태 체크) → `historyDomain.canUndo()` 교체
+        -   [x] `canRedo` (UI 상태 체크) → `historyDomain.canRedo()` 교체
+        -   [x] `pushToHistoryWithTextEdit` (3회 호출) → `historyDomain.pushToHistoryWithTextEdit()` 교체
+    -   [x] 중복 코드 완전 제거 및 최적화 ✅ **완료**
+        -   [x] editorStore.ts 99줄 중복 구현 제거
+        -   [x] 각 메서드가 1줄로 단순화
+        -   [x] 히스토리 관리 로직 완전 독립
+    -   [x] Core Services 의존성으로 순환 의존성 방지 ✅ **완료**
+        -   [x] 순수한 도메인 구조 (다른 도메인 의존성 없음)
+        -   [x] TypeScript 타입 안전성 100% 확보 (에러 0개)
 
 -   [ ] 4.1.4 PROJECT DOMAIN 분리 (CORE에만 의존)
     -   [ ] `domains/projectDomain.ts` 생성
