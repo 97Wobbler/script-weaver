@@ -1033,4 +1033,179 @@ export interface ExecutionResult {
   success: boolean;
   message?: string;
   data?: any;
-} 
+}
+
+// ===== 통합 스토어 인터페이스 =====
+
+/**
+ * 통합 에디터 스토어 인터페이스
+ * 
+ * 모든 도메인 인터페이스를 통합하여 단일 스토어 인터페이스를 제공합니다.
+ * Zustand를 기반으로 하며 persist 미들웨어를 사용합니다.
+ */
+export interface IEditorStore extends 
+  IProjectDomain,
+  IHistoryDomain, 
+  INodeDomain,
+  INodeOperationsDomain,
+  ILayoutDomain {
+  
+  // ===== 추가 상태 (EditorState 기반) =====
+  
+  /**
+   * 현재 선택된 템플릿 키
+   */
+  currentTemplate: string;
+  
+  /**
+   * 전체 템플릿 데이터
+   */
+  templateData: TemplateDialogues;
+  
+  /**
+   * 현재 선택된 씬 키
+   */
+  currentScene: string;
+  
+  /**
+   * 단일 선택된 노드 키 (UI 상태)
+   */
+  selectedNodeKey?: string;
+  
+  /**
+   * 전역 토스트 메시지 함수 (UI 도메인)
+   */
+  showToast?: (message: string, type?: "success" | "info" | "warning") => void;
+}
+
+/**
+ * 에디터 상태 타입 (기본 상태만 포함)
+ */
+export interface EditorState {
+  currentTemplate: string;
+  templateData: TemplateDialogues;
+  currentScene: string;
+  selectedNodeKey?: string;
+  lastNodePosition: NodePosition;
+  
+  // NODE DOMAIN 상태
+  lastDraggedNodeKey: string | null;
+  lastDragActionTime: number;
+  selectedNodeKeys: Set<string>;
+  
+  // HISTORY DOMAIN 상태
+  history: HistoryState[];
+  historyIndex: number;
+  isUndoRedoInProgress: boolean;
+  currentCompoundActionId: string | null;
+  compoundActionStartState: HistoryState | null;
+  
+  // UI DOMAIN 상태
+  showToast?: (message: string, type?: "success" | "info" | "warning") => void;
+}
+
+/**
+ * Zustand 스토어 설정 타입
+ */
+export interface StoreConfig {
+  name: string;
+  version: number;
+  onRehydrateStorage?: () => (state: IEditorStore | null) => void;
+}
+
+/**
+ * 스토어 미들웨어 옵션 타입
+ */
+export interface StoreMiddlewareOptions {
+  persist?: {
+    name: string;
+    version: number;
+    onRehydrateStorage?: () => (state: IEditorStore | null) => void;
+  };
+  devtools?: boolean;
+}
+
+// ===== 통합 스토어 관련 타입 =====
+
+/**
+ * 스토어 초기화 옵션 타입
+ */
+export interface StoreInitOptions {
+  initialTemplate?: string;
+  initialScene?: string;
+  enablePersist?: boolean;
+  enableDevtools?: boolean;
+}
+
+/**
+ * 스토어 상태 변경 함수 타입
+ */
+export type StateUpdater<T> = (state: T) => T | Partial<T>;
+
+/**
+ * 스토어 액션 함수 타입
+ */
+export type StoreAction<T = void> = (...args: any[]) => T;
+
+/**
+ * 스토어 선택자 함수 타입
+ */
+export type StoreSelector<T, R> = (state: T) => R;
+
+// ===== 도메인 통합 관련 타입 =====
+
+/**
+ * 도메인 서비스 컨테이너 타입
+ */
+export interface DomainServiceContainer {
+  coreServices: ICoreServices;
+  projectDomain: IProjectDomain;
+  historyDomain: IHistoryDomain;
+  nodeDomain: INodeDomain;
+  nodeOperationsDomain: INodeOperationsDomain;
+  layoutDomain: ILayoutDomain;
+}
+
+/**
+ * 도메인 의존성 맵 타입
+ */
+export interface DomainDependencyMap {
+  [domainName: string]: string[];
+}
+
+/**
+ * 스토어 팩토리 옵션 타입
+ */
+export interface StoreFactoryOptions {
+  domains: DomainServiceContainer;
+  config: StoreConfig;
+  middlewareOptions?: StoreMiddlewareOptions;
+}
+
+// ===== 타입 유틸리티 =====
+
+/**
+ * 실행 결과 타입
+ */
+export interface ExecutionResult {
+  success: boolean;
+  message?: string;
+  data?: any;
+  errors?: string[];
+}
+
+/**
+ * 비동기 작업 결과 타입
+ */
+export interface AsyncOperationResult<T = any> extends ExecutionResult {
+  data?: T;
+  duration?: number;
+}
+
+// ===== Import 타입들 =====
+
+/**
+ * 외부 의존성 타입들을 재export
+ */
+export type { TemplateDialogues, EditorNodeWrapper, Dialogue, Scene, ValidationResult } from '../../types/dialogue';
+export type { LocalizationData } from '../localizationStore'; 

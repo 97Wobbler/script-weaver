@@ -326,12 +326,12 @@ interface EditorState {
     -   [x] 구 트리 정렬 인터페이스 (arrangeChildNodesAsTree, arrangeAllNodesAsTree, arrangeNodesWithDagre)
     -   [x] 신 레이아웃 시스템 인터페이스 (arrangeAllNodes, arrangeSelectedNodeChildren, arrangeSelectedNodeDescendants)
 
-##### 3.1.3 통합 스토어 인터페이스
+##### 3.1.3 통합 스토어 인터페이스 ✅ **완료**
 
--   [ ] **MAIN STORE 인터페이스** (`IEditorStore`) 설계
-    -   [ ] 상태 인터페이스 (EditorState) 정의
-    -   [ ] 각 도메인 인터페이스 조합
-    -   [ ] Zustand 스토어 설정 인터페이스 (persist, devtools)
+-   [x] **MAIN STORE 인터페이스** (`IEditorStore`) 설계 ✅ **완료**
+    -   [x] 상태 인터페이스 (EditorState) 정의
+    -   [x] 각 도메인 인터페이스 조합
+    -   [x] Zustand 스토어 설정 인터페이스 (persist, devtools)
 
 ##### 3.1.4 공통 타입 및 유틸리티
 
