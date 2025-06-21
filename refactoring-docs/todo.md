@@ -404,7 +404,7 @@ src/store/
     -   [x] 공통 타입 및 인터페이스 이동 ✅ **완료**
         -   [x] `editorStore.ts`에서 중복 `HistoryState` 인터페이스 제거
         -   [x] `editorTypes.ts`에서 `IEditorStore`, `HistoryState` import 추가
-        -   [x] 타입 일관성 확보 및 TypeScript 에러 0개 유지
+        -   [x] 타입 일관성 확보 및 TypeScript 에러 0개
         -   [x] Phase 4.2+ 분할을 위한 깔끔한 기반 확립
 
 -   [x] 4.1.2 CORE SERVICES 분리 ✅ **완료 (2025-06-21 11:05)**
@@ -535,6 +535,11 @@ src/store/
         -   [x] PropertyPanel 표시 개선: 다중 선택 시에도 대표 노드 정보 표시
         -   [x] 근본 원인 해결: setSelectedNode의 selectedNodeKeys 덮어쓰기 문제 해결
         -   [x] 디버깅 프로세스 확립: 체계적 로그→분석→해결→정리
+    -   [x] 자식 노드 삭제 후 부모 노드 핸들 상태 이상 문제 수정 ✅ **완료 (2025-06-21 18:34 ~ 18:47)**
+        -   [x] F12 기능 완전 수정: 노드 삭제 후 핸들 상태 정상화
+        -   [x] 근본 원인 해결: `_performNodeDeletion`에서 두 번의 setState 충돌 문제 해결
+        -   [x] 단일 setState로 참조 정리와 노드 삭제 동시 처리
+        -   [x] 디버깅 로그 추가→분석→해결→정리 프로세스 완료
 
 -   [ ] **잠재적 버그 확인**
 
