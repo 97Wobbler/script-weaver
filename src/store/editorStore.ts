@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { EditorState, EditorNodeWrapper, Dialogue, TextDialogue, ChoiceDialogue, InputDialogue, Scene, TemplateDialogues, ValidationResult } from "../types/dialogue";
 import type { LocalizationData } from "./localizationStore";
+import type { IEditorStore, HistoryState } from "./types/editorTypes";
 import { DialogueSpeed } from "../types/dialogue";
 import { exportToJSON as exportToJSONUtil, exportToCSV as exportToCSVUtil, importFromJSON as importFromJSONUtil, validateTemplateData } from "../utils/importExport";
 import { useLocalizationStore } from "./localizationStore";
@@ -9,16 +10,9 @@ import { migrateTemplateData, needsMigration } from "../utils/migration";
 import { globalAsyncOperationManager } from "./asyncOperationManager";
 import dagre from "@dagrejs/dagre";
 
-// Undo/Redo를 위한 히스토리 상태 타입
-interface HistoryState {
-  templateData: TemplateDialogues;
-  localizationData: LocalizationData; // LocalizationStore 데이터 포함
-  timestamp: number;
-  action: string;
-  groupId?: string; // 복합 액션 그룹 식별자
-}
 
-interface EditorStore extends EditorState {
+
+interface EditorStore extends IEditorStore {
   // === PROJECT DOMAIN - 액션들 ===
   // 기본 액션들
   setCurrentTemplate: (templateKey: string) => void;
