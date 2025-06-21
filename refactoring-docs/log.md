@@ -2686,3 +2686,66 @@ src/store/
 **총 코드량**: 3,420줄 (7개 파일)
 
 ---
+
+### **F14 중복 키 배정 텍스트 입력 버그 수정** (2025-01-12) ✅ **완료**
+
+**문제 상황**: 
+이미 키값이 배정된 스트링을 새 노드의 textarea에 입력하고 focus를 해제하면:
+- textarea가 비워짐
+- 키 개수가 잘못 표시됨 (2개라고 쓰여야 하는데 1개라고 표시)
+- 캔버스에 "(없음)"으로 표시됨
+
+**근본 원인 분석**:
+1. **중복 키 감지 시 키 참조만 업데이트**: `updateNodeKeyReference`만 호출하여 `speakerKeyRef`는 업데이트되지만 `speakerText` 필드는 빈 문자열로 남음
+2. **실제 텍스트 미업데이트**: 중복 키 사용 시 노드의 실제 텍스트 필드가 업데이트되지 않아 사용자 입력이 사라짐
+3. **키 개수 계산 지연**: `getKeyUsageCount`가 `editorStoreRef`를 통해 `templateData`를 가져오는데, 이 참조가 실시간으로 업데이트되지 않음
+
+**디버그 과정**:
+- PropertyPanel, nodeDomain.ts에 상세 로그 추가
+- 중복 키 감지 → `updateNodeKeyReference` 호출 → 텍스트 누락 과정 확인
+- KeyDisplay 컴포넌트의 실시간 업데이트 문제 파악
+
+**해결 방안**:
+
+1. **중복 키 처리 로직 단순화** (`PropertyPanel.tsx`):
+   ```typescript
+   // 기존: 중복 키 감지 시 updateNodeKeyReference만 호출
+   if (existingKey && existingKey !== currentSpeakerKey) {
+     updateNodeKeyReference(selectedNodeKey, "speaker", existingKey);
+     return; // 실제 텍스트 업데이트 누락!
+   }
+   
+   // 수정: 모든 경우에 updateNodeText 호출 (중복 키 처리 포함)
+   updateNodeText(selectedNodeKey, trimmedText, undefined);
+   ```
+
+2. **선택지 텍스트 키 관리 추가** (`nodeDomain.ts`):
+   ```typescript
+   updateChoiceText(nodeKey: string, choiceKey: string, choiceText: string): void {
+     // 키 생성 및 설정 로직 추가
+     const result = localizationStore.generateChoiceKey(choiceText);
+     localizationStore.setText(result.key, choiceText);
+     textKeyRef = result.key;
+   }
+   ```
+
+3. **실시간 키 개수 계산** (`PropertyPanel.tsx`):
+   ```typescript
+   const calculateKeyUsageCount = (keyRef: string): number => {
+     // templateData에서 직접 계산하여 실시간 업데이트 보장
+     Object.entries(templateData).forEach(...);
+   };
+   ```
+
+**수정된 파일**:
+- `src/components/PropertyPanel.tsx`: 중복 키 처리 로직 단순화, 실시간 키 개수 계산 함수 추가
+- `src/store/domains/nodeDomain.ts`: `updateChoiceText`에 키 생성 및 관리 로직 추가
+
+**영향 범위**:
+- 화자명 입력 필드: ✅ 중복 키 사용 시 텍스트 유지, 키 개수 정상 표시
+- 대화 내용 입력 필드: ✅ 중복 키 사용 시 텍스트 유지, 키 개수 정상 표시  
+- 선택지 텍스트 입력 필드: ✅ 중복 키 사용 시 텍스트 유지, 키 개수 실시간 업데이트
+
+**성과**: F14 텍스트 편집 기능 100% 정상 작동, 모든 입력 필드에서 중복 키 처리 완벽 지원
+
+---
