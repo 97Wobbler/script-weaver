@@ -976,3 +976,101 @@ export interface IProjectDomain {
 ✅ **Phase 3.1.3 준비** 완료 (HISTORY DOMAIN 인터페이스 설계를 위한 기반 확립)  
 
 **다음 단계**: Phase 3.1.3 HISTORY DOMAIN 인터페이스 설계
+
+#### **Phase 3.1.3: HISTORY DOMAIN 인터페이스 설계** (2025-06-21 09:45) ✅ **완료**
+
+**목표**: HISTORY DOMAIN 인터페이스 (IHistoryDomain) 설계 및 관련 타입 정의
+
+##### **📋 Context Analysis (컨텍스트 분석)**
+
+**확인된 HISTORY DOMAIN 메서드 시그니처** (8개):
+1. **startCompoundAction**: `(actionName: string) => string` - 복합 액션 시작
+2. **endCompoundAction**: `() => void` - 복합 액션 종료
+3. **pushToHistory**: `(action: string) => void` - 히스토리 기록
+4. **pushToHistoryWithTextEdit**: `(action: string) => void` - 텍스트 편집 전용 히스토리
+5. **undo**: `() => void` - 되돌리기
+6. **redo**: `() => void` - 다시실행
+7. **canUndo**: `() => boolean` - 되돌리기 가능 여부
+8. **canRedo**: `() => boolean` - 다시실행 가능 여부
+
+**확인된 HISTORY DOMAIN 상태** (5개):
+1. **history**: `HistoryState[]` - 히스토리 스택
+2. **historyIndex**: `number` - 현재 히스토리 인덱스
+3. **isUndoRedoInProgress**: `boolean` - 실행취소/재실행 진행 중 플래그
+4. **currentCompoundActionId**: `string | null` - 현재 복합 액션 ID
+5. **compoundActionStartState**: `HistoryState | null` - 복합 액션 시작 상태
+
+**의존성 타입 확인**:
+- `HistoryState` 타입: templateData, localizationData, timestamp, action, groupId 포함
+- AsyncOperationManager, LocalizationStore 내부적 의존성
+
+##### **🎯 Planning (계획 수립)**
+
+**Phase 2.2.3 확정 구조 반영**:
+1. `IHistoryDomain` 인터페이스 설계 - 8개 메서드 + 5개 상태 포함
+2. 3개 기능 그룹별 체계적 분류 (복합 액션, 히스토리 관리, Undo/Redo)
+3. `HistoryState` 타입 정의 및 관련 보조 타입 정의
+4. 의존성 문서화 (AsyncOperationManager, LocalizationStore 내부 의존성 명시)
+
+##### **⚡ Execution (실행)**
+
+**수정된 파일**: `src/store/types/editorTypes.ts` (+136줄)
+
+**핵심 인터페이스 정의**:
+```typescript
+export interface IHistoryDomain {
+  // 상태 (5개)
+  history: HistoryState[];
+  historyIndex: number;
+  isUndoRedoInProgress: boolean;
+  currentCompoundActionId: string | null;
+  compoundActionStartState: HistoryState | null;
+  
+  // 복합 액션 관리 (2개)
+  startCompoundAction(actionName: string): string;
+  endCompoundAction(): void;
+  
+  // 히스토리 관리 (2개)
+  pushToHistory(action: string): void;
+  pushToHistoryWithTextEdit(action: string): void;
+  
+  // Undo/Redo 액션 (4개)
+  undo(): void;
+  redo(): void;
+  canUndo(): boolean;
+  canRedo(): boolean;
+}
+```
+
+**주요 특징**:
+- **도메인 독립성**: 다른 도메인에 의존하지 않는 순수 히스토리 관리 인터페이스
+- **명확한 JSDoc**: 각 메서드의 기능, 반환값, 의존성 관계 상세 문서화
+- **타입 안전성**: HistoryState 포함 모든 상태 및 반환 타입 명시
+- **기능별 그룹핑**: 3개 기능 영역별 논리적 분류
+
+**보조 타입 정의**:
+- `HistoryState`: 히스토리 엔트리 타입 (templateData, localizationData 포함)
+- `CompoundActionResult`: 복합 액션 시작 결과 타입
+- `HistoryOperationOptions`: 히스토리 작업 옵션 타입
+- `TemplateDialogues`, `LocalizationData` import 추가
+
+##### **✅ 달성 성과**
+
+**인터페이스 설계**:
+✅ **HISTORY DOMAIN 인터페이스** 완성 (8개 메서드 + 5개 상태)  
+✅ **타입 안전성** 확보 (모든 시그니처 명시)  
+✅ **기능별 분류** 달성 (3개 기능 그룹)  
+✅ **문서화** 완료 (JSDoc으로 의존성까지 상세 설명)  
+
+**코드 품질**:
+✅ **TypeScript 에러 0개** 달성  
+✅ **의존성 분석** 완료 (AsyncOperationManager, LocalizationStore 내부 의존성만 확인)  
+✅ **일관된 명명 규칙** 적용  
+✅ **확장 가능한 구조** 설계  
+
+**Phase 3-4 연계성**:
+✅ **도메인 분할 준비** 완료 (historyDomain.ts 구현을 위한 명확한 가이드라인)  
+✅ **독립적 운영** 가능 (다른 도메인과 의존성 없음)  
+✅ **Phase 3.1.4 준비** 완료 (NODE CORE DOMAIN 인터페이스 설계를 위한 기반 확립)  
+
+**다음 단계**: Phase 3.1.4 NODE CORE DOMAIN 인터페이스 설계

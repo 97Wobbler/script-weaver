@@ -301,10 +301,10 @@ interface EditorState {
     -   [x] Import/Export 인터페이스 (exportToJSON, exportToCSV, importFromJSON)
     -   [x] 데이터 관리 인터페이스 (resetEditor, loadFromLocalStorage, migrateToNewArchitecture)
 
--   [ ] **HISTORY DOMAIN 인터페이스** (`IHistoryDomain`) 설계
-    -   [ ] 복합 액션 관리 (startCompoundAction, endCompoundAction)
-    -   [ ] 히스토리 관리 (pushToHistory, pushToHistoryWithTextEdit)
-    -   [ ] Undo/Redo 액션 (undo, redo, canUndo, canRedo)
+-   [x] **HISTORY DOMAIN 인터페이스** (`IHistoryDomain`) 설계 ✅ **완료**
+    -   [x] 복합 액션 관리 (startCompoundAction, endCompoundAction)
+    -   [x] 히스토리 관리 (pushToHistory, pushToHistoryWithTextEdit)
+    -   [x] Undo/Redo 액션 (undo, redo, canUndo, canRedo)
 
 -   [ ] **NODE CORE DOMAIN 인터페이스** (`INodeDomain`) 설계
     -   [ ] 선택 관리 인터페이스 (setSelectedNode, toggleNodeSelection, clearSelection, selectMultipleNodes)

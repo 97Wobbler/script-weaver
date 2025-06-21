@@ -7,7 +7,8 @@
  * 이 파일은 7개 도메인 분할을 위한 공통 타입들을 정의합니다.
  */
 
-import type { Scene, ValidationResult } from '../../types/dialogue';
+import type { Scene, ValidationResult, TemplateDialogues } from '../../types/dialogue';
+import type { LocalizationData } from '../localizationStore';
 
 // ===== CORE SERVICES 관련 타입 =====
 
@@ -237,6 +238,147 @@ export interface SceneValidationResult {
 export interface CSVExportResult {
   dialogue: string;
   localization: string;
+}
+
+// ===== HISTORY DOMAIN 인터페이스 =====
+
+/**
+ * 히스토리 상태 타입
+ * 
+ * Undo/Redo를 위한 히스토리 엔트리 정의
+ */
+export interface HistoryState {
+  templateData: TemplateDialogues;
+  localizationData: LocalizationData;
+  timestamp: number;
+  action: string;
+  groupId?: string; // 복합 액션 그룹 식별자
+}
+
+/**
+ * 히스토리 도메인 인터페이스
+ * 
+ * 실행취소/재실행 및 복합 액션 관리를 담당합니다.
+ * 독립적으로 운영되며 다른 도메인과 의존성이 없습니다.
+ */
+export interface IHistoryDomain {
+  // ===== 상태 =====
+  
+  /**
+   * 히스토리 스택
+   */
+  history: HistoryState[];
+
+  /**
+   * 현재 히스토리 인덱스
+   */
+  historyIndex: number;
+
+  /**
+   * 실행취소/재실행 진행 중 플래그
+   */
+  isUndoRedoInProgress: boolean;
+
+  /**
+   * 현재 복합 액션 ID
+   */
+  currentCompoundActionId: string | null;
+
+  /**
+   * 복합 액션 시작 상태
+   */
+  compoundActionStartState: HistoryState | null;
+
+  // ===== 복합 액션 관리 =====
+
+  /**
+   * 복합 액션을 시작합니다.
+   * 
+   * @param actionName - 복합 액션 이름
+   * @returns 복합 액션 ID (차단된 경우 blocked- 접두사)
+   * 
+   * **의존성**: AsyncOperationManager (내부적)
+   */
+  startCompoundAction(actionName: string): string;
+
+  /**
+   * 현재 진행 중인 복합 액션을 종료합니다.
+   * 
+   * **의존성**: LocalizationStore (내부적)
+   */
+  endCompoundAction(): void;
+
+  // ===== 히스토리 관리 =====
+
+  /**
+   * 히스토리에 액션을 기록합니다.
+   * 
+   * @param action - 기록할 액션 설명
+   * 
+   * **의존성**: LocalizationStore (내부적)
+   */
+  pushToHistory(action: string): void;
+
+  /**
+   * 텍스트 편집 전용 히스토리를 기록합니다.
+   * 
+   * @param action - 기록할 액션 설명
+   * 
+   * **의존성**: pushToHistory
+   */
+  pushToHistoryWithTextEdit(action: string): void;
+
+  // ===== Undo/Redo 액션 =====
+
+  /**
+   * 마지막 액션을 되돌립니다.
+   * 
+   * **의존성**: AsyncOperationManager, LocalizationStore (내부적)
+   */
+  undo(): void;
+
+  /**
+   * 되돌린 액션을 다시 실행합니다.
+   * 
+   * **의존성**: AsyncOperationManager, LocalizationStore (내부적)
+   */
+  redo(): void;
+
+  /**
+   * 되돌리기가 가능한지 확인합니다.
+   * 
+   * @returns 되돌리기 가능 여부
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  canUndo(): boolean;
+
+  /**
+   * 다시실행이 가능한지 확인합니다.
+   * 
+   * @returns 다시실행 가능 여부
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  canRedo(): boolean;
+}
+
+// ===== HISTORY DOMAIN 관련 타입 =====
+
+/**
+ * 복합 액션 시작 결과
+ */
+export interface CompoundActionResult {
+  actionId: string;
+  isBlocked: boolean;
+}
+
+/**
+ * 히스토리 작업 옵션
+ */
+export interface HistoryOperationOptions {
+  skipCompoundAction?: boolean;
+  maxHistorySize?: number;
 }
 
 // ===== 의존성 주입 관련 타입 =====
