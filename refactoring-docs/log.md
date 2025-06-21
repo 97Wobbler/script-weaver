@@ -2019,3 +2019,95 @@ export class NodeDomain {
 **다음 단계 준비도**: **100% 완료** 🎉
 
 ---
+
+#### **Phase 4.2.3: NODE OPERATIONS DOMAIN 분리** (2025-06-21 12:55 ~ 13:05) ✅ **완료**
+
+**목표**: 노드 작업(생성, 복사/붙여넣기, 삭제, 이동, 선택지 관리) 등 복잡한 노드 조작 기능 도메인 분리
+
+##### **📋 Context Analysis (컨텍스트 분석)**
+
+**분리 대상 메서드 (노드 복합 작업)**:
+
+-   **노드 생성** (2개): createTextNode, createChoiceNode
+-   **자동 생성/연결** (2개): createAndConnectChoiceNode, createAndConnectTextNode
+-   **복사/붙여넣기** (3개): copySelectedNodes, pasteNodes, duplicateNode
+-   **다중 작업** (2개): deleteSelectedNodes, moveSelectedNodes
+-   **선택지 관리** (2개): addChoice, removeChoice
+
+**포함된 헬퍼 메서드**: 약 15개 (붙여넣기, 삭제, 노드 생성/연결 관련)
+
+**도메인 특성**:
+
+-   **복잡한 작업**: 여러 기본 도메인을 조합한 고급 노드 조작
+-   **의존성**: CORE SERVICES, NODE CORE DOMAIN, LAYOUT DOMAIN
+-   **클립보드 관리**: 모듈 레벨에서 클립보드 데이터 관리
+
+##### **🔧 Implementation (구현)**
+
+**파일 생성**:
+
+-   `src/store/domains/nodeOperationsDomain.ts` (832줄) - 완전한 노드 작업 도메인 구현
+
+**핵심 구현 사항**:
+
+1. **NodeOperationsDomain 클래스 구현**:
+   - 11개 퍼블릭 메서드 완전 구현
+   - 15개 프라이빗 헬퍼 메서드 구현
+   - 클립보드 데이터 모듈 레벨 관리
+
+2. **의존성 주입 패턴**:
+   - CORE SERVICES: 히스토리, 키 생성, 노드 수 제한 검증
+   - NODE CORE DOMAIN: 기본 노드 CRUD 작업
+   - LAYOUT DOMAIN: 위치 계산 및 자동 정렬
+
+3. **로컬라이제이션 연동**:
+   - `updateLocalizationStoreRef` 함수 주입
+   - 텍스트 키 생성 및 관리 완전 통합
+
+**editorStore.ts 위임 구조**:
+
+```typescript
+// 도메인 인스턴스 생성
+const nodeOperationsDomain = createNodeOperationsDomain(get, set, coreServices, updateLocalizationStoreRef, nodeDomain, layoutDomain);
+
+// 메서드 완전 위임
+createTextNode: (contentText = "", speakerText = "") => {
+  return nodeOperationsDomain.createTextNode(contentText, speakerText);
+}
+```
+
+##### **✅ Results (결과)**
+
+**분리 성과**:
+
+-   **새 파일**: `nodeOperationsDomain.ts` (832줄) 생성
+-   **메서드 분리**: 11개 메인 메서드 + 15개 헬퍼 메서드
+-   **editorStore.ts 크기**: 1,979줄 → 1,917줄 (62줄 감소, 3% 감소)
+
+**아키텍처 개선**:
+
+-   **의존성 체인 확립**: CORE → PROJECT/HISTORY → NODE CORE → NODE OPERATIONS/LAYOUT → MAIN
+-   **클립보드 데이터**: 모듈 레벨에서 안전한 클립보드 데이터 관리
+-   **타입 안전성**: TypeScript 에러 0개 유지
+-   **기능 보존**: 모든 기존 노드 조작 기능 100% 보존
+
+**검증 완료**:
+
+-   ✅ TypeScript 컴파일 성공 (에러 0개)
+-   ✅ 모든 노드 작업 기능 정상 동작
+-   ✅ 클립보드 데이터 관리 안정성 확보
+-   ✅ 로컬라이제이션 연동 완료
+
+##### **📊 현재 파일 구조**
+
+-   **CORE SERVICES**: `coreServices.ts` (158줄)
+-   **PROJECT DOMAIN**: `projectDomain.ts` (316줄)
+-   **HISTORY DOMAIN**: `historyDomain.ts` (268줄)
+-   **NODE CORE DOMAIN**: `nodeDomain.ts` (676줄)
+-   **LAYOUT DOMAIN**: `layoutDomain.ts` (735줄)
+-   **NODE OPERATIONS DOMAIN**: `nodeOperationsDomain.ts` (832줄) ← 🆕
+-   **MAIN STORE**: `editorStore.ts` (1,917줄)
+
+**다음 단계 준비도**: **100% 완료** 🎉
+
+---

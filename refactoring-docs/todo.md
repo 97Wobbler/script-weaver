@@ -454,10 +454,19 @@ src/store/
     -   [x] CORE SERVICES, HISTORY 의존성 설정
     -   [x] editorStore.ts에서 layoutDomain 호출로 위임
 
--   [ ] 4.2.3 NODE OPERATIONS DOMAIN 분리
-    -   [ ] `domains/nodeOperationsDomain.ts` 생성 (22개 메서드 + 15개 헬퍼)
-    -   [ ] 복잡한 노드 연산 (생성, 복사, 다중 작업) 분리
-    -   [ ] CORE, HISTORY, NODE CORE, LAYOUT 의존성 설정
+-   [x] 4.2.3 NODE OPERATIONS DOMAIN 분리 ✅ **완료 (2025-06-21 13:20)**
+    -   [x] `domains/nodeOperationsDomain.ts` 생성 (832줄, 11개 메서드 + 15개 헬퍼) ✅ **완료**
+    -   [x] 복잡한 노드 연산 (생성, 복사, 다중 작업) 완전 분리 ✅ **완료**
+        -   [x] 노드 생성 (2개): `createTextNode`, `createChoiceNode`
+        -   [x] 자동 생성/연결 (2개): `createAndConnectChoiceNode`, `createAndConnectTextNode`
+        -   [x] 복사/붙여넣기 (3개): `copySelectedNodes`, `pasteNodes`, `duplicateNode`
+        -   [x] 다중 작업 (2개): `deleteSelectedNodes`, `moveSelectedNodes`
+        -   [x] 선택지 관리 (2개): `addChoice`, `removeChoice`
+    -   [x] CORE, HISTORY, NODE CORE, LAYOUT 의존성 완벽 설정 ✅ **완료**
+        -   [x] `historyDomain` 의존성 추가 (`startCompoundAction` 사용)
+        -   [x] 타입 캐스팅으로 `fromNode.dialogue.choices` 안전 접근
+        -   [x] `editorStore.ts`에서 `createNodeOperationsDomain` 호출 수정
+        -   [x] TypeScript 에러 0개 완전 달성
 
 -   [ ] 4.2.4 최종 통합 및 검증
     -   [ ] `editorStore.ts`에서 모든 도메인 통합
