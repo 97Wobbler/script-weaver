@@ -4,6 +4,7 @@ import type { EditorState, EditorNodeWrapper, Dialogue, TextDialogue, ChoiceDial
 import type { LocalizationData } from "./localizationStore";
 import type { IEditorStore, HistoryState, ICoreServices } from "./types/editorTypes";
 import { createCoreServices } from "./services/coreServices";
+import { createHistoryDomain } from "./domains/historyDomain";
 import { DialogueSpeed } from "../types/dialogue";
 import { exportToJSON as exportToJSONUtil, exportToCSV as exportToCSVUtil, importFromJSON as importFromJSONUtil, validateTemplateData } from "../utils/importExport";
 import { useLocalizationStore } from "./localizationStore";
@@ -406,14 +407,17 @@ const comparePositions = (beforePositions: Map<string, { x: number; y: number }>
 export const useEditorStore = create<EditorStore>()(
   persist(
     (set, get) => {
-      // Core Services 인스턴스 생성
-      const coreServices: ICoreServices = createCoreServices(get, set);
-
       // LocalizationStore 참조 업데이트 헬퍼
       const updateLocalizationStoreRef = () => {
         const localizationStore = useLocalizationStore.getState();
         localizationStore._setEditorStore(get());
       };
+
+      // Core Services 인스턴스 생성
+      const coreServices: ICoreServices = createCoreServices(get, set);
+
+      // History Domain 인스턴스 생성
+      const historyDomain = createHistoryDomain(get, set, coreServices, updateLocalizationStoreRef);
 
       return {
         ...initialState,
@@ -486,29 +490,7 @@ export const useEditorStore = create<EditorStore>()(
 
         // 복합 액션 그룹 관리
         startCompoundAction: (actionName) => {
-          // 다른 비동기 작업 중이면 차단
-          if (!globalAsyncOperationManager.startOperation(`복합 액션: ${actionName}`)) {
-            return `blocked-${Date.now()}`;
-          }
-
-          const state = get();
-
-          // 시작 전 상태 저장
-          const startState: HistoryState = {
-            templateData: JSON.parse(JSON.stringify(state.templateData)),
-            localizationData: useLocalizationStore.getState().exportLocalizationData(),
-            timestamp: Date.now(),
-            action: `복합 액션 시작: ${actionName}`,
-            groupId: undefined,
-          };
-
-          const groupId = `compound-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          set(() => ({
-            currentCompoundActionId: groupId,
-            compoundActionStartState: startState,
-          }));
-
-          return groupId;
+          return historyDomain.startCompoundAction(actionName);
         },
 
         endCompoundAction: () => {
@@ -521,87 +503,23 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         pushToHistoryWithTextEdit: (action) => {
-          // 텍스트 편집의 경우 LocalizationStore와 함께 히스토리 추가
-          get().pushToHistory(action);
+          historyDomain.pushToHistoryWithTextEdit(action);
         },
 
         undo: () => {
-          // 비동기 작업 진행 중이면 차단
-          if (!globalAsyncOperationManager.canPerformUndoRedo()) {
-            return;
-          }
-
-          const state = get();
-          if (!get().canUndo()) return;
-
-          set(() => ({ isUndoRedoInProgress: true }));
-
-          const previousState = state.history[state.historyIndex - 1];
-          const currentState = state.history[state.historyIndex]; // 취소되는 액션
-
-          if (previousState) {
-            set(() => ({
-              templateData: JSON.parse(JSON.stringify(previousState.templateData)),
-              historyIndex: state.historyIndex - 1,
-              isUndoRedoInProgress: false,
-            }));
-
-            // LocalizationStore 데이터도 함께 복원
-            const localizationStore = useLocalizationStore.getState();
-            localizationStore.importLocalizationData(previousState.localizationData);
-
-            if (state.showToast && currentState) {
-              state.showToast(`되돌리기: ${currentState.action}`, "info");
-            }
-          } else {
-            set(() => ({ isUndoRedoInProgress: false }));
-          }
-
-          updateLocalizationStoreRef();
+          historyDomain.undo();
         },
 
         redo: () => {
-          // 비동기 작업 진행 중이면 차단
-          if (!globalAsyncOperationManager.canPerformUndoRedo()) {
-            return;
-          }
-
-          const state = get();
-          if (!get().canRedo()) return;
-
-          set(() => ({ isUndoRedoInProgress: true }));
-
-          const nextState = state.history[state.historyIndex + 1];
-
-          if (nextState) {
-            set(() => ({
-              templateData: JSON.parse(JSON.stringify(nextState.templateData)),
-              historyIndex: state.historyIndex + 1,
-              isUndoRedoInProgress: false,
-            }));
-
-            // LocalizationStore 데이터도 함께 복원
-            const localizationStore = useLocalizationStore.getState();
-            localizationStore.importLocalizationData(nextState.localizationData);
-
-            if (state.showToast) {
-              state.showToast(`다시실행: ${nextState.action}`, "info");
-            }
-          } else {
-            set(() => ({ isUndoRedoInProgress: false }));
-          }
-
-          updateLocalizationStoreRef();
+          historyDomain.redo();
         },
 
         canUndo: () => {
-          const state = get();
-          return state.historyIndex > 0;
+          return historyDomain.canUndo();
         },
 
         canRedo: () => {
-          const state = get();
-          return state.historyIndex < state.history.length - 1;
+          return historyDomain.canRedo();
         },
 
         // 복사/붙여넣기
