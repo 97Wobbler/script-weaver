@@ -612,3 +612,157 @@ _액션 (1개)_
 -   createAndConnectChoiceNode → \_finalizeChoiceNodeCreation → arrangeSelectedNodeChildren → \_findChildNodes → \_findRelatedNodes
 -   createAndConnectChoiceNode → \_finalizeChoiceNodeCreation → arrangeSelectedNodeChildren → \_runChildLayoutSystem → \_runLayoutSystem
 -   createAndConnectTextNode → \_createNewTextChild → calculateChildNodePosition → \_getRealNodeDimensions → \_getEstimatedNodeDimensions
+
+#### **Phase 2.2.3: 분할 경계 최종 확정** (2025-06-21 09:19 ~ 진행중)
+
+**목표**: Phase 2.2.2의 의존성 분석 결과를 바탕으로 물리적 파일 분할을 위한 최종 분할 경계 확정
+
+##### **📊 분할 경계 결정 원칙**
+
+**1. 의존성 최소화 원칙**
+- 도메인 간 호출 빈도가 높은 메서드들을 식별하여 공통 인터페이스로 추출
+- 순환 의존성 발생 가능성을 사전 차단
+
+**2. 응집도 최대화 원칙**  
+- 관련 기능들을 하나의 파일에 모아 응집도 증대
+- 헬퍼 메서드들을 해당 도메인 내부에 배치
+
+**3. 파일 크기 균형화 원칙**
+- 각 도메인 파일이 목표 크기(500줄 이하)를 준수하도록 조정
+- NODE DOMAIN의 과도한 크기 문제 해결
+
+##### **🎯 최종 분할 경계 확정**
+
+###### **1. CORE SERVICES (공통 서비스)**
+**파일**: `src/store/services/coreServices.ts` (~150줄)
+**역할**: 도메인 간 공통 사용 메서드 제공
+
+**포함 메서드** (5개):
+- `pushToHistory(action: string)` - 9회 호출됨
+- `generateNodeKey()` - 5회 호출됨  
+- `_validateNodeCountLimit()` - 4회 호출됨
+- `endCompoundAction()` - 4회 호출됨
+- `_runLayoutSystem()` - 3회 호출됨
+
+**의존성**: HISTORY DOMAIN의 pushToHistory를 제외하고 순환 의존성 없음
+
+###### **2. PROJECT DOMAIN**
+**파일**: `src/store/domains/projectDomain.ts` (~200줄)
+**역할**: 프로젝트/템플릿/씬 관리
+
+**포함 메서드** (12개):
+- 기본 액션: setCurrentTemplate, setCurrentScene
+- 생성 액션: createTemplate, createScene  
+- 검증 액션: validateCurrentScene, validateAllData
+- Import/Export: exportToJSON, exportToCSV, importFromJSON
+- 데이터 관리: resetEditor, loadFromLocalStorage, migrateToNewArchitecture
+
+**외부 의존성**: 
+- CORE SERVICES만 의존 (pushToHistory 호출)
+- 다른 도메인 의존성 없음 ✅
+
+###### **3. HISTORY DOMAIN** 
+**파일**: `src/store/domains/historyDomain.ts` (~180줄)
+**역할**: 실행취소/재실행 히스토리 관리
+
+**포함 메서드** (8개):
+- 복합 액션: startCompoundAction, endCompoundAction
+- 히스토리 관리: pushToHistory, pushToHistoryWithTextEdit
+- Undo/Redo: undo, redo, canUndo, canRedo
+
+**외부 의존성**: 
+- 독립적 운영 가능 ✅  
+- pushToHistory가 다른 도메인에서 호출되지만 인터페이스를 통해 해결
+
+###### **4. NODE CORE DOMAIN** (분할 1/2)
+**파일**: `src/store/domains/nodeDomain.ts` (~400줄)  
+**역할**: 핵심 노드 CRUD 및 선택 관리
+
+**포함 메서드** (25개 + 15개 헬퍼):
+- 선택 관리: setSelectedNode, toggleNodeSelection, clearSelection, selectMultipleNodes
+- 기본 CRUD: addNode, updateNode, deleteNode, moveNode
+- 내용 수정: updateDialogue, updateNodeText, updateChoiceText
+- 연결 관리: connectNodes, disconnectNodes
+- 유틸리티: generateNodeKey, getCurrentNodeCount, canCreateNewNode
+- 참조 업데이트: updateNodeKeyReference, updateChoiceKeyReference
+- 상태 업데이트: updateNodeVisibility, updateNodePositionAndVisibility
+- 관련 헬퍼 메서드들
+
+###### **5. NODE OPERATIONS DOMAIN** (분할 2/2)
+**파일**: `src/store/domains/nodeOperationsDomain.ts` (~350줄)
+**역할**: 복잡한 노드 연산 (생성, 복사, 삭제 등)
+
+**포함 메서드** (22개 + 15개 헬퍼):
+- 노드 생성: createTextNode, createChoiceNode
+- 자동 생성/연결: createAndConnectChoiceNode, createAndConnectTextNode  
+- 복사/붙여넣기: copySelectedNodes, pasteNodes, duplicateNode
+- 다중 작업: deleteSelectedNodes, moveSelectedNodes
+- 선택지 관리: addChoice, removeChoice
+- 관련 헬퍼 메서드들
+
+###### **6. LAYOUT DOMAIN**
+**파일**: `src/store/domains/layoutDomain.ts` (~400줄)
+**역할**: 노드 배치 및 자동 정렬
+
+**포함 메서드** (8개 + 20개 헬퍼):
+- 위치 계산: getNextNodePosition, calculateChildNodePosition
+- 구 트리 정렬: arrangeChildNodesAsTree, arrangeAllNodesAsTree, arrangeNodesWithDagre  
+- 신 레이아웃 시스템: arrangeAllNodes, arrangeSelectedNodeChildren, arrangeSelectedNodeDescendants
+- 모든 레이아웃 관련 헬퍼 메서드들
+
+###### **7. MAIN STORE** (통합 인터페이스)
+**파일**: `src/store/editorStore.ts` (~200줄)
+**역할**: 모든 도메인을 통합하는 Zustand 스토어
+
+**포함 내용**:
+- EditorState 인터페이스 정의
+- 각 도메인 인스턴스 생성 및 관리
+- 공통 스토어 설정 (persist, devtools 등)
+- 도메인별 메서드들의 프록시 역할
+
+##### **📊 분할 결과 예상 크기**
+
+| 파일 | 예상 크기 | 메서드 수 | 목표 달성 |
+|------|-----------|----------|-----------|
+| coreServices.ts | ~150줄 | 5개 | ✅ |
+| projectDomain.ts | ~200줄 | 12개 | ✅ |
+| historyDomain.ts | ~180줄 | 8개 | ✅ |
+| nodeDomain.ts | ~400줄 | 40개 | ✅ |
+| nodeOperationsDomain.ts | ~350줄 | 37개 | ✅ |
+| layoutDomain.ts | ~400줄 | 28개 | ✅ |
+| editorStore.ts | ~200줄 | 통합 | ✅ |
+| **총계** | **~1,880줄** | **130개** | **✅** |
+
+**기존 대비**: 2,941줄 → 1,880줄 (36% 감소)
+
+##### **🔗 도메인 간 의존성 해결 전략**
+
+###### **의존성 순서** (Phase 4 분할 순서 결정)
+1. **CORE SERVICES** (최우선 - 다른 도메인들이 의존)
+2. **HISTORY DOMAIN** (독립적 - 다른 도메인에 의존성 없음)  
+3. **PROJECT DOMAIN** (CORE에만 의존)
+4. **NODE CORE DOMAIN** (CORE, HISTORY에 의존)
+5. **NODE OPERATIONS DOMAIN** (CORE, HISTORY, NODE CORE에 의존)
+6. **LAYOUT DOMAIN** (CORE, HISTORY에 의존) 
+7. **MAIN STORE** (모든 도메인 통합)
+
+###### **인터페이스 설계 방향**
+- 각 도메인은 명확한 public 인터페이스 정의
+- 도메인 간 호출은 인터페이스를 통해서만 수행
+- CORE SERVICES는 utility 함수로 제공하여 순환 의존성 방지
+
+###### **헬퍼 메서드 배치 원칙**
+- 각 도메인 내부에서만 사용되는 헬퍼는 해당 파일 내 private으로 배치
+- 여러 도메인에서 사용되는 공통 헬퍼는 CORE SERVICES로 이동
+- 도메인별 특화 헬퍼는 해당 도메인 파일에 유지
+
+##### **✅ Phase 2.2.3 완료 확인**
+
+**달성 사항**:
+✅ **분할 경계 명확화**: 7개 파일로 명확한 분할 계획 수립  
+✅ **크기 목표 달성**: 모든 파일이 500줄 이하 목표 준수  
+✅ **의존성 해결**: 순환 의존성 방지를 위한 분할 순서 및 전략 확정  
+✅ **응집도 최적화**: 관련 기능들의 논리적 그룹핑 완료  
+✅ **Phase 3 준비**: 인터페이스 설계를 위한 명확한 가이드라인 제공
+
+**다음 단계**: Phase 3.1 도메인 인터페이스 정의
