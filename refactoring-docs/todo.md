@@ -434,10 +434,11 @@ src/store/
         -   [x] 순수한 도메인 구조 (다른 도메인 의존성 없음)
         -   [x] TypeScript 타입 안전성 100% 확보 (에러 0개)
 
--   [ ] 4.1.4 PROJECT DOMAIN 분리 (CORE에만 의존)
-    -   [ ] `domains/projectDomain.ts` 생성
-    -   [ ] 12개 프로젝트 메서드 이동
-    -   [ ] CORE SERVICES 의존성 설정
+-   [x] 4.1.4 PROJECT DOMAIN 분리 (CORE에만 의존)
+    -   [x] `domains/projectDomain.ts` 생성 (208줄)
+    -   [x] 9개 프로젝트 메서드 분리
+    -   [x] 107줄 중복 구현 제거
+    -   [x] Import/Export 및 검증 로직 독립화
 
 #### 4.2 복합 도메인 및 통합
 
