@@ -540,6 +540,14 @@ src/store/
         -   [x] 근본 원인 해결: `_performNodeDeletion`에서 두 번의 setState 충돌 문제 해결
         -   [x] 단일 setState로 참조 정리와 노드 삭제 동시 처리
         -   [x] 디버깅 로그 추가→분석→해결→정리 프로세스 완료
+    -   [x] F14 화자명 편집 로컬키 배정 문제 수정 ✅ **완료 (2025-06-22)**
+        -   [x] 근본 원인 파악: `updateNodeText` 메서드에서 로컬키 생성 로직 완전 누락
+        -   [x] 7단계 버그 수정 프로세스 완벽 적용 (문제 정의→디버깅 로그→재현→분석→해결→검증→정리)
+        -   [x] 해결책 구현: 
+            - `updateNodeText`에 `generateSpeakerKey`, `generateContentKey` 로직 추가
+            - `editorStore.ts`에서 `updateLocalizationStoreRef()` 즉시 동기화 추가
+        -   [x] 상태 동기화 문제 해결: UI 실시간 업데이트 보장
+        -   [x] 기능 검증 완료: 화자명/내용 편집 시 자동 키 생성 및 표시 100% 정상 작동
 
 -   [ ] **잠재적 버그 확인**
 
