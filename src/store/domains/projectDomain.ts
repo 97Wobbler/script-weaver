@@ -4,38 +4,52 @@ import { exportToJSON as exportToJSONUtil, exportToCSV as exportToCSVUtil, impor
 import { useLocalizationStore } from "../localizationStore";
 import { migrateTemplateData, needsMigration } from "../../utils/migration";
 
-// Project Domain 인터페이스
+/**
+ * Project Domain 인터페이스
+ * 
+ * 프로젝트, 템플릿, 씬 관리 및 Import/Export 기능을 담당합니다.
+ */
 export interface IProjectDomain {
-  // 기본 액션들
+  // ===== 기본 액션 =====
   setCurrentTemplate: (templateKey: string) => void;
   setCurrentScene: (sceneKey: string) => void;
 
-  // 템플릿/씬 관리 액션들
+  // ===== 템플릿/씬 관리 =====
   createTemplate: (templateKey: string) => void;
   createScene: (templateKey: string, sceneKey: string) => void;
 
-  // 검증 액션들
+  // ===== 검증 액션 =====
   validateCurrentScene: () => { isValid: boolean; errors: string[] };
   validateAllData: () => ValidationResult;
 
-  // Import/Export 액션들
+  // ===== Import/Export 액션 =====
   exportToJSON: () => string;
   exportToCSV: () => { dialogue: string; localization: string };
   importFromJSON: (jsonString: string) => void;
 
-  // 데이터 관리 액션들
+  // ===== 데이터 관리 액션 =====
   resetEditor: () => void;
   loadFromLocalStorage: () => void;
   migrateToNewArchitecture: () => void;
 }
 
-// 헬퍼 함수들
+// ===== 헬퍼 함수들 =====
+
+/**
+ * 빈 씬을 생성합니다.
+ */
 const createEmptyScene = () => ({});
 
+/**
+ * 기본 템플릿을 생성합니다.
+ */
 const createEmptyTemplate = (): TemplateDialogues => ({
   main: createEmptyScene(),
 });
 
+/**
+ * 템플릿이 존재하지 않으면 생성합니다.
+ */
 const ensureTemplateExists = (templateData: TemplateDialogues, templateKey: string): TemplateDialogues => {
   if (!templateData[templateKey]) {
     return {
@@ -46,6 +60,9 @@ const ensureTemplateExists = (templateData: TemplateDialogues, templateKey: stri
   return templateData;
 };
 
+/**
+ * 씬이 존재하지 않으면 생성합니다.
+ */
 const ensureSceneExists = (templateData: TemplateDialogues, templateKey: string, sceneKey: string): TemplateDialogues => {
   const updatedTemplateData = ensureTemplateExists(templateData, templateKey);
   
@@ -61,6 +78,9 @@ const ensureSceneExists = (templateData: TemplateDialogues, templateKey: string,
   return updatedTemplateData;
 };
 
+/**
+ * 씬에서 노드를 조회합니다.
+ */
 const getNode = (scene: any, nodeKey: string) => {
   return scene[nodeKey];
 };

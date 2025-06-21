@@ -214,12 +214,26 @@ export class CoreServices implements ICoreServices {
     );
   }
 
-  // 헬퍼 메서드들 (private)
-  private getNode(scene: Scene, nodeKey: string) {
+  /**
+   * 씬에서 노드 조회
+   * 
+   * @param scene 대상 씬
+   * @param nodeKey 노드 키
+   * @returns 노드 또는 undefined
+   */
+  getNode(scene: Scene, nodeKey: string) {
     return scene[nodeKey];
   }
 
-  private setNode(scene: Scene, nodeKey: string, node: any) {
+  /**
+   * 씬에 노드 설정 (불변성 유지)
+   * 
+   * @param scene 대상 씬
+   * @param nodeKey 노드 키
+   * @param node 설정할 노드
+   * @returns 새로운 씬
+   */
+  setNode(scene: Scene, nodeKey: string, node: any) {
     return {
       ...scene,
       [nodeKey]: node,

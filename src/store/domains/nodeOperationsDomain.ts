@@ -220,7 +220,7 @@ export class NodeOperationsDomain {
     const targetKeys = state.selectedNodeKeys.size > 0 ? Array.from(state.selectedNodeKeys) : state.selectedNodeKey ? [state.selectedNodeKey] : [];
 
     targetKeys.forEach((nodeKey: string) => {
-      const node = this._getNode(currentScene, nodeKey);
+      const node = this.coreServices.getNode(currentScene, nodeKey);
       if (node) {
         nodesToCopy.push(JSON.parse(JSON.stringify(node)));
       }
@@ -262,7 +262,7 @@ export class NodeOperationsDomain {
         const newTemplateData = this._ensureSceneExists(updatedState.templateData, updatedState.currentTemplate, updatedState.currentScene);
 
         const currentScene = newTemplateData[updatedState.currentTemplate][updatedState.currentScene];
-        const updatedScene = this._setNode(currentScene, node.nodeKey, node);
+        const updatedScene = this.coreServices.setNode(currentScene, node.nodeKey, node);
 
         updatedState = {
           ...updatedState,
@@ -301,7 +301,7 @@ export class NodeOperationsDomain {
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
     if (!currentScene) return "";
 
-    const originalNode = this._getNode(currentScene, nodeKey);
+    const originalNode = this.coreServices.getNode(currentScene, nodeKey);
     if (!originalNode) return "";
 
     // 임시로 클립보드에 저장하고 붙여넣기
@@ -344,7 +344,7 @@ export class NodeOperationsDomain {
       const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
       if (!currentScene) return;
 
-      const node = this._getNode(currentScene, nodeKey);
+      const node = this.coreServices.getNode(currentScene, nodeKey);
       if (node) {
         this.nodeDomain.moveNode(nodeKey, {
           x: node.position.x + deltaX,
@@ -364,7 +364,7 @@ export class NodeOperationsDomain {
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
     if (!currentScene) return;
 
-    const node = this._getNode(currentScene, nodeKey);
+    const node = this.coreServices.getNode(currentScene, nodeKey);
     if (!node || node.dialogue.type !== "choice") return;
 
     // 로컬라이제이션 키 생성
@@ -397,7 +397,7 @@ export class NodeOperationsDomain {
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
     if (!currentScene) return;
 
-    const node = this._getNode(currentScene, nodeKey);
+    const node = this.coreServices.getNode(currentScene, nodeKey);
     if (!node || node.dialogue.type !== "choice") return;
 
     const choice = node.dialogue.choices?.[choiceKey];
@@ -557,7 +557,7 @@ export class NodeOperationsDomain {
       return { isValid: false, fromNode: null, choice: null, currentScene: null };
     }
 
-    const fromNode = this._getNode(currentScene, fromNodeKey);
+    const fromNode = this.coreServices.getNode(currentScene, fromNodeKey);
     if (!fromNode || fromNode.dialogue.type !== "choice") {
       this.coreServices.endCompoundAction();
       return { isValid: false, fromNode: null, choice: null, currentScene: null };
@@ -654,7 +654,7 @@ export class NodeOperationsDomain {
       return { isValid: false, fromNode: null, currentScene: null };
     }
 
-    const fromNode = this._getNode(currentScene, fromNodeKey);
+    const fromNode = this.coreServices.getNode(currentScene, fromNodeKey);
     if (!fromNode || fromNode.dialogue.type !== "text") {
       this.coreServices.endCompoundAction();
       return { isValid: false, fromNode: null, currentScene: null };
@@ -740,18 +740,9 @@ export class NodeOperationsDomain {
     return keys;
   }
 
+
+
   // 유틸리티 헬퍼들
-  private _getNode(scene: Scene, nodeKey: string): EditorNodeWrapper | undefined {
-    return scene[nodeKey] as EditorNodeWrapper | undefined;
-  }
-
-  private _setNode(scene: Scene, nodeKey: string, node: EditorNodeWrapper): Scene {
-    return {
-      ...scene,
-      [nodeKey]: node,
-    };
-  }
-
   private _ensureSceneExists(templateData: TemplateDialogues, templateKey: string, sceneKey: string): TemplateDialogues {
     if (!templateData[templateKey]) {
       templateData = {
