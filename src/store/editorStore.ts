@@ -83,8 +83,8 @@ interface EditorStore extends IEditorStore {
   disconnectNodes: (fromNodeKey: string, choiceKey?: string) => void;
 
   // 자식 노드 생성 및 연결
-  createAndConnectChoiceNode: (fromNodeKey: string, choiceKey: string, nodeType?: "text" | "choice") => string;
-  createAndConnectTextNode: (fromNodeKey: string, nodeType?: "text" | "choice") => string;
+  createAndConnectChoiceNode: (fromNodeKey: string, choiceKey: string, nodeType?: "text" | "choice") => Promise<string>;
+  createAndConnectTextNode: (fromNodeKey: string, nodeType?: "text" | "choice") => Promise<string>;
 
   // 유틸리티 액션들
   generateNodeKey: () => string;
@@ -349,13 +349,13 @@ export const useEditorStore = create<EditorStore>()(
         },
 
         // AC-02: 선택지별 새 노드 자동 생성 및 연결 (리팩터링됨)
-        createAndConnectChoiceNode: (fromNodeKey, choiceKey, nodeType = "text") => {
-          return nodeOperationsDomain.createAndConnectChoiceNode(fromNodeKey, choiceKey, nodeType);
+        createAndConnectChoiceNode: async (fromNodeKey, choiceKey, nodeType = "text") => {
+          return await nodeOperationsDomain.createAndConnectChoiceNode(fromNodeKey, choiceKey, nodeType);
         },
 
         // 텍스트 노드에서 새 노드 자동 생성 및 연결
-        createAndConnectTextNode: (fromNodeKey, nodeType = "text") => {
-          return nodeOperationsDomain.createAndConnectTextNode(fromNodeKey, nodeType);
+        createAndConnectTextNode: async (fromNodeKey, nodeType = "text") => {
+          return await nodeOperationsDomain.createAndConnectTextNode(fromNodeKey, nodeType);
         },
 
         // 템플릿/씬 관리

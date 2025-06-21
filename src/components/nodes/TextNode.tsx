@@ -21,7 +21,7 @@ export default function TextNode({ data, selected }: NodeProps<TextNodeData>) {
   };
 
   // 빈 핸들 클릭 시 텍스트 노드 생성 및 연결
-  const handleCreateTextNode = (e: React.MouseEvent) => {
+  const handleCreateTextNode = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
     if (dialogue.nextNodeKey) {
@@ -34,7 +34,7 @@ export default function TextNode({ data, selected }: NodeProps<TextNodeData>) {
     }
 
     try {
-      createAndConnectTextNode(nodeKey, "text");
+      await createAndConnectTextNode(nodeKey, "text");
     } catch (error) {
       console.error("노드 생성 중 오류:", error);
       showToast?.("노드 생성 중 오류가 발생했습니다.", "warning");

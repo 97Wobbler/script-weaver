@@ -691,7 +691,7 @@ export interface INodeOperationsDomain {
    * 
    * **의존성**: CORE SERVICES (startCompoundAction, generateNodeKey, endCompoundAction), LAYOUT (calculateChildNodePosition, arrangeSelectedNodeChildren)
    */
-  createAndConnectChoiceNode(fromNodeKey: string, choiceKey: string, nodeType?: "text" | "choice"): string;
+  createAndConnectChoiceNode(fromNodeKey: string, choiceKey: string, nodeType?: "text" | "choice"): Promise<string>;
 
   /**
    * 텍스트 노드에 연결된 새 노드를 생성하고 자동 연결합니다.
@@ -702,7 +702,7 @@ export interface INodeOperationsDomain {
    * 
    * **의존성**: CORE SERVICES (startCompoundAction, generateNodeKey, endCompoundAction), LAYOUT (calculateChildNodePosition, arrangeSelectedNodeChildren)
    */
-  createAndConnectTextNode(fromNodeKey: string, nodeType?: "text" | "choice"): string;
+  createAndConnectTextNode(fromNodeKey: string, nodeType?: "text" | "choice"): Promise<string>;
 
   // ===== 복사/붙여넣기 =====
 

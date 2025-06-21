@@ -22,7 +22,7 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
   };
 
   // 빈 선택지 핸들 클릭 시 텍스트 노드 생성 및 연결
-  const handleCreateTextNode = (choiceKey: string) => (e: React.MouseEvent) => {
+  const handleCreateTextNode = (choiceKey: string) => async (e: React.MouseEvent) => {
     e.stopPropagation();
 
     const choice = dialogue.choices[choiceKey];
@@ -36,7 +36,7 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
     }
 
     try {
-      createAndConnectChoiceNode(nodeKey, choiceKey, "text");
+      await createAndConnectChoiceNode(nodeKey, choiceKey, "text");
     } catch (error) {
       console.error("노드 생성 중 오류:", error);
       showToast?.("노드 생성 중 오류가 발생했습니다.", "warning");

@@ -154,7 +154,7 @@ export class NodeOperationsDomain {
   /**
    * 선택지 노드 생성 및 연결
    */
-  createAndConnectChoiceNode(fromNodeKey: string, choiceKey: string, nodeType: "text" | "choice" = "text"): string {
+  async createAndConnectChoiceNode(fromNodeKey: string, choiceKey: string, nodeType: "text" | "choice" = "text"): Promise<string> {
     const validation = this._validateChoiceNodeCreation(fromNodeKey, choiceKey);
     if (!validation.isValid || !validation.fromNode || !validation.choice || !validation.currentScene) {
       return "";
@@ -177,7 +177,7 @@ export class NodeOperationsDomain {
       tempPosition
     );
 
-    this._finalizeChoiceNodeCreation(fromNodeKey, newNodeKey);
+    await this._finalizeChoiceNodeCreation(fromNodeKey, newNodeKey);
 
     return newNodeKey;
   }
@@ -185,7 +185,7 @@ export class NodeOperationsDomain {
   /**
    * 텍스트 노드 생성 및 연결
    */
-  createAndConnectTextNode(fromNodeKey: string, nodeType: "text" | "choice" = "text"): string {
+  async createAndConnectTextNode(fromNodeKey: string, nodeType: "text" | "choice" = "text"): Promise<string> {
     const validation = this._validateTextNodeCreation(fromNodeKey);
     if (!validation.isValid || !validation.fromNode || !validation.currentScene) {
       return "";
@@ -199,7 +199,7 @@ export class NodeOperationsDomain {
 
     this._connectAndUpdateTextNode(validation.fromNode, fromNodeKey, newNodeKey, newNode, tempPosition);
 
-    this._finalizeTextNodeCreation(fromNodeKey, newNodeKey);
+    await this._finalizeTextNodeCreation(fromNodeKey, newNodeKey);
 
     return newNodeKey;
   }
@@ -595,7 +595,7 @@ export class NodeOperationsDomain {
       nodeKey: newNodeKey,
       dialogue,
       position: tempPosition,
-      hidden: false,
+      hidden: true, // 감춰진 상태로 생성
     };
 
     return { newNodeKey, newNode, tempPosition };
@@ -625,14 +625,14 @@ export class NodeOperationsDomain {
     });
   }
 
-  private _finalizeChoiceNodeCreation(fromNodeKey: string, newNodeKey: string): void {
+  private async _finalizeChoiceNodeCreation(fromNodeKey: string, newNodeKey: string): Promise<void> {
     // 선택 노드를 새로 생성된 노드로 변경
     this.nodeDomain.setSelectedNode(newNodeKey);
 
-    // 자식 노드들 정렬
-    this.layoutDomain.arrangeSelectedNodeChildren(fromNodeKey, true);
+    // 자식 노드들 정렬 (위치 조정)
+    await this.layoutDomain.arrangeSelectedNodeChildren(fromNodeKey, true);
 
-    // 새 노드 표시
+    // 정렬 완료 후 새 노드 나타내기
     this.nodeDomain.updateNodeVisibility(newNodeKey, false);
 
     this.coreServices.endCompoundAction();
@@ -685,7 +685,7 @@ export class NodeOperationsDomain {
       nodeKey: newNodeKey,
       dialogue,
       position: tempPosition,
-      hidden: false,
+      hidden: true, // 감춰진 상태로 생성
     };
 
     return { newNodeKey, newNode, tempPosition };
@@ -714,10 +714,10 @@ export class NodeOperationsDomain {
     // 선택 노드를 새로 생성된 노드로 변경
     this.nodeDomain.setSelectedNode(newNodeKey);
 
-    // 자식 노드들 정렬
+    // 자식 노드들 정렬 (위치 조정)
     await this.layoutDomain.arrangeSelectedNodeChildren(fromNodeKey, true);
 
-    // 새 노드 표시
+    // 정렬 완료 후 새 노드 나타내기
     this.nodeDomain.updateNodeVisibility(newNodeKey, false);
 
     this.coreServices.endCompoundAction();
