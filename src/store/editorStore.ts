@@ -7,6 +7,7 @@ import { createCoreServices } from "./services/coreServices";
 import { createHistoryDomain } from "./domains/historyDomain";
 import { createProjectDomain, type IProjectDomain } from "./domains/projectDomain";
 import { createNodeDomain } from "./domains/nodeDomain";
+import { createLayoutDomain } from "./domains/layoutDomain";
 import { DialogueSpeed } from "../types/dialogue";
 import { useLocalizationStore } from "./localizationStore";
 import { globalAsyncOperationManager } from "./asyncOperationManager";
@@ -424,6 +425,9 @@ export const useEditorStore = create<EditorStore>()(
 
       // Node Domain 인스턴스 생성
       const nodeDomain = createNodeDomain(get, set, coreServices);
+
+      // Layout Domain 인스턴스 생성
+      const layoutDomain = createLayoutDomain(get, set, coreServices);
 
       return {
         ...initialState,
@@ -1437,19 +1441,7 @@ export const useEditorStore = create<EditorStore>()(
 
         // 유틸리티 - 안정적인 노드 위치 계산
         getNextNodePosition: () => {
-          // 1. 기본 설정 및 초기화
-          const initData = get()._initializePositionCalculation();
-          if (!initData.currentScene) {
-            return { x: 100, y: 100 };
-          }
-
-          // 2. 후보 위치 계산
-          const candidatePosition = get()._calculateCandidatePosition(initData);
-
-          // 3. 겹치지 않는 위치 찾기
-          const finalPosition = get()._findNonOverlappingPosition(candidatePosition, initData);
-
-          return finalPosition;
+          return layoutDomain.getNextNodePosition();
         },
 
         // 기본 설정 및 초기화
@@ -1645,32 +1637,7 @@ export const useEditorStore = create<EditorStore>()(
 
         // 개선된 자식 노드 위치 계산 - 실제 동적 크기 기반 (리팩터링됨)
         calculateChildNodePosition: (parentNodeKey, choiceKey) => {
-          const state = get();
-          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-
-          if (!currentScene) {
-            return { x: 100, y: 100 };
-          }
-
-          const parentNode = getNode(currentScene, parentNodeKey);
-          if (!parentNode) {
-            return { x: 100, y: 100 };
-          }
-
-          // 1. 부모 노드 크기 측정
-          const parentDimensions = get()._getRealNodeDimensions(parentNodeKey);
-          const parentPosition = parentNode.position;
-
-          // 2. 간격 설정
-          const HORIZONTAL_SPACING = 50;
-          const VERTICAL_SPACING = 30;
-
-          // 3. 노드 타입에 따른 위치 계산
-          if (parentNode.dialogue.type === "text" || !choiceKey) {
-            return get()._calculateTextNodeChildPosition(parentPosition, parentDimensions, HORIZONTAL_SPACING);
-          } else {
-            return get()._calculateChoiceNodeChildPosition(parentNode, choiceKey, parentPosition, parentDimensions, HORIZONTAL_SPACING, VERTICAL_SPACING, currentScene);
-          }
+          return layoutDomain.calculateChildNodePosition(parentNodeKey, choiceKey);
         },
 
         generateNodeKey: () => {
@@ -1687,88 +1654,7 @@ export const useEditorStore = create<EditorStore>()(
 
         // Dagre 기반 자동 정렬 (향상된 버전)
         arrangeNodesWithDagre: () => {
-          const state = get();
-          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          if (!currentScene) return;
-
-          const allNodeKeys = Object.keys(currentScene);
-          if (allNodeKeys.length === 0) return;
-
-          // Dagre 그래프 생성
-          const dagreGraph = new dagre.graphlib.Graph();
-          dagreGraph.setDefaultEdgeLabel(() => ({}));
-          dagreGraph.setGraph({
-            rankdir: "LR", // 좌우 배치
-            nodesep: 20, // 노드 간격
-            ranksep: 120, // 레벨 간격
-            marginx: 50,
-            marginy: 50,
-          });
-
-          // 노드들을 Dagre에 추가
-          allNodeKeys.forEach((nodeKey) => {
-            dagreGraph.setNode(nodeKey, {
-              width: 200,
-              height: 120,
-            });
-          });
-
-          // 엣지들을 Dagre에 추가
-          allNodeKeys.forEach((nodeKey) => {
-            const node = getNode(currentScene, nodeKey);
-            if (!node) return;
-
-            if (node.dialogue.type === "text" && node.dialogue.nextNodeKey) {
-              dagreGraph.setEdge(nodeKey, node.dialogue.nextNodeKey);
-            } else if (node.dialogue.type === "choice") {
-              Object.values(node.dialogue.choices).forEach((choice) => {
-                if (choice.nextNodeKey) {
-                  dagreGraph.setEdge(nodeKey, choice.nextNodeKey);
-                }
-              });
-            }
-          });
-
-          // 레이아웃 계산
-          dagre.layout(dagreGraph);
-
-          // 계산된 위치를 적용 (moveNode 대신 직접 업데이트하여 히스토리 중복 방지)
-          allNodeKeys.forEach((nodeKey) => {
-            const nodeWithPosition = dagreGraph.node(nodeKey);
-            if (nodeWithPosition) {
-              // Dagre는 중앙 좌표를 반환하므로 좌상단 좌표로 변환
-              const newPosition = {
-                x: nodeWithPosition.x - nodeWithPosition.width / 2,
-                y: nodeWithPosition.y - nodeWithPosition.height / 2,
-              };
-
-              // 직접 위치 업데이트 (히스토리 중복 방지)
-              const currentState = get();
-              const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
-              if (!currentScene) return;
-
-              const currentNode = getNode(currentScene, nodeKey);
-              if (!currentNode) return;
-
-              const updatedNode = { ...currentNode, position: newPosition };
-              const updatedScene = setNode(currentScene, nodeKey, updatedNode);
-
-              set((state) => ({
-                ...state,
-                templateData: {
-                  ...state.templateData,
-                  [state.currentTemplate]: {
-                    ...state.templateData[state.currentTemplate],
-                    [state.currentScene]: updatedScene,
-                  },
-                },
-                lastNodePosition: newPosition,
-              }));
-            }
-          });
-
-          // 정렬 완료 후 히스토리 추가
-          get().pushToHistory(`Dagre 레이아웃 정렬 (${allNodeKeys.length}개 노드)`);
+          layoutDomain.arrangeNodesWithDagre();
         },
 
         // 헬퍼 메서드: 자식 노드 위치 계산 및 업데이트 (루트 노드 고정)
@@ -1833,30 +1719,7 @@ export const useEditorStore = create<EditorStore>()(
 
         // 노드 자동 정렬 - 선택된 노드를 루트로 하여 자식 노드들을 트리 형태로 배치 (리팩터링됨)
         arrangeChildNodesAsTree: (rootNodeKey) => {
-          const state = get();
-          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          if (!currentScene) return;
-
-          const rootNode = getNode(currentScene, rootNodeKey);
-          if (!rootNode) return;
-
-          // 1. 노드 관계 매핑 생성 (기존 헬퍼 재사용)
-          const allNodeKeys = Object.keys(currentScene);
-          const { childrenMap } = get()._buildNodeRelationMaps(currentScene, allNodeKeys);
-
-          // 2. 노드 레벨 매핑 생성 (기존 헬퍼 재사용)
-          const levelMap = get()._buildNodeLevelMap(rootNodeKey, childrenMap);
-
-          // 3. 자식 노드 위치 업데이트 (루트 노드 고정)
-          const startX = rootNode.position.x;
-          const startY = rootNode.position.y;
-          get()._updateChildNodePositions(levelMap, rootNodeKey, startX, startY);
-
-          // 4. 정렬 완료 후 히스토리 추가
-          const affectedNodeCount = Array.from(levelMap.values())
-            .flat()
-            .filter((nodeKey) => nodeKey !== rootNodeKey).length;
-          get().pushToHistory(`자식 트리 정렬 (${affectedNodeCount}개 노드)`);
+          layoutDomain.arrangeChildNodesAsTree(rootNodeKey);
         },
 
         // 헬퍼 메서드: 노드 관계 매핑 생성
@@ -1998,39 +1861,7 @@ export const useEditorStore = create<EditorStore>()(
 
         // 전체 노드 자동 정렬 - 모든 노드를 계층적으로 배치 (리팩터링됨)
         arrangeAllNodesAsTree: () => {
-          const state = get();
-          const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-          if (!currentScene) return;
-
-          const allNodeKeys = Object.keys(currentScene);
-          if (allNodeKeys.length === 0) return;
-
-          // 1. 노드 관계 매핑 생성
-          const { childrenMap, parentMap } = get()._buildNodeRelationMaps(currentScene, allNodeKeys);
-
-          // 2. 루트 노드들 찾기
-          const rootNodes = allNodeKeys.filter((nodeKey) => !parentMap.has(nodeKey));
-          if (rootNodes.length === 0 && allNodeKeys.length > 0) {
-            rootNodes.push(allNodeKeys[0]);
-          }
-
-          // 3. 각 루트 노드별로 트리 배치
-          const startX = 100;
-          const startY = 100;
-          const rootSpacing = 400; // 루트 노드 간 수직 간격
-
-          rootNodes.forEach((rootNodeKey, rootIndex) => {
-            const rootY = startY + rootIndex * rootSpacing;
-
-            // 4. 노드 레벨 매핑 생성
-            const levelMap = get()._buildNodeLevelMap(rootNodeKey, childrenMap);
-
-            // 5. 레벨별 노드 위치 업데이트
-            get()._updateLevelNodePositions(levelMap, startX, rootY);
-          });
-
-          // 6. 정렬 완료 후 히스토리 추가
-          get().pushToHistory(`전체 트리 정렬 (${allNodeKeys.length}개 노드)`);
+          layoutDomain.arrangeAllNodesAsTree();
         },
 
         // 검증
@@ -2162,120 +1993,15 @@ export const useEditorStore = create<EditorStore>()(
 
         // 새로운 레이아웃 시스템 (즉시 배치) - 리팩터링됨
         arrangeAllNodes: async (internal = false) => {
-          // 내부 호출이 아닐 때만 AsyncOperationManager 사용
-          if (!internal && !globalAsyncOperationManager.startOperation("전체 캔버스 정렬")) {
-            return;
-          }
-
-          try {
-            const state = get();
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return;
-
-            const allNodeKeys = Object.keys(currentScene);
-            if (allNodeKeys.length === 0) return;
-
-            // 1. 정렬 전 위치 캡처
-            const beforePositions = captureNodePositions(currentScene, allNodeKeys);
-
-            // 2. 루트 노드 찾기
-            const rootNodeKey = get()._findRootNodeForLayout(currentScene, allNodeKeys);
-
-            // 3. 글로벌 레이아웃 시스템 실행
-            await get()._runGlobalLayoutSystem(currentScene, rootNodeKey);
-
-            // 4. 레이아웃 결과 처리
-            get()._handleLayoutResult(beforePositions, allNodeKeys);
-          } catch (error) {
-            console.error("[정렬 시스템] 전체 캔버스 정렬 중 오류:", error);
-            if (!internal) {
-              globalAsyncOperationManager.showError("정렬 중 오류가 발생했습니다");
-            }
-          } finally {
-            if (!internal) {
-              globalAsyncOperationManager.endOperation();
-            }
-          }
+          return await layoutDomain.arrangeAllNodes(internal);
         },
 
         arrangeSelectedNodeChildren: async (nodeKey, internal = false) => {
-          // 내부 호출이 아닐 때만 AsyncOperationManager 사용
-          if (!internal && !globalAsyncOperationManager.startOperation("자식 노드 정렬")) {
-            return;
-          }
-
-          try {
-            const state = get();
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return;
-
-            const parentNode = getNode(currentScene, nodeKey);
-            if (!parentNode) return;
-
-            // 자식 노드들 찾기
-            const childNodeKeys = get()._findChildNodes(nodeKey, currentScene);
-
-            // 정렬할 노드들 (부모 + 자식)
-            const affectedNodeKeys = [nodeKey, ...Array.from(childNodeKeys)];
-
-            // 정렬 전 위치 캡처
-            const beforePositions = captureNodePositions(currentScene, affectedNodeKeys);
-
-            // 레이아웃 시스템 실행
-            await get()._runChildLayoutSystem(nodeKey, currentScene, affectedNodeKeys);
-
-            // 결과 처리 및 히스토리 저장
-            get()._handleChildLayoutResult(beforePositions, affectedNodeKeys, childNodeKeys.size);
-          } catch (error) {
-            console.error("[정렬 시스템] 자식 노드 정렬 중 오류:", error);
-            if (!internal) {
-              globalAsyncOperationManager.showError("정렬 중 오류가 발생했습니다");
-            }
-          } finally {
-            if (!internal) {
-              globalAsyncOperationManager.endOperation();
-            }
-          }
+          return await layoutDomain.arrangeSelectedNodeChildren(nodeKey, internal);
         },
 
         arrangeSelectedNodeDescendants: async (nodeKey, internal = false) => {
-          // 내부 호출이 아닐 때만 AsyncOperationManager 사용
-          if (!internal && !globalAsyncOperationManager.startOperation("후손 노드 정렬")) {
-            return;
-          }
-
-          try {
-            const state = get();
-            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-            if (!currentScene) return;
-
-            const parentNode = getNode(currentScene, nodeKey);
-            if (!parentNode) return;
-
-            // 후손 노드들 찾기
-            const descendantNodeKeys = get()._findDescendantNodes(nodeKey, currentScene);
-
-            // 정렬할 노드들 (부모 + 후손)
-            const affectedNodeKeys = [nodeKey, ...Array.from(descendantNodeKeys)];
-
-            // 정렬 전 위치 캡처
-            const beforePositions = captureNodePositions(currentScene, affectedNodeKeys);
-
-            // 레이아웃 시스템 실행
-            await get()._runDescendantLayoutSystem(nodeKey, currentScene, affectedNodeKeys);
-
-            // 결과 처리 및 히스토리 저장
-            get()._handleDescendantLayoutResult(beforePositions, affectedNodeKeys, descendantNodeKeys.size);
-          } catch (error) {
-            console.error("[정렬 시스템] 후손 노드 정렬 중 오류:", error);
-            if (!internal) {
-              globalAsyncOperationManager.showError("정렬 중 오류가 발생했습니다");
-            }
-          } finally {
-            if (!internal) {
-              globalAsyncOperationManager.endOperation();
-            }
-          }
+          return await layoutDomain.arrangeSelectedNodeDescendants(nodeKey, internal);
         },
 
         // 노드 숨김 상태 업데이트 함수 추가

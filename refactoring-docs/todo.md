@@ -448,10 +448,11 @@ src/store/
     -   [x] CORE, HISTORY 의존성 설정
     -   [x] 린터 오류 수정 (타입 안전성 확보)
 
--   [ ] 4.2.2 LAYOUT DOMAIN 분리
-    -   [ ] `domains/layoutDomain.ts` 생성 (8개 메서드 + 20개 헬퍼)
-    -   [ ] 위치 계산, 자동 정렬 기능 분리
-    -   [ ] CORE SERVICES, HISTORY 의존성 설정
+-   [x] 4.2.2 LAYOUT DOMAIN 분리 ✅ **완료**
+    -   [x] `domains/layoutDomain.ts` 생성 (735줄)
+    -   [x] 8개 레이아웃 메서드 + 20개 헬퍼 완전 분리
+    -   [x] CORE SERVICES, HISTORY 의존성 설정
+    -   [x] editorStore.ts에서 layoutDomain 호출로 위임
 
 -   [ ] 4.2.3 NODE OPERATIONS DOMAIN 분리
     -   [ ] `domains/nodeOperationsDomain.ts` 생성 (22개 메서드 + 15개 헬퍼)
