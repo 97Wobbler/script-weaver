@@ -114,16 +114,12 @@ export default function Canvas() {
     // selectedNodeKeys가 Set이 아닌 경우 안전하게 처리
     const safeSelectedNodeKeys = selectedNodeKeys instanceof Set ? selectedNodeKeys : new Set(Array.isArray(selectedNodeKeys) ? selectedNodeKeys : []);
 
-
-
     const nodeWrappers = Object.values(currentSceneData);
 
     // 모든 노드를 렌더링하되, hidden 노드는 CSS로 숨김 처리
     const nodes = nodeWrappers.map((wrapper) => {
       // 다중 선택이 있는 경우 selectedNodeKeys만 사용, 없으면 selectedNodeKey 사용
       const isSelected = safeSelectedNodeKeys.size > 0 ? safeSelectedNodeKeys.has(wrapper.nodeKey) : wrapper.nodeKey === selectedNodeKey;
-
-
 
       const reactFlowNode = {
         ...convertToReactFlowNode(wrapper, selectedNodeKey),

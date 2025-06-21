@@ -225,7 +225,7 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   // ===== 내용 수정 (3개) =====
 
   /**
-   * 노드의 대화 내용을 업데이트합니다.
+   * 노드의 대화 데이터를 업데이트합니다.
    */
   updateDialogue(nodeKey: string, dialogue: Partial<Dialogue>): void {
     const state = this.getState();
@@ -235,12 +235,28 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
       return;
     }
 
+    const existingNode = currentScene[nodeKey];
+
     const updatedNode = {
-      ...currentScene[nodeKey],
-      dialogue: { ...currentScene[nodeKey].dialogue, ...dialogue }
+      ...existingNode,
+      dialogue: {
+        ...existingNode.dialogue,
+        ...dialogue
+      }
     };
 
-    this.updateNode(nodeKey, updatedNode);
+    this.setState({
+      templateData: {
+        ...state.templateData,
+        [state.currentTemplate]: {
+          ...state.templateData[state.currentTemplate],
+          [state.currentScene]: {
+            ...currentScene,
+            [nodeKey]: updatedNode
+          }
+        }
+      }
+    });
   }
 
   /**
@@ -531,83 +547,75 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
     
-    if (!currentScene) return;
+    if (!currentScene) {
+      return;
+    }
 
     // 삭제할 노드를 참조하는 다른 노드들 찾기
     const referencingNodes = this._findReferencingNodes(currentScene, nodeKey);
+
+    // 참조 정리와 노드 삭제를 하나의 업데이트로 처리
+    let finalScene = { ...currentScene };
 
     if (referencingNodes.length > 0) {
       const message = `다음 노드들이 삭제 대상을 참조하고 있습니다:\n${referencingNodes.join(', ')}\n\n참조를 제거하고 삭제를 진행합니다.`;
       state.showToast?.(message, "warning");
 
-      // 댕글링 참조 정리: 삭제된 노드를 참조하는 모든 노드들의 참조를 제거
-      const updatedScene = { ...currentScene };
-      for (const [key, node] of Object.entries(updatedScene)) {
+      for (const [key, node] of Object.entries(finalScene)) {
         if (key === nodeKey) continue;
 
         // 타입 가드: node가 EditorNodeWrapper인지 확인
         const nodeWrapper = node as EditorNodeWrapper;
-        
         let nodeUpdated = false;
-        const updatedNode: EditorNodeWrapper = { 
-          nodeKey: nodeWrapper.nodeKey,
-          dialogue: nodeWrapper.dialogue,
-          position: nodeWrapper.position,
-          hidden: nodeWrapper.hidden
-        };
+        const dialogue = nodeWrapper.dialogue;
 
         // 텍스트 노드의 nextNodeKey 정리
-        if (updatedNode.dialogue.type === "text" && updatedNode.dialogue.nextNodeKey === nodeKey) {
-          const textDialogue = updatedNode.dialogue as TextDialogue;
-          const newDialogue: Partial<TextDialogue> = { 
-            ...textDialogue, 
-            nextNodeKey: undefined 
+        if (dialogue.type === "text" && dialogue.nextNodeKey === nodeKey) {
+          const textDialogue = dialogue as TextDialogue;
+          finalScene[key] = {
+            ...finalScene[key],
+            dialogue: {
+              ...textDialogue,
+              nextNodeKey: undefined
+            }
           };
-          updatedNode.dialogue = newDialogue as TextDialogue;
           nodeUpdated = true;
         }
 
-        // 선택지 노드의 각 선택지 nextNodeKey 정리
-        if (updatedNode.dialogue.type === "choice") {
-          const choiceDialogue = updatedNode.dialogue as ChoiceDialogue;
+        // 선택지 노드의 choices 정리
+        if (dialogue.type === "choice") {
+          const choiceDialogue = dialogue as ChoiceDialogue;
           const updatedChoices = { ...choiceDialogue.choices };
+          let choicesUpdated = false;
 
           for (const [choiceKey, choice] of Object.entries(updatedChoices)) {
             if (choice.nextNodeKey === nodeKey) {
-              const updatedChoice = { 
-                ...choice, 
-                nextNodeKey: undefined as any // 타입 강제 캐스팅으로 해결
+              updatedChoices[choiceKey] = {
+                ...choice,
+                nextNodeKey: undefined as any
               };
-              updatedChoices[choiceKey] = updatedChoice;
-              nodeUpdated = true;
+              choicesUpdated = true;
             }
           }
 
-          if (nodeUpdated) {
-            updatedNode.dialogue = { ...choiceDialogue, choices: updatedChoices };
+          if (choicesUpdated) {
+            finalScene[key] = {
+              ...finalScene[key],
+              dialogue: {
+                ...choiceDialogue,
+                choices: updatedChoices
+              }
+            };
+            nodeUpdated = true;
           }
-        }
-
-        if (nodeUpdated) {
-          updatedScene[key] = updatedNode;
         }
       }
-
-      // 업데이트된 씬 적용
-      this.setState({
-        templateData: {
-          ...state.templateData,
-          [state.currentTemplate]: {
-            ...state.templateData[state.currentTemplate],
-            [state.currentScene]: updatedScene
-          }
-        }
-      });
     }
 
-    // 실제 노드 삭제 수행
-    const { [nodeKey]: deletedNode, ...remainingNodes } = currentScene;
+    // 실제 노드 삭제 수행 (참조 정리된 씬에서)
+    const { [nodeKey]: deletedNode, ...remainingNodes } = finalScene;
     
+    // 한 번의 setState로 참조 정리와 노드 삭제를 동시에 처리
     this.setState({
       templateData: {
         ...state.templateData,
