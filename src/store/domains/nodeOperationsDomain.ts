@@ -520,21 +520,18 @@ export class NodeOperationsDomain {
 
   private _performNodesDeletion(targetKeys: string[]): void {
     targetKeys.forEach(nodeKey => {
-      this.nodeDomain.deleteNode(nodeKey);
+      this.nodeDomain.deleteNode(nodeKey, true); // 개별 히스토리 기록 생략
     });
   }
 
   private _finalizeNodesDeletion(allKeysToCleanup: string[], targetKeys: string[]): void {
-    // 로컬라이제이션 키 정리
-    const localizationStore = useLocalizationStore.getState();
-    allKeysToCleanup.forEach(key => {
-      localizationStore.deleteKey(key);
-    });
-
+    // 로컬라이제이션 키 정리는 이미 개별 deleteNode에서 처리됨
+    // 중복 정리 제거
+    
     // 선택 상태 정리
     this.nodeDomain.clearSelection();
 
-    // 히스토리 추가
+    // 히스토리 추가 (통합 히스토리)
     this.coreServices.pushToHistory(`${targetKeys.length}개 노드 삭제`);
     this.updateLocalizationStoreRef();
   }
