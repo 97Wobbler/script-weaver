@@ -114,12 +114,16 @@ export default function Canvas() {
     // selectedNodeKeys가 Set이 아닌 경우 안전하게 처리
     const safeSelectedNodeKeys = selectedNodeKeys instanceof Set ? selectedNodeKeys : new Set(Array.isArray(selectedNodeKeys) ? selectedNodeKeys : []);
 
+
+
     const nodeWrappers = Object.values(currentSceneData);
 
     // 모든 노드를 렌더링하되, hidden 노드는 CSS로 숨김 처리
     const nodes = nodeWrappers.map((wrapper) => {
       // 다중 선택이 있는 경우 selectedNodeKeys만 사용, 없으면 selectedNodeKey 사용
       const isSelected = safeSelectedNodeKeys.size > 0 ? safeSelectedNodeKeys.has(wrapper.nodeKey) : wrapper.nodeKey === selectedNodeKey;
+
+
 
       const reactFlowNode = {
         ...convertToReactFlowNode(wrapper, selectedNodeKey),
@@ -171,31 +175,11 @@ export default function Canvas() {
   // 노드 클릭 핸들러 (다중 선택 지원)
   const handleNodeClick = useCallback(
     (event: any, node: any) => {
+      
+
       if (event.ctrlKey || event.metaKey) {
         // Ctrl+클릭: 다중 선택 토글
-        const wasSelected = selectedNodeKeys instanceof Set ? selectedNodeKeys.has(node.id) : false;
-
         toggleNodeSelection(node.id);
-
-        // 토글 후 노드가 선택된 상태라면 selectedNodeKey로 설정 (PropertyPanel 표시용)
-        // 노드가 선택 해제된 상태라면 다른 선택된 노드 중 하나를 selectedNodeKey로 설정
-        if (!wasSelected) {
-          // 노드가 새로 선택됨
-          setSelectedNode(node.id);
-        } else {
-          // 노드가 선택 해제됨 - 다른 선택된 노드가 있으면 그 중 하나를 selectedNodeKey로 설정
-          // toggleNodeSelection 후의 상태를 확인하기 위해 setTimeout 사용
-          setTimeout(() => {
-            const currentSelectedKeys = useEditorStore.getState().selectedNodeKeys;
-            if (currentSelectedKeys instanceof Set && currentSelectedKeys.size > 0) {
-              // 첫 번째 선택된 노드를 selectedNodeKey로 설정
-              const firstSelectedKey = Array.from(currentSelectedKeys)[0];
-              setSelectedNode(firstSelectedKey);
-            } else {
-              setSelectedNode(undefined);
-            }
-          }, 0);
-        }
       } else {
         // 일반 클릭: 단일 선택
         clearSelection();

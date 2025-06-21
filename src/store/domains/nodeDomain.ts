@@ -37,10 +37,19 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
   setSelectedNode(nodeKey?: string): void {
     const state = this.getState();
     
-    this.setState({
-      selectedNodeKey: nodeKey,
-      selectedNodeKeys: nodeKey ? new Set([nodeKey]) : new Set()
-    });
+    // 다중 선택이 있는 경우, selectedNodeKey만 변경하고 selectedNodeKeys는 유지
+    const currentSelectedKeys = state.selectedNodeKeys instanceof Set ? state.selectedNodeKeys : new Set();
+    
+    if (currentSelectedKeys.size > 1) {
+      this.setState({
+        selectedNodeKey: nodeKey
+      });
+    } else {
+      this.setState({
+        selectedNodeKey: nodeKey,
+        selectedNodeKeys: nodeKey ? new Set([nodeKey]) : new Set()
+      });
+    }
   }
 
   /**
@@ -55,11 +64,36 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
     } else {
       newSelectedKeys.add(nodeKey);
     }
-    
-    this.setState({
+
+    // 다중 선택 시 PropertyPanel 표시를 위한 selectedNodeKey 설정
+    let selectedNodeKey: string | undefined;
+    if (newSelectedKeys.size === 0) {
+      selectedNodeKey = undefined;
+    } else if (newSelectedKeys.size === 1) {
+      const firstKey = Array.from(newSelectedKeys)[0];
+      selectedNodeKey = typeof firstKey === 'string' ? firstKey : undefined;
+    } else {
+      // 다중 선택 시: 방금 추가된 노드를 대표로 선택
+      // 만약 노드가 제거되었다면 첫 번째 노드를 선택
+      const state = this.getState();
+      const wasSelected = state.selectedNodeKeys instanceof Set && state.selectedNodeKeys.has(nodeKey);
+      
+      if (!wasSelected) {
+        // 노드가 새로 추가됨 - 해당 노드를 대표로 선택
+        selectedNodeKey = nodeKey;
+      } else {
+        // 노드가 제거됨 - 첫 번째 남은 노드를 선택
+        const firstKey = Array.from(newSelectedKeys)[0];
+        selectedNodeKey = typeof firstKey === 'string' ? firstKey : undefined;
+      }
+    }
+
+    const newState = {
       selectedNodeKeys: newSelectedKeys,
-      selectedNodeKey: newSelectedKeys.size === 1 ? Array.from(newSelectedKeys)[0] : undefined
-    });
+      selectedNodeKey: selectedNodeKey
+    };
+    
+    this.setState(newState);
   }
 
   /**
