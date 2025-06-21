@@ -391,10 +391,14 @@ src/store/
 
 **의존성 순서 기반 분할 계획** (Phase 2.2.3 확정):
 
--   [ ] 4.1.1 기반 구조 생성
-    -   [ ] ~~`types/editorTypes.ts` 생성~~ → 이미존재
-    -   [ ] ~~`services/` 및 `domains/` 폴더 생성~~ → 추후 생성 예정
-    -   [ ] 공통 타입 및 인터페이스 이동
+-   [x] 4.1.1 기반 구조 생성 ✅ **완료 (2025-06-21 10:48)**
+    -   [x] ~~`types/editorTypes.ts` 생성~~ → 이미존재
+    -   [x] ~~`services/` 및 `domains/` 폴더 생성~~ → 추후 생성 예정
+    -   [x] 공통 타입 및 인터페이스 이동 ✅ **완료**
+        -   [x] `editorStore.ts`에서 중복 `HistoryState` 인터페이스 제거
+        -   [x] `editorTypes.ts`에서 `IEditorStore`, `HistoryState` import 추가
+        -   [x] 타입 일관성 확보 및 TypeScript 에러 0개 유지
+        -   [x] Phase 4.2+ 분할을 위한 깔끔한 기반 확립
 
 -   [ ] 4.1.2 CORE SERVICES 분리 (최우선)
     -   [ ] `services/coreServices.ts` 생성
