@@ -881,3 +881,98 @@ export interface ICoreServices {
 ✅ **Phase 3.1.2 준비** 완료 (도메인별 인터페이스 설계를 위한 기반 확립)  
 
 **다음 단계**: Phase 3.1.2 PROJECT DOMAIN 인터페이스 설계
+
+#### **Phase 3.1.2: PROJECT DOMAIN 인터페이스 설계** (2025-06-21 09:40) ✅ **완료**
+
+**목표**: PROJECT DOMAIN 인터페이스 (IProjectDomain) 설계 및 관련 타입 정의
+
+##### **📋 Context Analysis (컨텍스트 분석)**
+
+**확인된 PROJECT DOMAIN 메서드 시그니처** (12개):
+1. **setCurrentTemplate**: `(templateKey: string) => void` - 템플릿 전환
+2. **setCurrentScene**: `(sceneKey: string) => void` - 씬 전환
+3. **createTemplate**: `(templateKey: string) => void` - 템플릿 생성
+4. **createScene**: `(templateKey: string, sceneKey: string) => void` - 씬 생성
+5. **validateCurrentScene**: `() => { isValid: boolean; errors: string[] }` - 현재 씬 검증
+6. **validateAllData**: `() => ValidationResult` - 전체 데이터 검증
+7. **exportToJSON**: `() => string` - JSON 내보내기
+8. **exportToCSV**: `() => { dialogue: string; localization: string }` - CSV 내보내기
+9. **importFromJSON**: `(jsonString: string) => void` - JSON 가져오기
+10. **resetEditor**: `() => void` - 에디터 초기화
+11. **loadFromLocalStorage**: `() => void` - 로컬 저장소 로드
+12. **migrateToNewArchitecture**: `() => void` - 데이터 마이그레이션
+
+**의존성 타입 확인**:
+- `ValidationResult` 타입: `types/dialogue.ts`에서 정의됨
+- LocalizationStore 내부적 의존성 (외부 인터페이스 아님)
+
+##### **🎯 Planning (계획 수립)**
+
+**Phase 2.2.3 확정 구조 반영**:
+1. `IProjectDomain` 인터페이스 설계 - 12개 메서드 포함
+2. 5개 기능 그룹별 체계적 분류 (기본, 생성, 검증, Import/Export, 데이터 관리)
+3. 관련 보조 타입 정의 (`SceneValidationResult`, `CSVExportResult`)
+4. 의존성 문서화 (LocalizationStore 내부 의존성 명시)
+
+##### **⚡ Execution (실행)**
+
+**수정된 파일**: `src/store/types/editorTypes.ts` (+143줄)
+
+**핵심 인터페이스 정의**:
+```typescript
+export interface IProjectDomain {
+  // 기본 액션 (2개)
+  setCurrentTemplate(templateKey: string): void;
+  setCurrentScene(sceneKey: string): void;
+  
+  // 생성 액션 (2개) 
+  createTemplate(templateKey: string): void;
+  createScene(templateKey: string, sceneKey: string): void;
+  
+  // 검증 액션 (2개)
+  validateCurrentScene(): { isValid: boolean; errors: string[] };
+  validateAllData(): ValidationResult;
+  
+  // Import/Export 액션 (3개)
+  exportToJSON(): string;
+  exportToCSV(): { dialogue: string; localization: string };
+  importFromJSON(jsonString: string): void;
+  
+  // 데이터 관리 액션 (3개)
+  resetEditor(): void;
+  loadFromLocalStorage(): void;
+  migrateToNewArchitecture(): void;
+}
+```
+
+**주요 특징**:
+- **도메인 독립성**: 다른 도메인에 의존하지 않는 순수 프로젝트 관리 인터페이스
+- **명확한 JSDoc**: 각 메서드의 기능, 매개변수, 의존성 관계 상세 문서화
+- **타입 안전성**: ValidationResult 포함 모든 반환 타입 명시
+- **기능별 그룹핑**: 5개 기능 영역별 논리적 분류
+
+**보조 타입 정의**:
+- `SceneValidationResult`: 씬 검증 결과 타입
+- `CSVExportResult`: CSV 내보내기 결과 타입
+- `ValidationResult` import 추가
+
+##### **✅ 달성 성과**
+
+**인터페이스 설계**:
+✅ **PROJECT DOMAIN 인터페이스** 완성 (12개 메서드)  
+✅ **타입 안전성** 확보 (모든 시그니처 명시)  
+✅ **기능별 분류** 달성 (5개 기능 그룹)  
+✅ **문서화** 완료 (JSDoc으로 의존성까지 상세 설명)  
+
+**코드 품질**:
+✅ **TypeScript 에러 0개** 달성  
+✅ **의존성 분석** 완료 (LocalizationStore 내부 의존성만 확인)  
+✅ **일관된 명명 규칙** 적용  
+✅ **확장 가능한 구조** 설계  
+
+**Phase 3-4 연계성**:
+✅ **도메인 분할 준비** 완료 (projectDomain.ts 구현을 위한 명확한 가이드라인)  
+✅ **독립적 운영** 가능 (순환 의존성 없음)  
+✅ **Phase 3.1.3 준비** 완료 (HISTORY DOMAIN 인터페이스 설계를 위한 기반 확립)  
+
+**다음 단계**: Phase 3.1.3 HISTORY DOMAIN 인터페이스 설계

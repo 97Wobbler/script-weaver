@@ -294,12 +294,12 @@ interface EditorState {
 
 ##### 3.1.2 도메인별 인터페이스
 
--   [ ] **PROJECT DOMAIN 인터페이스** (`IProjectDomain`) 설계
-    -   [ ] 기본 액션 인터페이스 (setCurrentTemplate, setCurrentScene)
-    -   [ ] 생성 액션 인터페이스 (createTemplate, createScene)
-    -   [ ] 검증 액션 인터페이스 (validateCurrentScene, validateAllData)
-    -   [ ] Import/Export 인터페이스 (exportToJSON, exportToCSV, importFromJSON)
-    -   [ ] 데이터 관리 인터페이스 (resetEditor, loadFromLocalStorage, migrateToNewArchitecture)
+-   [x] **PROJECT DOMAIN 인터페이스** (`IProjectDomain`) 설계
+    -   [x] 기본 액션 인터페이스 (setCurrentTemplate, setCurrentScene)
+    -   [x] 생성 액션 인터페이스 (createTemplate, createScene)
+    -   [x] 검증 액션 인터페이스 (validateCurrentScene, validateAllData)
+    -   [x] Import/Export 인터페이스 (exportToJSON, exportToCSV, importFromJSON)
+    -   [x] 데이터 관리 인터페이스 (resetEditor, loadFromLocalStorage, migrateToNewArchitecture)
 
 -   [ ] **HISTORY DOMAIN 인터페이스** (`IHistoryDomain`) 설계
     -   [ ] 복합 액션 관리 (startCompoundAction, endCompoundAction)
