@@ -2425,3 +2425,189 @@ src/store/
 **다음 단계**: Phase 5 (코드 품질 향상) 또는 기능 검증 및 버그 수정
 
 ---
+
+### **Phase 4.4: 기능 검증 및 버그 수정** (2025-06-21 17:03 ~ 18:34) ✅ **진행 중**
+
+**목표**: 리팩터링 완료 후 UI 기능 명세 작성 및 회귀 테스트, 발견된 버그 수정
+
+#### **Phase 4.4.1: 기능 명세 리스트 작성** ✅ **완료 (2025-06-21 17:03 ~ 17:15)**
+
+**Context Analysis**:
+- ✅ **Phase 4.3 완료**: God Object 해소 및 7개 도메인 분할 완료
+- ❌ **회귀 테스트 부재**: 리팩터링 후 기능 동작 확인 필요
+- 🎯 **목표**: 사용자가 직접 조작할 수 있는 UI 요소 기반 기능 명세 작성
+
+**Planning & Implementation**:
+- ✅ **44개 기능 식별**: UI 인터랙션 기반 체계적 분류
+- ✅ **3개 카테고리 구성**: 핵심 편집(F01-F19), 고급 관리(F20-F34), UI/UX(F35-F44)
+- ✅ **명세 형식**: `F##: 기능명 - 구체적 동작 설명` 형태로 표준화
+
+**Results**:
+- ✅ **회귀 테스트 기반 확립**: 사용자 테스트를 위한 명확한 체크리스트 제공
+- ✅ **기능 범위 명확화**: 리팩터링 영향 범위 정확한 파악
+
+#### **Phase 4.4.2: F03 기능 수정 - 텍스트 노드 연결 생성** ✅ **완료 (2025-06-21 17:15 ~ 17:45)**
+
+**Context Analysis**:
+- 🐛 **문제**: F03 "텍스트 노드 연결 생성" 기능이 기대와 다르게 동작
+- **as-is**: 숨겨지지 않은 상태로 생성 + 위치 조정
+- **to-be**: 감춰진 상태로 생성 + 위치 조정 + 나타내기
+
+**Planning**:
+1. `nodeOperationsDomain.ts`에서 노드 생성 로직 수정 (`hidden: true`로 생성)
+2. 정렬 완료 후 노드를 표시하도록 순차 실행 로직 변경
+3. 관련 함수들을 async/await로 변경하여 순차 실행 보장
+4. TypeScript 인터페이스 타입 업데이트
+5. React 컴포넌트에서 async 호출 처리
+
+**Implementation**:
+- ✅ **nodeOperationsDomain.ts 수정**: `_createNewTextChild`, `_createNewChoiceChild` 함수에서 `hidden: true`로 노드 생성
+- ✅ **정렬 후 표시 로직**: `_finalizeTextNodeCreation`, `_finalizeChoiceNodeCreation`에서 정렬 완료 후 `updateNodeVisibility(nodeKey, false)` 호출
+- ✅ **async/await 변경**: 관련 함수들을 Promise 반환 타입으로 변경하여 순차 실행 보장
+- ✅ **타입 인터페이스 업데이트**: `createAndConnectTextNode`, `createAndConnectChoiceNode` → `Promise<string>` 타입 변경
+- ✅ **React 컴포넌트 수정**: TextNode.tsx, ChoiceNode.tsx에서 async 호출 처리
+
+**Results**:
+- ✅ **기능 동작 개선**: 노드가 감춰진 상태로 생성 → 위치 조정 → 나타내기 순서로 자연스러운 UX
+- ✅ **TypeScript 에러 0개**: 타입 안전성 유지
+- ✅ **빌드 성공**: 기능 변경 후에도 정상 빌드 확인
+- ✅ **커밋 완료**: 88f2886 해시로 변경사항 커밋
+
+#### **Phase 4.4.3: F08 다중 노드 선택 버그 수정** ✅ **완료 (2025-06-21 17:45 ~ 18:34)**
+
+**Context Analysis**:
+- 🐛 **문제**: F08 "다중 노드 선택" 기능이 작동하지 않음
+- **사용자 보고**: 이전에 3번의 수정 시도가 모두 실패
+- **증상**: Ctrl+클릭으로 다중 선택 시도 시 실패, 하지만 Ctrl+A는 정상 작동
+
+**Planning**:
+1. **디버깅 로그 추가**: 다중 선택 플로우 전체에 상세 로그 추가
+2. **문제 원인 파악**: 로그 분석을 통한 정확한 버그 위치 식별
+3. **근본 원인 해결**: 임시 방편이 아닌 구조적 문제 해결
+4. **디버깅 로그 제거**: 문제 해결 후 모든 로그 정리
+
+**Implementation**:
+
+##### **4.4.3-A: 디버깅 로그 추가** ✅ **완료**
+
+**추가된 로그 위치**:
+- ✅ **Canvas.tsx - handleNodeClick**: 노드 클릭 이벤트, Ctrl+클릭 감지, 선택 상태 확인
+- ✅ **nodeDomain.ts - toggleNodeSelection**: 함수 호출, Set 생성, 노드 추가/제거, setState 전후 상태
+- ✅ **editorStore.ts - toggleNodeSelection**: 스토어 함수 호출 시작/완료
+- ✅ **Canvas.tsx - React Flow 노드 변환**: 변환 과정 및 각 노드별 선택 상태
+
+**로그 특징**: 이모지와 [DEBUG] 태그로 구분, 개발 서버 백그라운드 실행
+
+##### **4.4.3-B: 문제 원인 파악** ✅ **완료**
+
+**사용자 테스트 시나리오**:
+1. 로컬스토리지 초기화 상태에서 브라우저 접속
+2. 텍스트 노드 두 개 생성
+3. 두 번째 노드가 자동 선택된 상태에서 Ctrl+클릭으로 첫 번째 노드 다중선택 시도
+
+**로그 분석 결과**:
+- ✅ **다중 선택 로직 정상**: `toggleNodeSelection`에서 Set(1) → Set(2)로 정상 증가
+- ❌ **상태 덮어쓰기 문제**: Canvas.tsx에서 `setSelectedNode(node.id)` 호출 후 상태가 다시 Set(1)로 되돌아감
+- 🎯 **핵심 문제**: `setSelectedNode` 함수가 `selectedNodeKeys`를 `new Set([nodeKey])`로 덮어씀
+
+##### **4.4.3-C: 근본 원인 해결** ✅ **완료**
+
+**문제 1: setSelectedNode가 selectedNodeKeys 초기화**
+```typescript
+// 🚨 문제 코드 (nodeDomain.ts)
+setSelectedNode(nodeKey?: string): void {
+  this.setState({
+    selectedNodeKey: nodeKey,
+    selectedNodeKeys: nodeKey ? new Set([nodeKey]) : new Set()  // 여기가 문제!
+  });
+}
+```
+
+**해결책**: 다중 선택 시 `selectedNodeKeys` 보존
+```typescript
+// ✅ 수정 코드
+setSelectedNode(nodeKey?: string): void {
+  const currentSelectedKeys = state.selectedNodeKeys instanceof Set ? state.selectedNodeKeys : new Set();
+  
+  if (currentSelectedKeys.size > 1) {
+    // 다중 선택 시 selectedNodeKeys 보존, selectedNodeKey만 변경
+    this.setState({ selectedNodeKey: nodeKey });
+  } else {
+    // 단일/무선택 시 기존 로직 유지
+    this.setState({
+      selectedNodeKey: nodeKey,
+      selectedNodeKeys: nodeKey ? new Set([nodeKey]) : new Set()
+    });
+  }
+}
+```
+
+**문제 2: Canvas.tsx에서 불필요한 setSelectedNode 호출**
+```typescript
+// 🚨 문제 코드
+if (!wasSelected) {
+  setSelectedNode(node.id);  // toggleNodeSelection 후 다시 호출하여 상태 덮어씀
+}
+```
+
+**해결책**: 불필요한 호출 제거
+```typescript
+// ✅ 수정 코드
+// toggleNodeSelection이 이미 selectedNodeKey를 올바르게 설정하므로 
+// 추가적인 setSelectedNode 호출 불필요
+```
+
+**문제 3: toggleNodeSelection의 selectedNodeKey 설정 로직**
+```typescript
+// 🚨 문제 코드
+selectedNodeKey: newSelectedKeys.size === 1 ? Array.from(newSelectedKeys)[0] : undefined
+```
+
+**해결책**: 다중 선택 시에도 대표 노드 설정
+```typescript
+// ✅ 수정 코드
+// 다중 선택 시: 방금 추가된 노드를 대표로 선택
+// 노드 제거 시: 첫 번째 남은 노드를 대표로 선택
+if (newSelectedKeys.size === 0) {
+  selectedNodeKey = undefined;
+} else if (newSelectedKeys.size === 1) {
+  selectedNodeKey = Array.from(newSelectedKeys)[0];
+} else {
+  const wasSelected = state.selectedNodeKeys instanceof Set && state.selectedNodeKeys.has(nodeKey);
+  selectedNodeKey = !wasSelected ? nodeKey : Array.from(newSelectedKeys)[0];
+}
+```
+
+##### **4.4.3-D: 디버깅 로그 제거** ✅ **완료**
+
+**제거된 로그들**:
+- ✅ **Canvas.tsx**: 9개 디버깅 로그 완전 제거 (🔶🔸🔵🟢🟡🟠🟣🔴⚪)
+- ✅ **nodeDomain.ts**: 8개 디버깅 로그 완전 제거 (🟡🟠🟢🟦🟨🟥🟩🟫🔷)
+- ✅ **editorStore.ts**: 2개 디버깅 로그 완전 제거 (🟧🟪)
+
+**Results**:
+- ✅ **F08 기능 완전 수정**: Ctrl+클릭 다중 선택 정상 작동 확인
+- ✅ **PropertyPanel 표시 개선**: 다중 선택 시에도 대표 노드 정보 표시
+- ✅ **코드 정리 완료**: 모든 디버깅 로그 제거, 깔끔한 코드 유지
+- ✅ **타입 안전성**: TypeScript 에러 0개 유지
+- ✅ **빌드 성공**: npm run build 정상 완료
+
+#### **📊 Phase 4.4 최종 성과**
+
+**완료 기간**: 2025-06-21 17:03 ~ 18:34 (총 1시간 31분)
+
+**달성 성과**:
+1. ✅ **44개 기능 명세 작성**: 체계적인 회귀 테스트 기반 마련
+2. ✅ **F03 기능 개선**: 노드 생성 UX 자연스럽게 개선 (감춤→정렬→표시)
+3. ✅ **F08 버그 완전 수정**: 다중 선택 기능 정상 작동, PropertyPanel 표시 개선
+4. ✅ **코드 품질 유지**: 모든 수정 후에도 TypeScript 에러 0개, 빌드 성공
+5. ✅ **디버깅 프로세스 확립**: 체계적 로그 추가→문제 파악→근본 해결→정리 프로세스
+
+**기술적 성과**:
+- ✅ **async/await 패턴**: 순차 실행이 필요한 UI 로직에 적절한 비동기 처리 적용
+- ✅ **상태 관리 개선**: 다중 선택과 단일 선택의 상태 충돌 문제 근본 해결
+- ✅ **디버깅 역량**: 복잡한 상태 관리 버그를 체계적으로 분석하고 해결하는 프로세스 확립
+
+**다음 단계**: Phase 4.4.4 잠재적 버그 확인 및 Phase 5 코드 품질 향상
+
+---
