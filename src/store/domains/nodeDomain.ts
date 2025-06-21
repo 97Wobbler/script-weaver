@@ -314,11 +314,26 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
     }
 
     const dialogue = node.dialogue as ChoiceDialogue;
+    const localizationStore = useLocalizationStore.getState();
+    
+    // 키 생성 및 설정 로직 추가
+    let textKeyRef: string | undefined;
+    
+    if (choiceText.trim()) {
+      const result = localizationStore.generateChoiceKey(choiceText);
+      localizationStore.setText(result.key, choiceText);
+      textKeyRef = result.key;
+    } else {
+      // 빈 텍스트인 경우 키 참조 제거
+      textKeyRef = undefined;
+    }
+
     const updatedChoices = {
       ...dialogue.choices,
       [choiceKey]: {
         ...dialogue.choices[choiceKey],
-        choiceText
+        choiceText,
+        textKeyRef
       }
     };
 

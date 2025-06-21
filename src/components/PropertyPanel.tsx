@@ -90,12 +90,14 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   // 선택된 노드가 변경될 때 로컬 상태 초기화
   useEffect(() => {
     if (selectedNode) {
-      setLocalTextState({
+      const newLocalState = {
         speakerText: selectedNode.dialogue.speakerText || "",
         contentText: selectedNode.dialogue.contentText || "",
         choiceTexts:
           selectedNode.dialogue.type === "choice" ? Object.fromEntries(Object.entries(selectedNode.dialogue.choices).map(([key, choice]) => [key, choice.choiceText])) : {},
-      });
+      };
+      
+      setLocalTextState(newLocalState);
     } else {
       setLocalTextState({
         speakerText: "",
@@ -138,20 +140,12 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
       const existingKey = useLocalizationStore.getState().findExistingKey(trimmedText);
       
       if (existingKey && existingKey !== currentSpeakerKey) {
-        // 기존 키 자동 사용
-        updateNodeKeyReference(selectedNodeKey, "speaker", existingKey);
-        setLocalTextState((prev) => ({ ...prev, speakerText: trimmedText }));
-
-        // 히스토리 추가
-        pushToHistoryWithTextEdit(`화자 텍스트 수정: "${trimmedText}"`);
-
-        // 토스트 알림 표시
+        // 기존 키 자동 사용을 위해 토스트 메시지 표시
         showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, "info");
-        return;
       }
     }
 
-    // 중복이 없는 경우 기존 로직 실행
+    // 모든 경우에 updateNodeText 호출 (중복 키 처리 포함)
     updateNodeText(selectedNodeKey, trimmedText, undefined);
 
     // 히스토리 추가
@@ -173,20 +167,12 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     if (trimmedText) {
       const existingKey = useLocalizationStore.getState().findExistingKey(trimmedText);
       if (existingKey && existingKey !== currentTextKey) {
-        // 기존 키 자동 사용
-        updateNodeKeyReference(selectedNodeKey, "text", existingKey);
-        setLocalTextState((prev) => ({ ...prev, contentText: trimmedText }));
-
-        // 히스토리 추가
-        pushToHistoryWithTextEdit(`대사 텍스트 수정: "${trimmedText}"`);
-
-        // 토스트 알림 표시
+        // 기존 키 자동 사용을 위해 토스트 메시지 표시
         showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, "info");
-        return;
       }
     }
 
-    // 중복이 없는 경우 기존 로직 실행
+    // 모든 경우에 updateNodeText 호출 (중복 키 처리 포함)
     updateNodeText(selectedNodeKey, undefined, trimmedText);
 
     // 히스토리 추가
@@ -209,23 +195,12 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     if (trimmedText) {
       const existingKey = useLocalizationStore.getState().findExistingKey(trimmedText);
       if (existingKey && existingKey !== currentChoiceKey) {
-        // 기존 키 자동 사용
-        updateChoiceKeyReference(selectedNodeKey, choiceKey, existingKey);
-        setLocalTextState((prev) => ({
-          ...prev,
-          choiceTexts: { ...prev.choiceTexts, [choiceKey]: trimmedText },
-        }));
-
-        // 히스토리 추가
-        pushToHistoryWithTextEdit(`선택지 텍스트 수정: "${trimmedText}"`);
-
-        // 토스트 알림 표시
+        // 기존 키 자동 사용을 위해 토스트 메시지 표시
         showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, "info");
-        return;
       }
     }
 
-    // 중복이 없는 경우 기존 로직 실행
+    // 모든 경우에 updateChoiceText 호출 (중복 키 처리 포함)
     updateChoiceText(selectedNodeKey, choiceKey, trimmedText);
 
     // 히스토리 추가 (한 번만)
@@ -556,12 +531,54 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     );
   };
 
+  // 실시간 키 사용 개수 계산 함수
+  const calculateKeyUsageCount = (keyRef: string): number => {
+    let count = 0;
+    
+    // 현재 templateData에서 직접 계산
+    Object.entries(templateData).forEach(([templateKey, template]) => {
+      Object.entries(template).forEach(([sceneKey, scene]) => {
+        Object.entries(scene).forEach(([nodeKey, nodeWrapper]: [string, any]) => {
+          const dialogue = nodeWrapper.dialogue;
+
+          // 화자 키 검증
+          if (dialogue.speakerKeyRef === keyRef) {
+            count++;
+          }
+
+          // 텍스트 키 검증
+          if (dialogue.textKeyRef === keyRef) {
+            count++;
+          }
+
+          // 선택지 키 검증
+          if (dialogue.type === "choice" && dialogue.choices) {
+            Object.entries(dialogue.choices).forEach(([choiceKey, choice]: [string, any]) => {
+              if (choice.textKeyRef === keyRef) {
+                count++;
+              }
+            });
+          }
+        });
+      });
+    });
+
+    return count;
+  };
+
   // 키 표시 컴포넌트 (클릭 가능)
-  const KeyDisplay = ({ keyRef, keyType, choiceKey }: { keyRef: string; keyType: "speaker" | "text" | "choice"; choiceKey?: string }) => (
-    <button onClick={() => startKeyEdit(keyType, keyRef, choiceKey)} className="mt-1 text-xs text-gray-500 hover:text-blue-600 hover:underline text-left">
-      키: {keyRef} ({getKeyUsageCount(keyRef)}개 사용)
-    </button>
-  );
+  const KeyDisplay = ({ keyRef, keyType, choiceKey }: { keyRef: string; keyType: "speaker" | "text" | "choice"; choiceKey?: string }) => {
+    // 로컬라이제이션 스토어와 에디터 스토어 모두 구독하여 실시간 업데이트 보장
+    const localizationData = useLocalizationStore((state) => state.localizationData);
+    const currentTemplateData = useEditorStore((state) => state.templateData);
+    const usageCount = calculateKeyUsageCount(keyRef);
+    
+    return (
+      <button onClick={() => startKeyEdit(keyType, keyRef, choiceKey)} className="mt-1 text-xs text-gray-500 hover:text-blue-600 hover:underline text-left">
+        키: {keyRef} ({usageCount}개 사용)
+      </button>
+    );
+  };
 
   // 노드가 선택되지 않은 경우
   if (!selectedNode) {
