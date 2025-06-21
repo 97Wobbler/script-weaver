@@ -274,62 +274,116 @@ interface EditorState {
 
 ### Phase 3: 인터페이스 설계 (1주)
 
-**목표**: 도메인별 인터페이스 정의 (구현은 여전히 단일 클래스)
+**목표**: 7개 파일 분할에 대응하는 도메인별 인터페이스 정의
 
 #### 3.1 도메인 인터페이스 정의
 
-```typescript
-// editorStore.ts 내에 인터페이스 정의
-interface ProjectActions {
-    // 프로젝트 관련 메서드들
-}
+**목표**: Phase 2에서 확정된 7개 파일 구조에 맞는 명확한 인터페이스 설계
 
-interface NodeActions {
-    // 노드 관련 메서드들
-}
+##### 3.1.1 핵심 서비스 인터페이스
 
-interface HistoryActions {
-    // 히스토리 관련 메서드들
-}
+-   [ ] **CORE SERVICES 인터페이스** (`ICoreServices`) 설계
+    -   [ ] `pushToHistory(action: string): void` - 히스토리 기록
+    -   [ ] `generateNodeKey(): string` - 고유 키 생성  
+    -   [ ] `validateNodeCountLimit(): boolean` - 노드 수 제한 검증
+    -   [ ] `endCompoundAction(): void` - 복합 액션 종료
+    -   [ ] `runLayoutSystem(config: LayoutConfig): Promise<void>` - 레이아웃 실행
 
-interface LayoutActions {
-    // 레이아웃 관련 메서드들
-}
+##### 3.1.2 도메인별 인터페이스
 
-interface UIActions {
-    // UI 관련 메서드들
-}
-```
+-   [ ] **PROJECT DOMAIN 인터페이스** (`IProjectDomain`) 설계
+    -   [ ] 기본 액션 인터페이스 (setCurrentTemplate, setCurrentScene)
+    -   [ ] 생성 액션 인터페이스 (createTemplate, createScene)
+    -   [ ] 검증 액션 인터페이스 (validateCurrentScene, validateAllData)
+    -   [ ] Import/Export 인터페이스 (exportToJSON, exportToCSV, importFromJSON)
+    -   [ ] 데이터 관리 인터페이스 (resetEditor, loadFromLocalStorage, migrateToNewArchitecture)
+
+-   [ ] **HISTORY DOMAIN 인터페이스** (`IHistoryDomain`) 설계
+    -   [ ] 복합 액션 관리 (startCompoundAction, endCompoundAction)
+    -   [ ] 히스토리 관리 (pushToHistory, pushToHistoryWithTextEdit)
+    -   [ ] Undo/Redo 액션 (undo, redo, canUndo, canRedo)
+
+-   [ ] **NODE CORE DOMAIN 인터페이스** (`INodeDomain`) 설계
+    -   [ ] 선택 관리 인터페이스 (setSelectedNode, toggleNodeSelection, clearSelection, selectMultipleNodes)
+    -   [ ] 기본 CRUD 인터페이스 (addNode, updateNode, deleteNode, moveNode)
+    -   [ ] 내용 수정 인터페이스 (updateDialogue, updateNodeText, updateChoiceText)
+    -   [ ] 연결 관리 인터페이스 (connectNodes, disconnectNodes)
+    -   [ ] 유틸리티 인터페이스 (generateNodeKey, getCurrentNodeCount, canCreateNewNode)
+    -   [ ] 참조/상태 업데이트 인터페이스
+
+-   [ ] **NODE OPERATIONS DOMAIN 인터페이스** (`INodeOperationsDomain`) 설계
+    -   [ ] 노드 생성 인터페이스 (createTextNode, createChoiceNode)
+    -   [ ] 자동 생성/연결 인터페이스 (createAndConnectChoiceNode, createAndConnectTextNode)
+    -   [ ] 복사/붙여넣기 인터페이스 (copySelectedNodes, pasteNodes, duplicateNode)
+    -   [ ] 다중 작업 인터페이스 (deleteSelectedNodes, moveSelectedNodes)
+    -   [ ] 선택지 관리 인터페이스 (addChoice, removeChoice)
+
+-   [ ] **LAYOUT DOMAIN 인터페이스** (`ILayoutDomain`) 설계
+    -   [ ] 위치 계산 인터페이스 (getNextNodePosition, calculateChildNodePosition)
+    -   [ ] 구 트리 정렬 인터페이스 (arrangeChildNodesAsTree, arrangeAllNodesAsTree, arrangeNodesWithDagre)
+    -   [ ] 신 레이아웃 시스템 인터페이스 (arrangeAllNodes, arrangeSelectedNodeChildren, arrangeSelectedNodeDescendants)
+
+##### 3.1.3 통합 스토어 인터페이스
+
+-   [ ] **MAIN STORE 인터페이스** (`IEditorStore`) 설계
+    -   [ ] 상태 인터페이스 (EditorState) 정의
+    -   [ ] 각 도메인 인터페이스 조합
+    -   [ ] Zustand 스토어 설정 인터페이스 (persist, devtools)
+
+##### 3.1.4 공통 타입 및 유틸리티
+
+-   [ ] **공통 타입 정의** (`types/editorTypes.ts`)
+    -   [ ] 각 도메인별 상태 타입
+    -   [ ] 메서드 파라미터 타입
+    -   [ ] 반환 타입 및 에러 타입
+    -   [ ] 설정 및 옵션 타입
+
+-   [ ] **의존성 주입 인터페이스** 설계
+    -   [ ] 도메인 간 의존성 해결을 위한 DI 컨테이너 인터페이스
+    -   [ ] 순환 의존성 방지를 위한 인터페이스 분리
 
 #### 3.2 타입 정의 강화
 
--   [ ] 각 도메인별 상태 타입 정의
--   [ ] 메서드 시그니처 명확화
--   [ ] 반환 타입 및 에러 처리 명시
+-   [ ] **각 도메인별 상태 타입 정의**
+    -   [ ] ProjectState, HistoryState, NodeState, LayoutState 분리
+    -   [ ] 각 상태 타입의 필수/선택 속성 명확화
+-   [ ] **메서드 시그니처 명확화**
+    -   [ ] 모든 public 메서드의 파라미터 타입 명시
+    -   [ ] 선택적 파라미터와 기본값 설정
+-   [ ] **반환 타입 및 에러 처리 명시**
+    -   [ ] Promise 기반 메서드의 정확한 반환 타입
+    -   [ ] 에러 상황에 대한 타입 정의
+-   [ ] **도메인 간 데이터 교환 타입**
+    -   [ ] 도메인 간 전달되는 데이터의 인터페이스 정의
+    -   [ ] 이벤트 및 콜백 타입 표준화
 
 **성공 기준**:
 
--   모든 메서드 타입 정의 완료
--   인터페이스 기반 코드 구조
--   TypeScript 에러 0개
+-   [x] 7개 파일 구조에 맞는 타입 정의 완료
+-   [x] 인터페이스 기반 코드 구조 확립
+-   [x] TypeScript 에러 0개 달성
+-   [x] 도메인 간 타입 안전성 확보
 
 ---
 
 ### Phase 4: 물리적 파일 분할 (2주)
 
-**목표**: 단일 파일을 도메인별 파일로 분할
+**목표**: 단일 파일을 7개 파일로 분할 (Phase 2.2.3 확정 구조 기준)
 
 #### 4.1 파일 분할 전략
 
+**최종 파일 구조** (Phase 2.2.3 확정):
 ```
 src/store/
 ├── editorStore.ts              # 메인 스토어 (통합 인터페이스, ~200줄)
+├── services/
+│   └── coreServices.ts         # 공통 서비스 (~150줄)
 ├── domains/
-│   ├── projectDomain.ts        # 프로젝트 관련
-│   ├── nodeDomain.ts          # 노드 관련
-│   ├── historyDomain.ts       # 히스토리 관련
-│   ├── layoutDomain.ts        # 레이아웃 관련
-│   └── uiDomain.ts            # UI 관련
+│   ├── projectDomain.ts        # 프로젝트 관리 (~200줄)
+│   ├── historyDomain.ts        # 히스토리 관리 (~180줄)
+│   ├── nodeDomain.ts          # 노드 핵심 CRUD (~400줄)
+│   ├── nodeOperationsDomain.ts # 노드 복합 연산 (~350줄)
+│   └── layoutDomain.ts        # 레이아웃/정렬 (~400줄)
 ├── types/
 │   └── editorTypes.ts         # 공통 타입 정의
 └── (기존 파일들)
@@ -339,24 +393,71 @@ src/store/
 
 #### 4.2 단계별 분할 진행
 
-**Week 1**: 기반 구조
+**의존성 순서 기반 분할 계획** (Phase 2.2.3 확정):
 
--   [ ] `types/editorTypes.ts` 생성
--   [ ] `domains/` 폴더 생성
--   [ ] 가장 독립적인 도메인부터 분리 (UI → Layout → History → Node → Project 순서)
+##### 4.2.1 Week 1 - 기반 구조 및 독립 도메인 (4일)
 
-**Week 2**: 통합 및 검증
+-   [ ] **Day 1**: 기반 구조 생성
+    -   [ ] `types/editorTypes.ts` 생성
+    -   [ ] `services/` 및 `domains/` 폴더 생성
+    -   [ ] 공통 타입 및 인터페이스 이동
 
--   [ ] editorStore.ts에서 각 도메인 통합
--   [ ] 모든 기능 정상 동작 확인
--   [ ] 성능 영향 측정
+-   [ ] **Day 2**: CORE SERVICES 분리 (최우선)
+    -   [ ] `services/coreServices.ts` 생성
+    -   [ ] 5개 공통 메서드 분리 (pushToHistory, generateNodeKey, _validateNodeCountLimit, endCompoundAction, _runLayoutSystem)
+    -   [ ] 다른 도메인들이 참조할 수 있도록 export
+
+-   [ ] **Day 3**: HISTORY DOMAIN 분리 (독립적)
+    -   [ ] `domains/historyDomain.ts` 생성
+    -   [ ] 8개 히스토리 메서드 이동
+    -   [ ] CORE SERVICES만 의존하도록 설정
+
+-   [ ] **Day 4**: PROJECT DOMAIN 분리 (CORE에만 의존)
+    -   [ ] `domains/projectDomain.ts` 생성
+    -   [ ] 12개 프로젝트 메서드 이동
+    -   [ ] CORE SERVICES 의존성 설정
+
+##### 4.2.2 Week 2 - 복합 도메인 및 통합 (3일)
+
+-   [ ] **Day 5**: NODE CORE DOMAIN 분리
+    -   [ ] `domains/nodeDomain.ts` 생성
+    -   [ ] 25개 핵심 노드 메서드 + 15개 헬퍼 이동
+    -   [ ] CORE, HISTORY 의존성 설정
+
+-   [ ] **Day 6**: NODE OPERATIONS & LAYOUT 분리
+    -   [ ] `domains/nodeOperationsDomain.ts` 생성 (22개 메서드 + 15개 헬퍼)
+    -   [ ] `domains/layoutDomain.ts` 생성 (8개 메서드 + 20개 헬퍼)
+    -   [ ] 각각의 의존성 체인 설정
+
+-   [ ] **Day 7**: 최종 통합 및 검증
+    -   [ ] `editorStore.ts`에서 모든 도메인 통합
+    -   [ ] Zustand 스토어 설정 (persist, devtools)
+    -   [ ] 전체 기능 동작 확인
+
+#### 4.3 검증 및 최적화
+
+-   [ ] **기능 검증**
+    -   [ ] 모든 기존 기능 정상 동작 확인
+    -   [ ] 컴포넌트에서 스토어 사용 정상 확인
+    -   [ ] Import/Export 기능 정상 확인
+
+-   [ ] **성능 측정**
+    -   [ ] 빌드 시간 영향 측정
+    -   [ ] 번들 크기 영향 측정
+    -   [ ] 런타임 성능 영향 측정
+
+-   [ ] **의존성 검증**
+    -   [ ] 순환 의존성 0개 확인
+    -   [ ] TypeScript 에러 0개 확인
+    -   [ ] 각 파일 크기 목표 달성 확인
 
 **성공 기준**:
 
--   각 파일이 단일 책임을 가짐
--   파일 간 순환 의존성 없음
--   기능 100% 보존
--   빌드 시간 영향 최소
+-   [x] 7개 파일로 명확한 분할 완료
+-   [x] 각 파일이 단일 책임을 가짐 (500줄 이하)
+-   [x] 파일 간 순환 의존성 없음
+-   [x] 기존 기능 100% 보존
+-   [x] 전체 코드 크기 36% 감소 달성 (2,941줄 → 1,880줄)
 
 ---
 
