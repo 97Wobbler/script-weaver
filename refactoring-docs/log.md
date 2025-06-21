@@ -42,19 +42,22 @@
 #### 📊 **주요 분석 결과**
 
 **1. 파일 규모**
+
 -   **총 라인 수**: 2,941줄 (목표: 500줄 이하로 분할)
 -   **총 메서드 수**: 44개 (인터페이스 정의 기준)
 -   **God Object 확인**: 단일 파일에 모든 기능 집중된 상태
 
 **2. 대형 메서드 목록** (50줄 이상, 13개)
-- arrangeAllNodesAsTree (155줄), arrangeChildNodesAsTree (141줄), arrangeAllNodes (121줄), pasteNodes (115줄), calculateChildNodePosition (113줄), deleteSelectedNodes (110줄), createAndConnectChoiceNode (107줄), arrangeSelectedNodeDescendants (107줄), createAndConnectTextNode (104줄), arrangeSelectedNodeChildren (99줄), deleteNode (90줄), moveNode (80줄), getNextNodePosition (80줄)
+
+-   arrangeAllNodesAsTree (155줄), arrangeChildNodesAsTree (141줄), arrangeAllNodes (121줄), pasteNodes (115줄), calculateChildNodePosition (113줄), deleteSelectedNodes (110줄), createAndConnectChoiceNode (107줄), arrangeSelectedNodeDescendants (107줄), createAndConnectTextNode (104줄), arrangeSelectedNodeChildren (99줄), deleteNode (90줄), moveNode (80줄), getNextNodePosition (80줄)
 
 **3. 자연스러운 도메인 경계 식별**
-- **PROJECT DOMAIN**: 프로젝트/씬 관리 (templateData, currentTemplate, currentScene)
-- **NODE DOMAIN**: 노드 CRUD 및 내용 관리 (selectedNodeKey, selectedNodeKeys, lastDraggedNodeKey)
-- **HISTORY DOMAIN**: 실행취소/재실행 (history, historyIndex, isUndoRedoInProgress)
-- **LAYOUT DOMAIN**: 노드 배치 및 정렬 (lastNodePosition)
-- **UI DOMAIN**: 사용자 인터페이스 상태 (showToast, 선택/복사/붙여넣기)
+
+-   **PROJECT DOMAIN**: 프로젝트/씬 관리 (templateData, currentTemplate, currentScene)
+-   **NODE DOMAIN**: 노드 CRUD 및 내용 관리 (selectedNodeKey, selectedNodeKeys, lastDraggedNodeKey)
+-   **HISTORY DOMAIN**: 실행취소/재실행 (history, historyIndex, isUndoRedoInProgress)
+-   **LAYOUT DOMAIN**: 노드 배치 및 정렬 (lastNodePosition)
+-   **UI DOMAIN**: 사용자 인터페이스 상태 (showToast, 선택/복사/붙여넣기)
 
 ---
 
@@ -98,8 +101,8 @@
 **총 통합 헬퍼**: 10개 → 4개 (60% 감소)
 **총 코드 감소량**: 253줄 → 131줄 (122줄 감소, 48% 감소)
 
-| 순위 | 대상               | 통합 전 | 통합 후 | 감소율 | 상태    |
-| ---- | ------------------ | ------- | ------- | ------ | ------- |
+| 순위  | 대상               | 통합 전 | 통합 후 | 감소율 | 상태    |
+| ----- | ------------------ | ------- | ------- | ------ | ------- |
 | 1순위 | 결과 처리 헬퍼     | 51줄    | 24줄    | 53%    | ✅ 완료 |
 | 2순위 | 레이아웃 실행 헬퍼 | 113줄   | 52줄    | 54%    | ✅ 완료 |
 | 3순위 | 키 수집 로직       | 64줄    | 33줄    | 48%    | ✅ 완료 |
@@ -108,11 +111,13 @@
 ##### **Phase 1.3.3: 미세 최적화** ⏸️ **부분 완료 후 건너뛰기**
 
 **완료 항목**:
-- ✅ **노드 개수 제한 체크** (`_validateNodeCountLimit`) - 5개 위치, 44% 감소
+
+-   ✅ **노드 개수 제한 체크** (`_validateNodeCountLimit`) - 5개 위치, 44% 감소
 
 **건너뛴 항목** (토큰 효율성 사유):
-- ⏸️ 상수 및 리터럴 공통화
-- ⏸️ 씬/노드 존재 검증, 공통 타입 가드 함수 등
+
+-   ⏸️ 상수 및 리터럴 공통화
+-   ⏸️ 씬/노드 존재 검증, 공통 타입 가드 함수 등
 
 ##### **Phase 1.3.4: 헬퍼 메서드 구조 최적화** ⏸️ **건너뛰기**
 
@@ -129,6 +134,7 @@
 **헬퍼 메서드**: 47개 → 약 25개 (47% 감소)
 
 ### **달성한 목표**
+
 ✅ **메서드 크기 정규화**: 모든 public 메서드 50줄 이하 달성  
 ✅ **단일 책임 원칙**: 각 메서드가 명확한 단일 책임 보유  
 ✅ **코드 가독성**: 대폭 개선된 구조로 이해하기 쉬운 코드  
@@ -148,28 +154,33 @@
 ##### **📊 도메인별 상태 그룹핑 결과**
 
 **1. PROJECT DOMAIN (프로젝트/씬 관리)**
-- `templateData: TemplateDialogues` - 전체 프로젝트 데이터
-- `currentTemplate: string` - 현재 선택된 템플릿
-- `currentScene: string` - 현재 선택된 씬
+
+-   `templateData: TemplateDialogues` - 전체 프로젝트 데이터
+-   `currentTemplate: string` - 현재 선택된 템플릿
+-   `currentScene: string` - 현재 선택된 씬
 
 **2. NODE DOMAIN (노드 관리)**
-- `selectedNodeKey?: string` - 단일 선택된 노드
-- `selectedNodeKeys: Set<string>` - 다중 선택된 노드들
-- `lastDraggedNodeKey: string | null` - 연속 드래그 감지용
-- `lastDragActionTime: number` - 드래그 액션 시간
+
+-   `selectedNodeKey?: string` - 단일 선택된 노드
+-   `selectedNodeKeys: Set<string>` - 다중 선택된 노드들
+-   `lastDraggedNodeKey: string | null` - 연속 드래그 감지용
+-   `lastDragActionTime: number` - 드래그 액션 시간
 
 **3. HISTORY DOMAIN (실행취소/재실행)**
-- `history: HistoryState[]` - 히스토리 스택
-- `historyIndex: number` - 현재 히스토리 인덱스
-- `isUndoRedoInProgress: boolean` - 실행취소/재실행 진행 중 플래그
-- `currentCompoundActionId: string | null` - 복합 액션 ID
-- `compoundActionStartState: HistoryState | null` - 복합 액션 시작 상태
+
+-   `history: HistoryState[]` - 히스토리 스택
+-   `historyIndex: number` - 현재 히스토리 인덱스
+-   `isUndoRedoInProgress: boolean` - 실행취소/재실행 진행 중 플래그
+-   `currentCompoundActionId: string | null` - 복합 액션 ID
+-   `compoundActionStartState: HistoryState | null` - 복합 액션 시작 상태
 
 **4. LAYOUT DOMAIN (레이아웃/위치)**
-- `lastNodePosition: { x: number; y: number }` - 마지막 노드 위치
+
+-   `lastNodePosition: { x: number; y: number }` - 마지막 노드 위치
 
 **5. UI DOMAIN (사용자 인터페이스)**
-- `showToast?: function` - 토스트 메시지 표시 함수
+
+-   `showToast?: function` - 토스트 메시지 표시 함수
 
 ##### **📋 인터페이스 구조 개선 결과**
 
@@ -178,207 +189,426 @@
 
 ```typescript
 interface EditorStore extends EditorState {
-  // === PROJECT DOMAIN - 액션들 ===
-  // 기본 액션들 (7개)
-  // 템플릿/씬 관리 액션들 (2개)
-  // 검증 액션들 (2개)
-  // Import/Export 액션들 (3개)
-  // 데이터 관리 액션들 (4개)
-
-  // === NODE DOMAIN ===
-  // 상태 (4개) + 액션들 (30개)
-
-  // === HISTORY DOMAIN ===
-  // 상태 (5개) + 액션들 (7개)
-
-  // === LAYOUT DOMAIN ===
-  // 액션들 (25개)
-
-  // === UI DOMAIN ===
-  // 상태 (1개)
+    // === PROJECT DOMAIN - 액션들 ===
+    // 기본 액션들 (7개)
+    // 템플릿/씬 관리 액션들 (2개)
+    // 검증 액션들 (2개)
+    // Import/Export 액션들 (3개)
+    // 데이터 관리 액션들 (4개)
+    // === NODE DOMAIN ===
+    // 상태 (4개) + 액션들 (30개)
+    // === HISTORY DOMAIN ===
+    // 상태 (5개) + 액션들 (7개)
+    // === LAYOUT DOMAIN ===
+    // 액션들 (25개)
+    // === UI DOMAIN ===
+    // 상태 (1개)
 }
 ```
 
-##### **✅ Phase 2.1 달성 성과**
-
-✅ **도메인 분리**: 5개 명확한 도메인으로 상태 그룹핑 완료  
-✅ **응집도 향상**: 관련 상태들이 논리적으로 그룹화됨  
-✅ **가독성 개선**: 주석 블록으로 구조 명확화  
-✅ **유지보수성**: 도메인별 책임 영역 명확히 구분됨  
-✅ **기능 보존**: 모든 기존 기능 100% 보존 확인
-
-#### **Phase 2.2: 메서드 그룹핑** ✅ **완료 (2025-06-20 22:39 ~ 22:53)**
+#### **Phase 2.2: 메서드 그룹핑**
 
 **완료 작업**: 각 도메인별 메서드 목록 정리 및 분석
 
-##### **📊 도메인별 메서드 목록 상세 분석**
+##### **Phase 2.2.1: 📊 도메인별 메서드 목록 상세 분석**
 
 **1. PROJECT DOMAIN (12개 메서드)**
 
-*기본 액션들 (2개)*
-- `setCurrentTemplate(templateKey: string) => void`
-- `setCurrentScene(sceneKey: string) => void`
+_기본 액션들 (2개)_
 
-*템플릿/씬 관리 액션들 (2개)*
-- `createTemplate(templateKey: string) => void`
-- `createScene(templateKey: string, sceneKey: string) => void`
+-   `setCurrentTemplate(templateKey: string) => void`
+-   `setCurrentScene(sceneKey: string) => void`
 
-*검증 액션들 (2개)*
-- `validateCurrentScene() => { isValid: boolean; errors: string[] }`
-- `validateAllData() => ValidationResult`
+_템플릿/씬 관리 액션들 (2개)_
 
-*Import/Export 액션들 (3개)*
-- `exportToJSON() => string`
-- `exportToCSV() => { dialogue: string; localization: string }`
-- `importFromJSON(jsonString: string) => void`
+-   `createTemplate(templateKey: string) => void`
+-   `createScene(templateKey: string, sceneKey: string) => void`
 
-*데이터 관리 액션들 (3개)*
-- `resetEditor() => void`
-- `loadFromLocalStorage() => void`
-- `migrateToNewArchitecture() => void`
+_검증 액션들 (2개)_
+
+-   `validateCurrentScene() => { isValid: boolean; errors: string[] }`
+-   `validateAllData() => ValidationResult`
+
+_Import/Export 액션들 (3개)_
+
+-   `exportToJSON() => string`
+-   `exportToCSV() => { dialogue: string; localization: string }`
+-   `importFromJSON(jsonString: string) => void`
+
+_데이터 관리 액션들 (3개)_
+
+-   `resetEditor() => void`
+-   `loadFromLocalStorage() => void`
+-   `migrateToNewArchitecture() => void`
 
 **2. NODE DOMAIN (77개 메서드 + 4개 상태)**
 
-*상태 (4개)*
-- `lastDraggedNodeKey: string | null`
-- `lastDragActionTime: number`
-- `selectedNodeKeys: Set<string>`
-- (plus selectedNodeKey from EditorState)
+_상태 (4개)_
 
-*노드 선택 액션 (1개)*
-- `setSelectedNode(nodeKey?: string) => void`
+-   `lastDraggedNodeKey: string | null`
+-   `lastDragActionTime: number`
+-   `selectedNodeKeys: Set<string>`
+-   (plus selectedNodeKey from EditorState)
 
-*다중 선택 액션들 (3개)*
-- `toggleNodeSelection(nodeKey: string) => void`
-- `clearSelection() => void`
-- `selectMultipleNodes(nodeKeys: string[]) => void`
+_노드 선택 액션 (1개)_
 
-*복사/붙여넣기 (3개)*
-- `copySelectedNodes() => void`
-- `pasteNodes(position?: { x: number; y: number }) => void`
-- `duplicateNode(nodeKey: string) => string`
+-   `setSelectedNode(nodeKey?: string) => void`
 
-*다중 조작 (2개)*
-- `deleteSelectedNodes() => void`
-- `moveSelectedNodes(deltaX: number, deltaY: number) => void`
+_다중 선택 액션들 (3개)_
 
-*노드 기본 관리 (4개)*
-- `addNode(node: EditorNodeWrapper) => void`
-- `updateNode(nodeKey: string, updates: Partial<EditorNodeWrapper>) => void`
-- `deleteNode(nodeKey: string) => void`
-- `moveNode(nodeKey: string, position: { x: number; y: number }) => void`
+-   `toggleNodeSelection(nodeKey: string) => void`
+-   `clearSelection() => void`
+-   `selectMultipleNodes(nodeKeys: string[]) => void`
 
-*대화 내용 수정 (3개)*
-- `updateDialogue(nodeKey: string, dialogue: Partial<Dialogue>) => void`
-- `updateNodeText(nodeKey: string, speakerText?: string, contentText?: string) => void`
-- `updateChoiceText(nodeKey: string, choiceKey: string, choiceText: string) => void`
+_복사/붙여넣기 (3개)_
 
-*자동 노드 생성 (2개)*
-- `createTextNode(contentText?: string, speakerText?: string) => string`
-- `createChoiceNode(contentText?: string, speakerText?: string) => string`
+-   `copySelectedNodes() => void`
+-   `pasteNodes(position?: { x: number; y: number }) => void`
+-   `duplicateNode(nodeKey: string) => string`
 
-*선택지 관리 (2개)*
-- `addChoice(nodeKey: string, choiceKey: string, choiceText: string, nextNodeKey?: string) => void`
-- `removeChoice(nodeKey: string, choiceKey: string) => void`
+_다중 조작 (2개)_
 
-*노드 연결 관리 (2개)*
-- `connectNodes(fromNodeKey: string, toNodeKey: string, choiceKey?: string) => void`
-- `disconnectNodes(fromNodeKey: string, choiceKey?: string) => void`
+-   `deleteSelectedNodes() => void`
+-   `moveSelectedNodes(deltaX: number, deltaY: number) => void`
 
-*자식 노드 생성 및 연결 (2개)*
-- `createAndConnectChoiceNode(fromNodeKey: string, choiceKey: string, nodeType?: "text" | "choice") => string`
-- `createAndConnectTextNode(fromNodeKey: string, nodeType?: "text" | "choice") => string`
+_노드 기본 관리 (4개)_
 
-*유틸리티 액션들 (3개)*
-- `generateNodeKey() => string`
-- `getCurrentNodeCount() => number`
-- `canCreateNewNode() => boolean`
+-   `addNode(node: EditorNodeWrapper) => void`
+-   `updateNode(nodeKey: string, updates: Partial<EditorNodeWrapper>) => void`
+-   `deleteNode(nodeKey: string) => void`
+-   `moveNode(nodeKey: string, position: { x: number; y: number }) => void`
 
-*키 참조 업데이트 (2개)*
-- `updateNodeKeyReference(nodeKey: string, keyType: "speaker" | "text", newKeyRef: string) => void`
-- `updateChoiceKeyReference(nodeKey: string, choiceKey: string, newKeyRef: string) => void`
+_대화 내용 수정 (3개)_
 
-*노드 상태 업데이트 (2개)*
-- `updateNodeVisibility(nodeKey: string, hidden: boolean) => void`
-- `updateNodePositionAndVisibility(nodeKey: string, position: { x: number; y: number }, hidden: boolean) => void`
+-   `updateDialogue(nodeKey: string, dialogue: Partial<Dialogue>) => void`
+-   `updateNodeText(nodeKey: string, speakerText?: string, contentText?: string) => void`
+-   `updateChoiceText(nodeKey: string, choiceKey: string, choiceText: string) => void`
 
-*Private 헬퍼 메서드들 (30개)*
-- 붙여넣기 관련 헬퍼들 (3개)
-- 위치 계산 헬퍼들 (4개)
-- 삭제 관련 헬퍼들 (4개)
-- 노드 생성 및 연결 헬퍼들 (4개)
-- 텍스트 노드 생성 및 연결 헬퍼들 (4개)
-- 단일 노드 삭제 헬퍼들 (5개)
-- 노드 이동 헬퍼들 (5개)
-- 노드 유틸리티 헬퍼 (1개)
+_자동 노드 생성 (2개)_
+
+-   `createTextNode(contentText?: string, speakerText?: string) => string`
+-   `createChoiceNode(contentText?: string, speakerText?: string) => string`
+
+_선택지 관리 (2개)_
+
+-   `addChoice(nodeKey: string, choiceKey: string, choiceText: string, nextNodeKey?: string) => void`
+-   `removeChoice(nodeKey: string, choiceKey: string) => void`
+
+_노드 연결 관리 (2개)_
+
+-   `connectNodes(fromNodeKey: string, toNodeKey: string, choiceKey?: string) => void`
+-   `disconnectNodes(fromNodeKey: string, choiceKey?: string) => void`
+
+_자식 노드 생성 및 연결 (2개)_
+
+-   `createAndConnectChoiceNode(fromNodeKey: string, choiceKey: string, nodeType?: "text" | "choice") => string`
+-   `createAndConnectTextNode(fromNodeKey: string, nodeType?: "text" | "choice") => string`
+
+_유틸리티 액션들 (3개)_
+
+-   `generateNodeKey() => string`
+-   `getCurrentNodeCount() => number`
+-   `canCreateNewNode() => boolean`
+
+_키 참조 업데이트 (2개)_
+
+-   `updateNodeKeyReference(nodeKey: string, keyType: "speaker" | "text", newKeyRef: string) => void`
+-   `updateChoiceKeyReference(nodeKey: string, choiceKey: string, newKeyRef: string) => void`
+
+_노드 상태 업데이트 (2개)_
+
+-   `updateNodeVisibility(nodeKey: string, hidden: boolean) => void`
+-   `updateNodePositionAndVisibility(nodeKey: string, position: { x: number; y: number }, hidden: boolean) => void`
+
+_Private 헬퍼 메서드들 (30개)_
+
+-   붙여넣기 관련 헬퍼들 (3개)
+-   위치 계산 헬퍼들 (4개)
+-   삭제 관련 헬퍼들 (4개)
+-   노드 생성 및 연결 헬퍼들 (4개)
+-   텍스트 노드 생성 및 연결 헬퍼들 (4개)
+-   단일 노드 삭제 헬퍼들 (5개)
+-   노드 이동 헬퍼들 (5개)
+-   노드 유틸리티 헬퍼 (1개)
 
 **3. HISTORY DOMAIN (8개 메서드 + 5개 상태)**
 
-*상태 (5개)*
-- `history: HistoryState[]`
-- `historyIndex: number`
-- `isUndoRedoInProgress: boolean`
-- `currentCompoundActionId: string | null`
-- `compoundActionStartState: HistoryState | null`
+_상태 (5개)_
 
-*복합 액션 그룹 관리 (2개)*
-- `startCompoundAction(actionName: string) => string`
-- `endCompoundAction() => void`
+-   `history: HistoryState[]`
+-   `historyIndex: number`
+-   `isUndoRedoInProgress: boolean`
+-   `currentCompoundActionId: string | null`
+-   `compoundActionStartState: HistoryState | null`
 
-*Undo/Redo 액션들 (6개)*
-- `pushToHistory(action: string) => void`
-- `pushToHistoryWithTextEdit(action: string) => void`
-- `undo() => void`
-- `redo() => void`
-- `canUndo() => boolean`
-- `canRedo() => boolean`
+_복합 액션 그룹 관리 (2개)_
+
+-   `startCompoundAction(actionName: string) => string`
+-   `endCompoundAction() => void`
+
+_Undo/Redo 액션들 (6개)_
+
+-   `pushToHistory(action: string) => void`
+-   `pushToHistoryWithTextEdit(action: string) => void`
+-   `undo() => void`
+-   `redo() => void`
+-   `canUndo() => boolean`
+-   `canRedo() => boolean`
 
 **4. LAYOUT DOMAIN (28개 메서드 + 1개 상태)**
 
-*상태 (1개)*
-- `lastNodePosition: { x: number; y: number }` (from EditorState)
+_상태 (1개)_
 
-*위치 계산 액션들 (2개)*
-- `getNextNodePosition() => { x: number; y: number }`
-- `calculateChildNodePosition(parentNodeKey: string, choiceKey?: string) => { x: number; y: number }`
+-   `lastNodePosition: { x: number; y: number }` (from EditorState)
 
-*정렬 액션들 - 기존 시스템 (3개)*
-- `arrangeChildNodesAsTree(rootNodeKey: string) => void`
-- `arrangeAllNodesAsTree() => void`
-- `arrangeNodesWithDagre() => void`
+_위치 계산 액션들 (2개)_
 
-*정렬 액션들 - 새로운 시스템 (3개)*
-- `arrangeAllNodes(internal?: boolean) => Promise<void>`
-- `arrangeSelectedNodeChildren(nodeKey: string, internal?: boolean) => Promise<void>`
-- `arrangeSelectedNodeDescendants(nodeKey: string, internal?: boolean) => Promise<void>`
+-   `getNextNodePosition() => { x: number; y: number }`
+-   `calculateChildNodePosition(parentNodeKey: string, choiceKey?: string) => { x: number; y: number }`
 
-*Private 헬퍼 메서드들 (20개)*
-- 노드 정렬 헬퍼들 (9개)
-- 위치 계산 헬퍼들 (4개)
-- 후손/자식 정렬 헬퍼들 (7개)
+_정렬 액션들 - 기존 시스템 (3개)_
+
+-   `arrangeChildNodesAsTree(rootNodeKey: string) => void`
+-   `arrangeAllNodesAsTree() => void`
+-   `arrangeNodesWithDagre() => void`
+
+_정렬 액션들 - 새로운 시스템 (3개)_
+
+-   `arrangeAllNodes(internal?: boolean) => Promise<void>`
+-   `arrangeSelectedNodeChildren(nodeKey: string, internal?: boolean) => Promise<void>`
+-   `arrangeSelectedNodeDescendants(nodeKey: string, internal?: boolean) => Promise<void>`
+
+_Private 헬퍼 메서드들 (20개)_
+
+-   노드 정렬 헬퍼들 (9개)
+-   위치 계산 헬퍼들 (4개)
+-   후손/자식 정렬 헬퍼들 (7개)
 
 **5. UI DOMAIN (1개 액션)**
 
-*액션 (1개)*
-- `showToast?: (message: string, type?: "success" | "info" | "warning") => void`
+_액션 (1개)_
+
+-   `showToast?: (message: string, type?: "success" | "info" | "warning") => void`
 
 ##### **📋 메서드 분포 통계**
 
-| 도메인 | Public 메서드 | Private 헬퍼 | 상태/액션 | 총계 |
-|--------|---------------|---------------|-----------|------|
-| PROJECT | 12개 | - | 3개 | 15개 |
-| NODE | 47개 | 30개 | 4개 | 81개 |
-| HISTORY | 8개 | - | 5개 | 13개 |
-| LAYOUT | 8개 | 20개 | 1개 | 29개 |
-| UI | - | - | 1개 | 1개 |
-| **총계** | **75개** | **50개** | **14개** | **139개** |
+| 도메인   | Public 메서드 | Private 헬퍼 | 상태/액션 | 총계      |
+| -------- | ------------- | ------------ | --------- | --------- |
+| PROJECT  | 12개          | -            | 3개       | 15개      |
+| NODE     | 47개          | 30개         | 4개       | 81개      |
+| HISTORY  | 8개           | -            | 5개       | 13개      |
+| LAYOUT   | 8개           | 20개         | 1개       | 29개      |
+| UI       | -             | -            | 1개       | 1개       |
+| **총계** | **75개**      | **50개**     | **14개**  | **139개** |
 
-##### **✅ Phase 2.2 달성 성과**
+##### **Phase 2.2.2: 📊 editorStore.ts 도메인 간 의존성 파악**
 
-✅ **메서드 분류**: 총 125개 메서드를 5개 도메인으로 정확히 분류  
-✅ **책임 영역**: 각 도메인별 명확한 책임 범위 정의  
-✅ **복잡도 분석**: NODE, LAYOUT 도메인의 높은 복잡도 확인 (분할 최우선)  
-✅ **헬퍼 분포**: Private 헬퍼 메서드 50개의 도메인별 분포 파악  
-✅ **분할 우선순위**: NODE(81개) > LAYOUT(29개) > PROJECT(15개) > HISTORY(13개) > UI(1개)
+###### 📊 요약 통계
 
----
+-   **총 메서드 수:** 108
+-   **공개 메서드:** 60
+-   **헬퍼 메서드:** 48
+-   **공통 헬퍼 함수:** 5
+
+###### 🔧 공통 헬퍼 함수 (3회 이상 사용)
+
+####### `pushToHistory` (9회 사용)
+**사용하는 메서드들:** pasteNodes, addNode, \_finalizeNodesDeletion, \_cleanupAfterNodeDeletion, \_addMoveHistory, pushToHistoryWithTextEdit, arrangeChildNodesAsTree, arrangeAllNodesAsTree, arrangeNodesWithDagre
+
+####### `generateNodeKey` (5회 사용)
+**사용하는 메서드들:** createTextNode, createChoiceNode, \_createPastedNodes, \_createNewChoiceChild, \_createNewTextChild
+
+####### `_validateNodeCountLimit` (4회 사용)
+**사용하는 메서드들:** createTextNode, createChoiceNode, \_validateChoiceNodeCreation, \_validateTextNodeCreation
+
+####### `endCompoundAction` (4회 사용)
+**사용하는 메서드들:** \_validateChoiceNodeCreation, \_finalizeChoiceNodeCreation, \_validateTextNodeCreation, \_finalizeTextNodeCreation
+
+####### `_runLayoutSystem` (3회 사용)
+**사용하는 메서드들:** \_runGlobalLayoutSystem, \_runDescendantLayoutSystem, \_runChildLayoutSystem1
+
+###### 🏗️ 도메인별 메서드 분류
+
+####### PROJECT DOMAIN
+
+-   `setCurrentTemplate`
+-   `setCurrentScene`
+-   `createTemplate`
+-   `createScene`
+-   `validateCurrentScene`
+-   `validateAllData`
+-   `exportToJSON`
+-   `exportToCSV`
+-   `importFromJSON` → [migrateToNewArchitecture]
+-   `resetEditor`
+-   `loadFromLocalStorage`
+-   `migrateToNewArchitecture`
+
+####### NODE DOMAIN
+
+-   `setSelectedNode`
+-   `toggleNodeSelection`
+-   `clearSelection`
+-   `selectMultipleNodes`
+-   `copySelectedNodes`
+-   `pasteNodes` → [_validatePasteOperation, _createPastedNodes, pushToHistory]
+-   `duplicateNode` → [pasteNodes]
+-   `deleteSelectedNodes` → [_getNodesForDeletion, _collectKeysForCleanup, _performNodesDeletion, _finalizeNodesDeletion]
+-   `moveSelectedNodes` → [moveNode]
+-   `addNode` → [pushToHistory]
+-   `updateNode`
+-   `deleteNode` → [_collectNodeKeysForCleanup, _performNodeDeletion, _cleanupAfterNodeDeletion]
+-   `moveNode` → [_validateNodeMovement, _checkContinuousDrag, _performNodeMove, _handleContinuousDrag, _addMoveHistory]
+-   `updateDialogue`
+-   `updateNodeText`
+-   `updateChoiceText`
+-   `createTextNode` → [_validateNodeCountLimit, generateNodeKey, getNextNodePosition, addNode]
+-   `createChoiceNode` → [_validateNodeCountLimit, generateNodeKey, getNextNodePosition, addNode]
+-   `addChoice`
+-   `removeChoice`
+-   `connectNodes`
+-   `disconnectNodes`
+-   `createAndConnectChoiceNode` → [_validateChoiceNodeCreation, _createNewChoiceChild, _finalizeChoiceNodeCreation]
+-   `createAndConnectTextNode` → [_validateTextNodeCreation, _createNewTextChild, _connectAndUpdateTextNode, _finalizeTextNodeCreation]
+-   `generateNodeKey`
+-   `getCurrentNodeCount`
+-   `canCreateNewNode` → [getCurrentNodeCount]
+-   `updateNodeKeyReference`
+-   `updateChoiceKeyReference`
+-   `updateNodeVisibility`
+-   `updateNodePositionAndVisibility`
+
+####### HISTORY DOMAIN
+
+-   `startCompoundAction`
+-   `endCompoundAction`
+-   `pushToHistory`
+-   `pushToHistoryWithTextEdit` → [pushToHistory]
+-   `undo` → [canUndo]
+-   `redo` → [canRedo]
+-   `canUndo`
+-   `canRedo`
+
+####### LAYOUT DOMAIN
+
+-   `getNextNodePosition` → [_initializePositionCalculation, _calculateCandidatePosition, _findNonOverlappingPosition]
+-   `calculateChildNodePosition` → [_getRealNodeDimensions, _calculateTextNodeChildPosition]
+-   `arrangeChildNodesAsTree` → [_buildNodeRelationMaps, _buildNodeLevelMap, _updateChildNodePositions, pushToHistory]
+-   `arrangeAllNodesAsTree` → [_buildNodeRelationMaps, _buildNodeLevelMap, _updateLevelNodePositions, pushToHistory]
+-   `arrangeNodesWithDagre` → [pushToHistory]
+-   `arrangeAllNodes` → [_findRootNodeForLayout, _runGlobalLayoutSystem, _handleLayoutResult]
+-   `arrangeSelectedNodeChildren` → [_findChildNodes, _runChildLayoutSystem, _handleChildLayoutResult]
+-   `arrangeSelectedNodeDescendants` → [_findDescendantNodes, _runDescendantLayoutSystem, _handleDescendantLayoutResult]
+
+####### HELPER METHODS
+
+-   `_validatePasteOperation` → [getCurrentNodeCount]
+-   `_setupPastedNodeLocalization`
+-   `_createPastedNodes` → [generateNodeKey, _setupPastedNodeLocalization]
+-   `_getRealNodeDimensions` → [_getEstimatedNodeDimensions]
+-   `_getEstimatedNodeDimensions`
+-   `_getNodesForDeletion`
+-   `_collectKeysForCleanup` → [_collectLocalizationKeys]
+-   `_performNodesDeletion`
+-   `_finalizeNodesDeletion` → [pushToHistory]
+-   `_validateChoiceNodeCreation` → [startCompoundAction, _validateNodeCountLimit, endCompoundAction]
+-   `_finalizeChoiceNodeCreation` → [arrangeSelectedNodeChildren, updateNodeVisibility, endCompoundAction]
+-   `_validateTextNodeCreation` → [startCompoundAction, _validateNodeCountLimit, endCompoundAction]
+-   `_connectAndUpdateTextNode`
+-   `_finalizeTextNodeCreation` → [arrangeSelectedNodeChildren, updateNodeVisibility, endCompoundAction]
+-   `_collectLocalizationKeys`
+-   `_collectNodeKeysForCleanup`
+-   `_findReferencingNodes`
+-   `_performNodeDeletion`
+-   `_cleanupAfterNodeDeletion` → [pushToHistory]
+-   `_validateNodeMovement`
+-   `_checkContinuousDrag`
+-   `_performNodeMove`
+-   `_handleContinuousDrag` → [_addMoveHistory]
+-   `_addMoveHistory` → [pushToHistory]
+-   `_validateNodeCountLimit`
+-   `_buildNodeRelationMaps`
+-   `_buildNodeLevelMap`
+-   `_updateLevelNodePositions`
+-   `_updateChildNodePositions`
+-   `_findRootNodeForLayout`
+-   `_runGlobalLayoutSystem` → [_runLayoutSystem]
+-   `_runLayoutSystem`
+-   `_handleLayoutResult`
+-   `_handleLayoutSystemResult`
+-   `_initializePositionCalculation`
+-   `_calculateCandidatePosition`
+-   `_findNonOverlappingPosition`
+-   `_getFallbackPosition`
+-   `_findRelatedNodes`
+-   `_findDescendantNodes` → [_findRelatedNodes]
+-   `_runDescendantLayoutSystem` → [_runLayoutSystem]
+-   `_handleDescendantLayoutResult`
+-   `_findChildNodes` → [_findRelatedNodes]
+-   `_runChildLayoutSystem` → [_runLayoutSystem]
+-   `_handleChildLayoutResult`
+-   `_createNewChoiceChild` → [generateNodeKey, calculateChildNodePosition]
+-   `_calculateTextNodeChildPosition`
+-   `_createNewTextChild` → [generateNodeKey, calculateChildNodePosition]
+
+####### OTHER
+
+-   `onRehydrateStorage`
+
+###### 🔗 의존성이 많은 메서드 TOP 10
+
+-   **`moveNode`** (5개 의존성)
+    -   호출: \_validateNodeMovement, \_checkContinuousDrag, \_performNodeMove, \_handleContinuousDrag, \_addMoveHistory
+-   **`deleteSelectedNodes`** (4개 의존성)
+    -   호출: \_getNodesForDeletion, \_collectKeysForCleanup, \_performNodesDeletion, \_finalizeNodesDeletion
+-   **`createTextNode`** (4개 의존성)
+    -   호출: \_validateNodeCountLimit, generateNodeKey, getNextNodePosition, addNode
+-   **`createChoiceNode`** (4개 의존성)
+    -   호출: \_validateNodeCountLimit, generateNodeKey, getNextNodePosition, addNode
+-   **`createAndConnectTextNode`** (4개 의존성)
+    -   호출: \_validateTextNodeCreation, \_createNewTextChild, \_connectAndUpdateTextNode, \_finalizeTextNodeCreation
+-   **`arrangeChildNodesAsTree`** (4개 의존성)
+    -   호출: \_buildNodeRelationMaps, \_buildNodeLevelMap, \_updateChildNodePositions, pushToHistory
+-   **`arrangeAllNodesAsTree`** (4개 의존성)
+    -   호출: \_buildNodeRelationMaps, \_buildNodeLevelMap, \_updateLevelNodePositions, pushToHistory
+-   **`pasteNodes`** (3개 의존성)
+    -   호출: \_validatePasteOperation, \_createPastedNodes, pushToHistory
+-   **`deleteNode`** (3개 의존성)
+    -   호출: \_collectNodeKeysForCleanup, \_performNodeDeletion, \_cleanupAfterNodeDeletion
+-   **`createAndConnectChoiceNode`** (3개 의존성)
+    -   호출: \_validateChoiceNodeCreation, \_createNewChoiceChild, \_finalizeChoiceNodeCreation
+
+###### 📞 자주 호출되는 메서드 TOP 10
+
+-   **`pushToHistory`** (9회 호출됨)
+    -   호출자: pasteNodes, addNode, \_finalizeNodesDeletion, \_cleanupAfterNodeDeletion, \_addMoveHistory, pushToHistoryWithTextEdit, arrangeChildNodesAsTree, arrangeAllNodesAsTree, arrangeNodesWithDagre
+-   **`generateNodeKey`** (5회 호출됨)
+    -   호출자: createTextNode, createChoiceNode, \_createPastedNodes, \_createNewChoiceChild, \_createNewTextChild
+-   **`_validateNodeCountLimit`** (4회 호출됨)
+    -   호출자: createTextNode, createChoiceNode, \_validateChoiceNodeCreation, \_validateTextNodeCreation
+-   **`endCompoundAction`** (4회 호출됨)
+    -   호출자: \_validateChoiceNodeCreation, \_finalizeChoiceNodeCreation, \_validateTextNodeCreation, \_finalizeTextNodeCreation
+-   **`_runLayoutSystem`** (3회 호출됨)
+    -   호출자: \_runGlobalLayoutSystem, \_runDescendantLayoutSystem, \_runChildLayoutSystem
+-   **`_addMoveHistory`** (2회 호출됨)
+    -   호출자: moveNode, \_handleContinuousDrag
+-   **`getNextNodePosition`** (2회 호출됨)
+    -   호출자: createTextNode, createChoiceNode
+-   **`addNode`** (2회 호출됨)
+    -   호출자: createTextNode, createChoiceNode
+-   **`getCurrentNodeCount`** (2회 호출됨)
+    -   호출자: canCreateNewNode, \_validatePasteOperation
+-   **`startCompoundAction`** (2회 호출됨)
+    -   호출자: \_validateChoiceNodeCreation, \_validateTextNodeCreation
+
+###### 🔄 순환 의존성 검사
+
+✅ 순환 의존성이 발견되지 않았습니다.
+
+###### 🔗 주요 의존성 체인
+
+-   moveSelectedNodes → moveNode → \_handleContinuousDrag → \_addMoveHistory → pushToHistory
+-   createAndConnectChoiceNode → \_createNewChoiceChild → calculateChildNodePosition → \_getRealNodeDimensions → \_getEstimatedNodeDimensions
+-   createAndConnectChoiceNode → \_finalizeChoiceNodeCreation → arrangeSelectedNodeChildren → \_findChildNodes → \_findRelatedNodes
+-   createAndConnectChoiceNode → \_finalizeChoiceNodeCreation → arrangeSelectedNodeChildren → \_runChildLayoutSystem → \_runLayoutSystem
+-   createAndConnectTextNode → \_createNewTextChild → calculateChildNodePosition → \_getRealNodeDimensions → \_getEstimatedNodeDimensions
