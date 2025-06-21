@@ -804,3 +804,80 @@ _액션 (1개)_
 ✅ **검증 기준** 정량적 목표 설정  
 
 **다음 단계**: Phase 3.1.1 핵심 서비스 인터페이스 설계 착수
+
+### **Phase 3: 인터페이스 설계** (2025-06-21 09:30 ~ 진행중)
+
+**목표**: 7개 파일 분할에 대응하는 도메인별 인터페이스 정의
+
+#### **Phase 3.1.1: 핵심 서비스 인터페이스 설계** (2025-06-21 09:30 ~ 09:31) ✅ **완료**
+
+**목표**: CORE SERVICES 인터페이스 (ICoreServices) 설계 및 공통 타입 정의
+
+##### **📋 Context Analysis (컨텍스트 분석)**
+
+**확인된 CORE SERVICES 메서드 시그니처**:
+1. **pushToHistory**: `(action: string) => void` - 9회 호출됨
+2. **generateNodeKey**: `() => string` - 5회 호출됨  
+3. **_validateNodeCountLimit**: `(options?: { endCompoundAction?: boolean }) => { isValid: boolean }` - 4회 호출됨
+4. **endCompoundAction**: `() => void` - 4회 호출됨
+5. **_runLayoutSystem**: `(currentScene: Scene, rootNodeId: string, layoutType: "global" | "descendant" | "child") => Promise<void>` - 3회 호출됨
+
+**의존성 타입 확인**:
+- `Scene` 타입: `types/dialogue.ts`에서 정의됨
+- 레이아웃 타입: "global" | "descendant" | "child" 리터럴 유니온
+
+##### **🎯 Planning (계획 수립)**
+
+**Phase 2.2.3 확정 구조 반영**:
+1. `src/store/types/editorTypes.ts` 생성 - 공통 타입 정의
+2. `ICoreServices` 인터페이스 설계 - 5개 메서드 포함
+3. 의존성 주입 패턴을 위한 `IDependencyContainer` 설계
+4. TypeScript 타입 안전성 확보
+
+##### **⚡ Execution (실행)**
+
+**생성된 파일**: `src/store/types/editorTypes.ts` (126줄)
+
+**핵심 인터페이스 정의**:
+```typescript
+export interface ICoreServices {
+  pushToHistory(action: string): void;
+  generateNodeKey(): string;
+  validateNodeCountLimit(options?: NodeCountValidationOptions): NodeCountValidationResult;
+  endCompoundAction(): void;
+  runLayoutSystem(currentScene: Scene, rootNodeId: string, layoutType: LayoutType): Promise<void>;
+}
+```
+
+**주요 특징**:
+- **도메인 중립성**: 어떤 도메인에도 의존하지 않는 순수 인터페이스
+- **명확한 JSDoc**: 각 메서드의 사용 빈도, 호출 도메인 명시
+- **타입 안전성**: 모든 매개변수 및 반환 타입 명시
+- **의존성 주입**: `IDependencyContainer` 패턴으로 순환 의존성 방지
+
+**보조 타입 정의**:
+- `LayoutType`: 레이아웃 시스템 타입 정의
+- `NodeCountValidationOptions/Result`: 노드 제한 검증 관련 타입
+- `IDependencyContainer`: DI 컨테이너 인터페이스
+- 유틸리티 타입들 (`Optional<T, K>`, `ExecutionResult`)
+
+##### **✅ 달성 성과**
+
+**인터페이스 설계**:
+✅ **CORE SERVICES 인터페이스** 완성 (5개 메서드)  
+✅ **타입 안전성** 확보 (모든 시그니처 명시)  
+✅ **의존성 분리** 달성 (순환 의존성 방지)  
+✅ **문서화** 완료 (JSDoc으로 상세 설명)  
+
+**코드 품질**:
+✅ **TypeScript 에러 0개** 달성  
+✅ **verbatimModuleSyntax** 준수  
+✅ **일관된 명명 규칙** 적용  
+✅ **확장 가능한 구조** 설계  
+
+**Phase 3-4 연계성**:
+✅ **도메인 분할 준비** 완료 (7개 파일 구조 지원)  
+✅ **DI 패턴 기반** 설계 (의존성 주입 지원)  
+✅ **Phase 3.1.2 준비** 완료 (도메인별 인터페이스 설계를 위한 기반 확립)  
+
+**다음 단계**: Phase 3.1.2 PROJECT DOMAIN 인터페이스 설계

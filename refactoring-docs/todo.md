@@ -280,14 +280,17 @@ interface EditorState {
 
 **목표**: Phase 2에서 확정된 7개 파일 구조에 맞는 명확한 인터페이스 설계
 
-##### 3.1.1 핵심 서비스 인터페이스
+##### 3.1.1 핵심 서비스 인터페이스 ✅ **완료**
 
--   [ ] **CORE SERVICES 인터페이스** (`ICoreServices`) 설계
-    -   [ ] `pushToHistory(action: string): void` - 히스토리 기록
-    -   [ ] `generateNodeKey(): string` - 고유 키 생성  
-    -   [ ] `validateNodeCountLimit(): boolean` - 노드 수 제한 검증
-    -   [ ] `endCompoundAction(): void` - 복합 액션 종료
-    -   [ ] `runLayoutSystem(config: LayoutConfig): Promise<void>` - 레이아웃 실행
+-   [x] **CORE SERVICES 인터페이스** (`ICoreServices`) 설계 ✅ **완료**
+    -   [x] `pushToHistory(action: string): void` - 히스토리 기록 ✅ **완료**
+    -   [x] `generateNodeKey(): string` - 고유 키 생성 ✅ **완료**
+    -   [x] `validateNodeCountLimit(options?: NodeCountValidationOptions): NodeCountValidationResult` - 노드 수 제한 검증 ✅ **완료**
+    -   [x] `endCompoundAction(): void` - 복합 액션 종료 ✅ **완료**
+    -   [x] `runLayoutSystem(currentScene: Scene, rootNodeId: string, layoutType: LayoutType): Promise<void>` - 레이아웃 실행 ✅ **완료**
+
+**생성 파일**: `src/store/types/editorTypes.ts` (126줄)  
+**핵심 성과**: 도메인 중립적 인터페이스, DI 패턴 지원, TypeScript 에러 0개
 
 ##### 3.1.2 도메인별 인터페이스
 
