@@ -136,6 +136,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     // 중복 텍스트 체크 (기존 키와 다른 키에 동일한 텍스트가 있는지)
     if (trimmedText) {
       const existingKey = useLocalizationStore.getState().findExistingKey(trimmedText);
+      
       if (existingKey && existingKey !== currentSpeakerKey) {
         // 기존 키 자동 사용
         updateNodeKeyReference(selectedNodeKey, "speaker", existingKey);

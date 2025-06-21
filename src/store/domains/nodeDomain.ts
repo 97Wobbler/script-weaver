@@ -264,12 +264,34 @@ export class NodeDomain implements Omit<INodeDomain, 'lastDraggedNodeKey' | 'las
    */
   updateNodeText(nodeKey: string, speakerText?: string, contentText?: string): void {
     const updates: Partial<Dialogue> = {};
+    const localizationStore = useLocalizationStore.getState();
     
+    // 화자 텍스트 업데이트 및 키 생성
     if (speakerText !== undefined) {
       updates.speakerText = speakerText;
+      
+      if (speakerText.trim()) {
+        const result = localizationStore.generateSpeakerKey(speakerText);
+        localizationStore.setText(result.key, speakerText);
+        updates.speakerKeyRef = result.key;
+      } else {
+        // 빈 텍스트인 경우 키 참조 제거
+        updates.speakerKeyRef = undefined;
+      }
     }
+    
+    // 내용 텍스트 업데이트 및 키 생성
     if (contentText !== undefined) {
       updates.contentText = contentText;
+      
+      if (contentText.trim()) {
+        const result = localizationStore.generateTextKey(contentText);
+        localizationStore.setText(result.key, contentText);
+        updates.textKeyRef = result.key;
+      } else {
+        // 빈 텍스트인 경우 키 참조 제거
+        updates.textKeyRef = undefined;
+      }
     }
 
     this.updateDialogue(nodeKey, updates);

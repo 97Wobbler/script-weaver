@@ -314,6 +314,7 @@ export const useEditorStore = create<EditorStore>()(
 
         updateNodeText: (nodeKey, speakerText, contentText) => {
           nodeDomain.updateNodeText(nodeKey, speakerText, contentText);
+          updateLocalizationStoreRef(); // 즉시 동기화
         },
 
         updateChoiceText: (nodeKey, choiceKey, choiceText) => {
