@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { DialogueSpeed } from "../types/dialogue";
 
 // 열거형 스키마
 export const DialogueSpeedSchema = z.enum(["SLOW", "NORMAL", "FAST"]);

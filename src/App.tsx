@@ -1,5 +1,3 @@
-// React import removed as it's not needed with jsx transform
-
 import React, { useState, useRef } from "react";
 import Canvas from "./components/Canvas";
 import PropertyPanel from "./components/PropertyPanel";

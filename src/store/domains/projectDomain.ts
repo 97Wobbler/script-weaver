@@ -6,27 +6,27 @@ import { migrateTemplateData, needsMigration } from "../../utils/migration";
 
 /**
  * Project Domain - 프로젝트 및 데이터 관리
- * 
+ *
  * ## 📋 주요 책임
  * - **프로젝트 설정**: 현재 템플릿/씬 전환 및 관리
  * - **구조 생성**: 새 템플릿/씬 생성 및 초기화
  * - **데이터 검증**: 개별 씬 및 전체 프로젝트 유효성 검사
  * - **Import/Export**: JSON/CSV 형식의 데이터 가져오기/내보내기
  * - **데이터 관리**: 초기화, 로컬 저장소 관리, 마이그레이션
- * 
+ *
  * ## 🔄 의존성 관리
  * - **Core Services**: 히스토리 기록 (검증 제외, 독립적 동작)
  * - **LocalizationStore**: Import/Export 시 텍스트 데이터 동기화
  * - **Migration Utils**: 레거시 데이터 구조 업그레이드
  * - **독립성**: 다른 도메인과 순환 의존성 없음
- * 
+ *
  * ## 🎯 핵심 특징
  * - **구조 보장**: 템플릿/씬 존재 보장 및 자동 생성
  * - **검증 시스템**: 노드 참조 무결성 및 연결 관계 검증
  * - **양방향 동기화**: EditorStore ↔ LocalizationStore 일관성
  * - **마이그레이션 지원**: 이전 버전 데이터 자동 업그레이드
  * - **에러 핸들링**: 안전한 Import 실패 처리 및 복구
- * 
+ *
  * @description 9개 public 메서드 + 헬퍼 함수들
  */
 export interface IProjectDomain {
@@ -85,7 +85,7 @@ const ensureTemplateExists = (templateData: TemplateDialogues, templateKey: stri
  */
 const ensureSceneExists = (templateData: TemplateDialogues, templateKey: string, sceneKey: string): TemplateDialogues => {
   const updatedTemplateData = ensureTemplateExists(templateData, templateKey);
-  
+
   if (!updatedTemplateData[templateKey][sceneKey]) {
     return {
       ...updatedTemplateData,
@@ -280,4 +280,4 @@ export const createProjectDomain = (
       }
     },
   };
-}; 
+};

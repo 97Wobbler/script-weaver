@@ -5,7 +5,7 @@ export const DialogueSpeed = {
   FAST: "FAST",
 } as const;
 
-export type DialogueSpeed = typeof DialogueSpeed[keyof typeof DialogueSpeed];
+export type DialogueSpeed = (typeof DialogueSpeed)[keyof typeof DialogueSpeed];
 
 // 액션 타입 (분기 후 동작 정의)
 export interface DialogueAction {
@@ -16,15 +16,15 @@ export interface DialogueAction {
 // 기본 대화 구조 (모든 노드가 공유) - 컨텐츠-키 분리 아키텍처 적용
 export interface BaseDialogue {
   type: "text" | "choice" | "input";
-  
+
   // 실제 텍스트 (사용자가 입력하는 내용)
   speakerText?: string;
   contentText?: string;
-  
+
   // 키 참조 (LocalizationStore와 연동)
   speakerKeyRef?: string;
   textKeyRef?: string;
-  
+
   // 기존 콜백 키들
   onEnterCallbackKey?: string;
   onExitCallbackKey?: string;
@@ -74,7 +74,7 @@ export interface EditorNodeWrapper {
   nodeKey: string;
   dialogue: Dialogue;
   position: { x: number; y: number };
-  hidden?: boolean;  // 노드 숨김 상태
+  hidden?: boolean; // 노드 숨김 상태
 }
 
 // 씬 타입 (노드들의 집합) - 빈 객체도 허용
@@ -133,4 +133,4 @@ export interface MigrationResult {
   success: boolean;
   migratedNodes: number;
   errors: string[];
-} 
+}

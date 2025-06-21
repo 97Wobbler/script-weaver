@@ -1,49 +1,32 @@
-import type { 
-  Scene,
-  EditorNodeWrapper
-} from "../../types/dialogue";
-import type { 
-  ICoreServices, 
-  ILayoutDomain,
-  NodePosition,
-  LayoutType,
-  NodeRelationMaps,
-  LevelMap,
-  PositionMap,
-  NodeDimensions,
-  PositionInitData
-} from "../types/editorTypes";
+import type { Scene, EditorNodeWrapper } from "../../types/dialogue";
+import type { ICoreServices, ILayoutDomain, NodePosition, LayoutType, NodeRelationMaps, LevelMap, PositionMap, NodeDimensions, PositionInitData } from "../types/editorTypes";
 
 /**
  * Layout Domain - 노드 레이아웃 및 자동 정렬 관리
- * 
+ *
  * ## 📋 주요 책임
  * - **위치 계산**: 새 노드 배치 위치 및 자식 노드 위치 계산
  * - **구 트리 정렬**: 기존 트리 구조 기반 노드 정렬 (3개 메서드)
  * - **신 레이아웃 시스템**: 글로벌 레이아웃 엔진 기반 정렬 (3개 메서드)
  * - **겹침 방지**: 노드 배치 시 다른 노드와의 겹침 검사 및 회피
  * - **관계 분석**: 부모-자식, 형제 관계 기반 레이아웃 최적화
- * 
+ *
  * ## 🔄 의존성 관리
  * - **Core Services**: 히스토리 기록, 레이아웃 시스템 실행
  * - **Layout Engine**: utils/layoutEngine의 글로벌 레이아웃 시스템
  * - **독립성**: 다른 도메인과 순환 의존성 없음
- * 
+ *
  * ## 🎯 핵심 특징
  * - **이중 시스템**: 구 트리 정렬 + 신 글로벌 레이아웃 시스템 지원
  * - **스마트 배치**: 노드 크기 추정 및 겹침 방지 알고리즘
  * - **계층 관리**: depth 기반 부모-자식-후손 관계 처리
  * - **비동기 처리**: 레이아웃 실행 중 상태 변경 안전성 보장
  * - **성능 최적화**: 변경된 노드만 선별적 정렬
- * 
+ *
  * @description 8개 public 메서드 + 20개 private 헬퍼 메서드
  */
-export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
-  constructor(
-    private getState: () => any,
-    private setState: (partial: any) => void,
-    private coreServices: ICoreServices
-  ) {}
+export class LayoutDomain implements Omit<ILayoutDomain, "lastNodePosition"> {
+  constructor(private getState: () => any, private setState: (partial: any) => void, private coreServices: ICoreServices) {}
 
   // ===== 위치 계산 (2개) =====
 
@@ -52,13 +35,13 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
    */
   getNextNodePosition(): NodePosition {
     const initData = this._initializePositionCalculation();
-    
+
     // 후보 위치 계산
     const candidatePosition = this._calculateCandidatePosition(initData);
-    
+
     // 겹치지 않는 위치 찾기
     const finalPosition = this._findNonOverlappingPosition(candidatePosition, initData);
-    
+
     return finalPosition;
   }
 
@@ -68,20 +51,20 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
   calculateChildNodePosition(parentNodeKey: string, choiceKey?: string): NodePosition {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene || !currentScene[parentNodeKey]) {
       return this.getNextNodePosition();
     }
 
     const parentNode = currentScene[parentNodeKey];
     const parentDimensions = this._getRealNodeDimensions(parentNodeKey);
-    
+
     if (parentNode.dialogue.type === "text") {
       return this._calculateTextNodeChildPosition(parentNode, parentDimensions);
     } else if (parentNode.dialogue.type === "choice" && choiceKey) {
       return this._calculateChoiceNodeChildPosition(parentNode, parentDimensions, choiceKey);
     }
-    
+
     return this.getNextNodePosition();
   }
 
@@ -93,24 +76,24 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
   arrangeChildNodesAsTree(rootNodeKey: string): void {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene || !currentScene[rootNodeKey]) {
       return;
     }
 
     const allNodeKeys = Object.keys(currentScene);
     const { childrenMap } = this._buildNodeRelationMaps(currentScene, allNodeKeys);
-    
+
     // 레벨별 노드 매핑 구축
     const levelMap = this._buildNodeLevelMap(rootNodeKey, childrenMap);
-    
+
     // 루트 노드 기준 시작 위치 설정
     const rootNode = currentScene[rootNodeKey];
     const startX = rootNode.position.x;
     const startY = rootNode.position.y + 200;
-    
+
     this._updateChildNodePositions(levelMap, rootNodeKey, startX, startY);
-    
+
     this.coreServices.pushToHistory(`자식 노드 트리 정렬 (${rootNodeKey})`);
   }
 
@@ -120,7 +103,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
   arrangeAllNodesAsTree(): void {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene) {
       return;
     }
@@ -132,7 +115,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
 
     // 노드 관계 분석
     const { childrenMap, parentMap } = this._buildNodeRelationMaps(currentScene, allNodeKeys);
-    
+
     // 루트 노드 찾기 (부모가 없는 노드)
     let rootNodeKey = "";
     for (const nodeKey of allNodeKeys) {
@@ -141,26 +124,26 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
         break;
       }
     }
-    
+
     if (!rootNodeKey) {
       rootNodeKey = allNodeKeys[0]; // 순환 참조인 경우 첫 번째 노드를 루트로
     }
 
     // 레벨별 노드 매핑 구축
     const levelMap = this._buildNodeLevelMap(rootNodeKey, childrenMap);
-    
+
     // 시작 위치 설정
     const startX = 100;
     const rootY = 100;
-    
+
     this._updateLevelNodePositions(levelMap, startX, rootY);
-    
+
     this.coreServices.pushToHistory("전체 노드 트리 정렬");
   }
 
   /**
    * Dagre 라이브러리를 사용하여 노드를 정렬합니다.
-   * 
+   *
    * @description 향후 구현 예정 - 현재는 기본 트리 정렬로 대체 실행
    */
   arrangeNodesWithDagre(): void {
@@ -176,7 +159,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
   async arrangeAllNodes(internal: boolean = false): Promise<void> {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene) {
       return;
     }
@@ -188,16 +171,16 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
 
     // 현재 위치 스냅샷
     const beforePositions = this._captureNodePositions(allNodeKeys);
-    
+
     // 루트 노드 찾기
     const rootNodeKey = this._findRootNodeForLayout(currentScene, allNodeKeys);
-    
+
     // 글로벌 레이아웃 시스템 실행
     await this._runGlobalLayoutSystem(currentScene, rootNodeKey);
-    
+
     // 결과 처리
     this._handleLayoutResult(beforePositions, allNodeKeys);
-    
+
     if (!internal) {
       this.coreServices.pushToHistory("전체 노드 자동 정렬");
     }
@@ -209,26 +192,26 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
   async arrangeSelectedNodeChildren(nodeKey: string, internal: boolean = false): Promise<void> {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene || !currentScene[nodeKey]) {
       return;
     }
 
     // 자식 노드들 찾기
     const childNodeKeys = this._findChildNodes(nodeKey, currentScene);
-    
+
     if (childNodeKeys.size === 0) {
       return;
     }
 
     const affectedNodeKeys = Array.from(childNodeKeys);
-    
+
     // 현재 위치 스냅샷
     const beforePositions = this._captureNodePositions(affectedNodeKeys);
-    
+
     // 자식 레이아웃 시스템 실행
     await this._runChildLayoutSystem(nodeKey, currentScene, affectedNodeKeys);
-    
+
     if (!internal) {
       this.coreServices.pushToHistory(`자식 노드 정렬 (${nodeKey})`);
     }
@@ -240,26 +223,26 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
   async arrangeSelectedNodeDescendants(nodeKey: string, internal: boolean = false): Promise<void> {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene || !currentScene[nodeKey]) {
       return;
     }
 
     // 후손 노드들 찾기
     const descendantNodeKeys = this._findDescendantNodes(nodeKey, currentScene);
-    
+
     if (descendantNodeKeys.size === 0) {
       return;
     }
 
     const affectedNodeKeys = Array.from(descendantNodeKeys);
-    
+
     // 현재 위치 스냅샷
     const beforePositions = this._captureNodePositions(affectedNodeKeys);
-    
+
     // 후손 레이아웃 시스템 실행
     await this._runDescendantLayoutSystem(nodeKey, currentScene, affectedNodeKeys);
-    
+
     if (!internal) {
       this.coreServices.pushToHistory(`후손 노드 정렬 (${nodeKey})`);
     }
@@ -282,14 +265,14 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
       SPACING_X: 250,
       SPACING_Y: 150,
       MAX_ATTEMPTS: 50,
-      MAX_ROWS_PER_COLUMN: 10
+      MAX_ROWS_PER_COLUMN: 10,
     };
 
     return {
       currentScene,
       allNodes,
       lastNodePosition,
-      constants
+      constants,
     };
   }
 
@@ -298,10 +281,10 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
    */
   private _calculateCandidatePosition(initData: PositionInitData): NodePosition {
     const { lastNodePosition, constants } = initData;
-    
+
     return {
       x: lastNodePosition.x + constants.SPACING_X,
-      y: lastNodePosition.y
+      y: lastNodePosition.y,
     };
   }
 
@@ -321,12 +304,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
 
       // 현재 위치에서 다른 노드와 겹치는지 확인
       for (const node of allNodes) {
-        if (this._isPositionOverlapping(
-          { x, y },
-          node.position,
-          DEFAULT_NODE_WIDTH,
-          DEFAULT_NODE_HEIGHT
-        )) {
+        if (this._isPositionOverlapping({ x, y }, node.position, DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT)) {
           hasOverlap = true;
           break;
         }
@@ -338,7 +316,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
 
       // 겹치면 다음 위치로 이동
       x += SPACING_X;
-      
+
       // 한 줄에 너무 많은 노드가 배치되면 다음 줄로
       if (currentRow >= MAX_ROWS_PER_COLUMN) {
         x = candidatePosition.x;
@@ -358,18 +336,8 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
   /**
    * 두 위치가 겹치는지 확인합니다.
    */
-  private _isPositionOverlapping(
-    pos1: NodePosition, 
-    pos2: NodePosition, 
-    width: number, 
-    height: number
-  ): boolean {
-    return !(
-      pos1.x + width < pos2.x ||
-      pos2.x + width < pos1.x ||
-      pos1.y + height < pos2.y ||
-      pos2.y + height < pos1.y
-    );
+  private _isPositionOverlapping(pos1: NodePosition, pos2: NodePosition, width: number, height: number): boolean {
+    return !(pos1.x + width < pos2.x || pos2.x + width < pos1.x || pos1.y + height < pos2.y || pos2.y + height < pos1.y);
   }
 
   /**
@@ -377,10 +345,10 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
    */
   private _getFallbackPosition(initData: PositionInitData): NodePosition {
     const { constants } = initData;
-    
+
     return {
       x: Math.random() * 500 + 100,
-      y: Math.random() * 400 + 100
+      y: Math.random() * 400 + 100,
     };
   }
 
@@ -390,14 +358,14 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
   private _getRealNodeDimensions(nodeKey: string): NodeDimensions {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene || !currentScene[nodeKey]) {
       return this._getEstimatedNodeDimensions("");
     }
 
     const node = currentScene[nodeKey];
     const contentLength = node.dialogue.contentText?.length || 0;
-    
+
     return this._getEstimatedNodeDimensions(node.dialogue.contentText || "");
   }
 
@@ -409,15 +377,15 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
     const baseHeight = 100;
     const charWidth = 8;
     const lineHeight = 20;
-    
+
     const contentLength = content.length;
     const estimatedWidth = Math.max(baseWidth, Math.min(400, baseWidth + contentLength * charWidth * 0.5));
     const estimatedLines = Math.ceil(contentLength / 30);
     const estimatedHeight = Math.max(baseHeight, baseHeight + estimatedLines * lineHeight);
-    
+
     return {
       width: estimatedWidth,
-      height: estimatedHeight
+      height: estimatedHeight,
     };
   }
 
@@ -427,25 +395,21 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
   private _calculateTextNodeChildPosition(parentNode: EditorNodeWrapper, parentDimensions: NodeDimensions): NodePosition {
     return {
       x: parentNode.position.x,
-      y: parentNode.position.y + parentDimensions.height + 50
+      y: parentNode.position.y + parentDimensions.height + 50,
     };
   }
 
   /**
    * 선택지 노드의 자식 위치를 계산합니다.
    */
-  private _calculateChoiceNodeChildPosition(
-    parentNode: EditorNodeWrapper, 
-    parentDimensions: NodeDimensions, 
-    choiceKey: string
-  ): NodePosition {
+  private _calculateChoiceNodeChildPosition(parentNode: EditorNodeWrapper, parentDimensions: NodeDimensions, choiceKey: string): NodePosition {
     const dialogue = parentNode.dialogue as any;
     const choices = Object.keys(dialogue.choices || {});
     const choiceIndex = choices.indexOf(choiceKey);
-    
+
     const baseX = parentNode.position.x + parentDimensions.width + 100;
-    const baseY = parentNode.position.y + (choiceIndex * 120);
-    
+    const baseY = parentNode.position.y + choiceIndex * 120;
+
     return { x: baseX, y: baseY };
   }
 
@@ -493,22 +457,22 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
   private _buildNodeLevelMap(rootNodeKey: string, childrenMap: Map<string, string[]>): LevelMap {
     const levelMap = new Map<number, string[]>();
     const visited = new Set<string>();
-    
+
     const buildLevel = (nodeKey: string, level: number) => {
       if (visited.has(nodeKey)) return;
       visited.add(nodeKey);
-      
+
       if (!levelMap.has(level)) {
         levelMap.set(level, []);
       }
       levelMap.get(level)!.push(nodeKey);
-      
+
       const children = childrenMap.get(nodeKey) || [];
       for (const child of children) {
         buildLevel(child, level + 1);
       }
     };
-    
+
     buildLevel(rootNodeKey, 0);
     return levelMap;
   }
@@ -522,7 +486,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
 
     for (const [level, nodeKeys] of levelMap.entries()) {
       const y = rootY + level * LEVEL_SPACING_Y;
-      
+
       nodeKeys.forEach((nodeKey, index) => {
         const x = startX + index * NODE_SPACING_X;
         this._updateNodePosition(nodeKey, { x, y });
@@ -540,9 +504,9 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
     // 루트 노드는 제외하고 자식들만 업데이트
     for (const [level, nodeKeys] of levelMap.entries()) {
       if (level === 0) continue; // 루트 노드 제외
-      
+
       const y = startY + (level - 1) * LEVEL_SPACING_Y;
-      
+
       nodeKeys.forEach((nodeKey, index) => {
         const x = startX + index * NODE_SPACING_X;
         this._updateNodePosition(nodeKey, { x, y });
@@ -556,22 +520,22 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
   private _updateNodePosition(nodeKey: string, position: NodePosition): void {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (!currentScene || !currentScene[nodeKey]) {
       return;
     }
 
     const updatedNode = { ...currentScene[nodeKey], position };
     const updatedScene = { ...currentScene, [nodeKey]: updatedNode };
-    
+
     this.setState({
       templateData: {
         ...state.templateData,
         [state.currentTemplate]: {
           ...state.templateData[state.currentTemplate],
-          [state.currentScene]: updatedScene
-        }
-      }
+          [state.currentScene]: updatedScene,
+        },
+      },
     });
   }
 
@@ -580,7 +544,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
    */
   private _findRootNodeForLayout(currentScene: Scene, allNodeKeys: string[]): string {
     const { parentMap } = this._buildNodeRelationMaps(currentScene, allNodeKeys);
-    
+
     // 부모가 없는 노드를 찾기
     for (const nodeKey of allNodeKeys) {
       const parents = parentMap.get(nodeKey) || [];
@@ -588,7 +552,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
         return nodeKey;
       }
     }
-    
+
     // 부모가 없는 노드가 없으면 첫 번째 노드를 루트로
     return allNodeKeys[0] || "";
   }
@@ -610,25 +574,19 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
   /**
    * 레이아웃 시스템 결과를 처리합니다.
    */
-  private _handleLayoutSystemResult(
-    beforePositions: PositionMap, 
-    nodeKeys: string[], 
-    layoutType: LayoutType, 
-    nodeCount: number
-  ): void {
+  private _handleLayoutSystemResult(beforePositions: PositionMap, nodeKeys: string[], layoutType: LayoutType, nodeCount: number): void {
     // 위치 변경 감지 및 결과 처리
     let hasPositionChanged = false;
-    
+
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
+
     if (currentScene) {
       for (const nodeKey of nodeKeys) {
         const beforePos = beforePositions.get(nodeKey);
         const currentPos = currentScene[nodeKey]?.position;
-        
-        if (beforePos && currentPos && 
-            (beforePos.x !== currentPos.x || beforePos.y !== currentPos.y)) {
+
+        if (beforePos && currentPos && (beforePos.x !== currentPos.x || beforePos.y !== currentPos.y)) {
           hasPositionChanged = true;
           break;
         }
@@ -636,10 +594,8 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
     }
 
     // 상태 메시지 표시
-    const message = hasPositionChanged 
-      ? `${layoutType} 레이아웃 완료 (${nodeCount}개 노드 정렬됨)`
-      : `${layoutType} 레이아웃 실행됨 (위치 변경 없음)`;
-    
+    const message = hasPositionChanged ? `${layoutType} 레이아웃 완료 (${nodeCount}개 노드 정렬됨)` : `${layoutType} 레이아웃 실행됨 (위치 변경 없음)`;
+
     state.showToast?.(message, "info");
   }
 
@@ -650,7 +606,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
     const positions = new Map<string, NodePosition>();
-    
+
     if (currentScene) {
       for (const nodeKey of nodeKeys) {
         const node = currentScene[nodeKey];
@@ -659,7 +615,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
         }
       }
     }
-    
+
     return positions;
   }
 
@@ -669,16 +625,16 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
   private _findRelatedNodes(nodeKey: string, currentScene: Scene, maxDepth: number = Infinity): Set<string> {
     const related = new Set<string>();
     const visited = new Set<string>();
-    
+
     const findRelated = (currentKey: string, depth: number) => {
       if (depth > maxDepth || visited.has(currentKey)) return;
       visited.add(currentKey);
-      
+
       const node = currentScene[currentKey];
       if (!node) return;
-      
+
       const dialogue = node.dialogue;
-      
+
       if (dialogue.type === "text" && dialogue.nextNodeKey) {
         if (currentScene[dialogue.nextNodeKey]) {
           related.add(dialogue.nextNodeKey);
@@ -695,7 +651,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
         }
       }
     };
-    
+
     findRelated(nodeKey, 0);
     return related;
   }
@@ -712,7 +668,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
    */
   private async _runDescendantLayoutSystem(nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]): Promise<void> {
     await this.coreServices.runLayoutSystem(currentScene, nodeKey, "descendant");
-    
+
     const beforePositions = this._captureNodePositions(affectedNodeKeys);
     const descendantCount = affectedNodeKeys.length;
     this._handleLayoutSystemResult(beforePositions, affectedNodeKeys, "descendant", descendantCount);
@@ -730,7 +686,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
    */
   private async _runChildLayoutSystem(nodeKey: string, currentScene: Scene, affectedNodeKeys: string[]): Promise<void> {
     await this.coreServices.runLayoutSystem(currentScene, nodeKey, "child");
-    
+
     const beforePositions = this._captureNodePositions(affectedNodeKeys);
     const childCount = affectedNodeKeys.length;
     this._handleLayoutSystemResult(beforePositions, affectedNodeKeys, "child", childCount);
@@ -740,10 +696,6 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
 /**
  * LayoutDomain 인스턴스를 생성합니다.
  */
-export const createLayoutDomain = (
-  getState: () => any,
-  setState: (partial: any) => void,
-  coreServices: ICoreServices
-): LayoutDomain => {
+export const createLayoutDomain = (getState: () => any, setState: (partial: any) => void, coreServices: ICoreServices): LayoutDomain => {
   return new LayoutDomain(getState, setState, coreServices);
 };

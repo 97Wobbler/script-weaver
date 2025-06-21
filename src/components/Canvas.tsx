@@ -171,8 +171,6 @@ export default function Canvas() {
   // 노드 클릭 핸들러 (다중 선택 지원)
   const handleNodeClick = useCallback(
     (event: any, node: any) => {
-      
-
       if (event.ctrlKey || event.metaKey) {
         // Ctrl+클릭: 다중 선택 토글
         toggleNodeSelection(node.id);

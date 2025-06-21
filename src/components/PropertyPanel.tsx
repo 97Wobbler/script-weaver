@@ -96,7 +96,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
         choiceTexts:
           selectedNode.dialogue.type === "choice" ? Object.fromEntries(Object.entries(selectedNode.dialogue.choices).map(([key, choice]) => [key, choice.choiceText])) : {},
       };
-      
+
       setLocalTextState(newLocalState);
     } else {
       setLocalTextState({
@@ -138,7 +138,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     // 중복 텍스트 체크 (기존 키와 다른 키에 동일한 텍스트가 있는지)
     if (trimmedText) {
       const existingKey = useLocalizationStore.getState().findExistingKey(trimmedText);
-      
+
       if (existingKey && existingKey !== currentSpeakerKey) {
         // 기존 키 자동 사용을 위해 토스트 메시지 표시
         showToast?.(`기존 키 "${existingKey}"를 자동으로 사용했습니다`, "info");
@@ -294,23 +294,23 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   // 직접 전체 템플릿 데이터에서 키를 사용하는 노드들을 찾는 함수
   const findDirectUsageNodes = (key: string): string[] => {
     const nodes: string[] = [];
-    
+
     // 전체 템플릿 데이터에서 검색
     Object.entries(templateData).forEach(([templateKey, template]) => {
       Object.entries(template).forEach(([sceneKey, scene]) => {
         Object.entries(scene).forEach(([nodeKey, nodeWrapper]) => {
           const dialogue = nodeWrapper.dialogue;
-          
+
           // 화자 키 검증
           if (dialogue.speakerKeyRef === key) {
             nodes.push(`${templateKey}/${sceneKey}/${nodeKey} (화자)`);
           }
-          
+
           // 텍스트 키 검증
           if (dialogue.textKeyRef === key) {
             nodes.push(`${templateKey}/${sceneKey}/${nodeKey} (내용)`);
           }
-          
+
           // 선택지 키 검증
           if (dialogue.type === "choice" && dialogue.choices) {
             Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
@@ -322,7 +322,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
         });
       });
     });
-    
+
     return nodes;
   };
 
@@ -330,8 +330,6 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   const startKeyEdit = (keyType: "speaker" | "text" | "choice", key: string, choiceKey?: string) => {
     const text = getText(key) || "";
     const usageNodes = findNodesUsingKey(key);
-
-
 
     setKeyEditState({
       isEditing: true,
@@ -358,8 +356,6 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     const isTextChanged = keyEditState.newText !== keyEditState.originalText;
     const isKeyChanged = keyEditState.newKey !== keyEditState.originalKey;
 
-
-
     if (updateAll) {
       // 모든 위치에서 함께 변경
       if (isTextChanged) {
@@ -368,13 +364,13 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
 
         // 모든 노드의 실제 텍스트도 동기화
         const usageNodes = localizationStore.findNodesUsingKey(keyEditState.originalKey);
-        
+
         // LocalizationStore에서 노드를 찾지 못한 경우, 직접 템플릿 데이터에서 찾기
         const directUsageNodes = usageNodes.length === 0 ? findDirectUsageNodes(keyEditState.originalKey) : [];
-        
+
         // usageNodes 또는 directUsageNodes를 사용하여 노드 업데이트
         const nodesToUpdate = usageNodes.length > 0 ? usageNodes : directUsageNodes;
-        
+
         if (nodesToUpdate.length > 0) {
           nodesToUpdate.forEach((nodeInfo) => {
             const match = nodeInfo.match(/^(.+)\/(.+)\/(.+) \((.+)\)$/);
@@ -394,7 +390,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
           });
         } else {
           // 노드를 찾지 못한 경우 현재 선택된 노드 직접 업데이트
-          
+
           if (keyEditState.keyType === "speaker") {
             updateNodeText(selectedNodeKey, keyEditState.newText, undefined);
           } else if (keyEditState.keyType === "text") {
@@ -408,9 +404,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
       if (isKeyChanged) {
         // 키값 변경: 모든 노드의 키 참조를 새 키로 업데이트
         // 텍스트가 변경되지 않았다면 원래 키의 텍스트를 사용, 변경되었다면 새 텍스트 사용
-        const textToUse = isTextChanged ? keyEditState.newText : (localizationStore.getText(keyEditState.originalKey) || keyEditState.originalText);
-        
-
+        const textToUse = isTextChanged ? keyEditState.newText : localizationStore.getText(keyEditState.originalKey) || keyEditState.originalText;
 
         // 새 키에 텍스트 설정
         localizationStore.setText(keyEditState.newKey, textToUse);
@@ -418,12 +412,10 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
         // 기존 키를 사용하는 모든 노드의 키 참조 업데이트
         const usageNodes = localizationStore.findNodesUsingKey(keyEditState.originalKey);
         const directUsageNodes = findDirectUsageNodes(keyEditState.originalKey);
-        
 
-        
         // 더 많은 노드를 찾은 방법을 우선 사용
         const nodesToUpdateForKeyChange = directUsageNodes.length > usageNodes.length ? directUsageNodes : usageNodes;
-        
+
         nodesToUpdateForKeyChange.forEach((nodeInfo) => {
           // nodeInfo 형식: "templateKey/sceneKey/nodeKey (타입)" 파싱
           const match = nodeInfo.match(/^(.+)\/(.+)\/(.+) \((.+)\)$/);
@@ -495,7 +487,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     }
 
     // 로컬 텍스트 상태 업데이트 (키 편집 완료 후 blur 방지)
-    
+
     if (keyEditState.keyType === "choice" && keyEditState.choiceKey) {
       setLocalTextState((prev) => ({
         ...prev,
@@ -603,7 +595,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   // 실시간 키 사용 개수 계산 함수
   const calculateKeyUsageCount = (keyRef: string): number => {
     let count = 0;
-    
+
     // 현재 templateData에서 직접 계산
     Object.entries(templateData).forEach(([templateKey, template]) => {
       Object.entries(template).forEach(([sceneKey, scene]) => {
@@ -641,7 +633,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     const localizationData = useLocalizationStore((state) => state.localizationData);
     const currentTemplateData = useEditorStore((state) => state.templateData);
     const usageCount = calculateKeyUsageCount(keyRef);
-    
+
     return (
       <button onClick={() => startKeyEdit(keyType, keyRef, choiceKey)} className="mt-1 text-xs text-gray-500 hover:text-blue-600 hover:underline text-left">
         키: {keyRef} ({usageCount}개 사용)
