@@ -548,6 +548,17 @@ src/store/
             - `editorStore.ts`에서 `updateLocalizationStoreRef()` 즉시 동기화 추가
         -   [x] 상태 동기화 문제 해결: UI 실시간 업데이트 보장
         -   [x] 기능 검증 완료: 화자명/내용 편집 시 자동 키 생성 및 표시 100% 정상 작동
+    -   [x] F22 키 텍스트 편집 문제 수정 ✅ **완료 (2025-01-21 17:30 ~ 18:15)**
+        -   [x] 근본 원인 파악: `LocalizationStore.findNodesUsingKey()`의 동기화 문제
+            - 키값 변경 후 일부 노드를 찾지 못해서 텍스트 변경이 일부 노드에만 적용됨
+            - 특히 선택지에서 키 편집 시 더 심각함 (1개 노드만 찾음 vs 실제 2개 노드)
+        -   [x] 해결책 구현:
+            - `findDirectUsageNodes()` 함수 추가 (전체 템플릿 데이터 직접 검색)
+            - 이중 검색 로직 (LocalizationStore vs 직접 검색, 더 많이 찾은 방법 우선 사용)
+            - fallback 메커니즘으로 현재 선택된 노드 직접 업데이트
+            - 키 변경 시 텍스트 처리 개선 (`textToUse` 로직)
+        -   [x] 검증 완료: 로그에서 `localizationCount: 1, directCount: 2`로 정상 작동 확인
+        -   [x] 기능 검증: 키값 변경 → 텍스트 변경 순서 100% 정상 작동, 모든 관련 노드 동시 업데이트
 
 -   [ ] **잠재적 버그 확인**
 

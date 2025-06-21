@@ -2749,3 +2749,73 @@ src/store/
 **성과**: F14 텍스트 편집 기능 100% 정상 작동, 모든 입력 필드에서 중복 키 처리 완벽 지원
 
 ---
+
+
+
+## **F22 키 텍스트 편집 버그 수정** (2025-01-21 17:30 ~ 18:15) ✅ **완료**
+
+**문제**: 키 편집 모달에서 키값 변경 후 키 텍스트 변경 시 패널 및 캔버스에 반영되지 않는 문제
+
+### **🔍 문제 분석**
+
+**재현 조건**:
+1. 키값을 먼저 변경 (예: `npc_1` → `npc_2`)
+2. 이어서 바로 키 텍스트를 변경 (예: `NPC` → `NPC2`)
+3. 모달에서 수정한 텍스트로 변경이 반영되지 않음 (패널 및 캔버스에서 반영 안됨)
+4. 모달 자체에서는 닫혔다가 다시 열면 반영되어 있음
+
+**근본 원인**:
+- `LocalizationStore.findNodesUsingKey()`의 동기화 문제
+- 키값 변경 후 일부 노드를 찾지 못해서 텍스트 변경이 일부 노드에만 적용됨
+- 특히 선택지에서 키 편집을 시작할 때 더 심각함 (1개 노드만 찾음 vs 실제 2개 노드)
+
+### **🛠 해결 방법**
+
+**1. 직접 노드 검색 함수 추가**:
+```typescript
+const findDirectUsageNodes = (key: string): string[] => {
+  // 전체 템플릿 데이터에서 키를 사용하는 노드들을 직접 검색
+  // LocalizationStore.findNodesUsingKey()의 대안 제공
+}
+```
+
+**2. 이중 검색 로직 구현**:
+- `LocalizationStore.findNodesUsingKey()` 결과와 직접 검색 결과 비교
+- 더 많은 노드를 찾은 방법을 우선 사용
+- fallback 로직으로 현재 선택된 노드 직접 업데이트
+
+**3. 키 변경 시 텍스트 처리 개선**:
+```typescript
+const textToUse = isTextChanged ? keyEditState.newText : 
+  (localizationStore.getText(keyEditState.originalKey) || keyEditState.originalText);
+```
+
+### **🎯 수정 결과**
+
+**수정 전 로그**:
+```
+localizationCount: 1, directCount: 0  // 1개만 찾음
+```
+
+**수정 후 로그**:
+```
+localizationCount: 1, directCount: 2  // 직접 검색이 더 많은 노드 찾음
+directNodes: ['텍스트 노드 화자', '선택지 노드']  // 모든 관련 노드 정확히 찾음
+```
+
+**검증 결과**:
+✅ **텍스트 노드** 키 편집 시 정상 작동  
+✅ **선택지 노드** 키 편집 시 정상 작동  
+✅ **키값 변경 → 텍스트 변경** 순서 정상 작동  
+✅ **모든 관련 노드** 동시 업데이트 확인  
+✅ **패널과 캔버스** 모두 정상 반영
+
+### **📁 수정된 파일**
+
+**`src/components/PropertyPanel.tsx`**:
+- `findDirectUsageNodes()` 함수 추가 (전체 템플릿 검색)
+- 키 변경 시 이중 검색 로직 구현
+- 텍스트 변경 시 fallback 로직 추가
+- 디버깅 로그 추가 및 제거
+
+**커밋**: `fc3a16a` - "fix: F22 키 편집 모달에서 키값 변경 후 텍스트 변경 시 반영되지 않는 문제 수정"
