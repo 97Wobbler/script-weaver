@@ -442,10 +442,11 @@ src/store/
 
 #### 4.2 복합 도메인 및 통합
 
--   [ ] 4.2.1 NODE CORE DOMAIN 분리
-    -   [ ] `domains/nodeDomain.ts` 생성
-    -   [ ] 25개 핵심 노드 메서드 + 15개 헬퍼 이동
-    -   [ ] CORE, HISTORY 의존성 설정
+-   [x] 4.2.1 NODE CORE DOMAIN 분리 ✅ **완료**
+    -   [x] `domains/nodeDomain.ts` 생성 (676줄)
+    -   [x] 20개 핵심 노드 메서드 + 15개 헬퍼 이동
+    -   [x] CORE, HISTORY 의존성 설정
+    -   [x] 린터 오류 수정 (타입 안전성 확보)
 
 -   [ ] 4.2.2 NODE OPERATIONS & LAYOUT 분리
     -   [ ] `domains/nodeOperationsDomain.ts` 생성 (22개 메서드 + 15개 헬퍼)

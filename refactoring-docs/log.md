@@ -1774,4 +1774,76 @@ export class HistoryDomain {
 
 **다음 단계 준비도**: **100% 완료** 🎉
 
+#### **Phase 4.2.1: NODE CORE DOMAIN 분리** (2025-06-21 11:20 ~ 12:17) ✅ **완료**
+
+**목표**: 노드의 기본 CRUD, 선택 관리, 내용 수정, 연결 관리 등 핵심 기능 도메인 분리
+
+##### **📋 Context Analysis (컨텍스트 분석)**
+
+**분리 대상 메서드 (노드 핵심 관리)**:
+- **선택 관리** (4개): setSelectedNode, toggleNodeSelection, clearSelection, selectMultipleNodes
+- **기본 CRUD** (4개): addNode, updateNode, deleteNode, moveNode
+- **내용 수정** (3개): updateDialogue, updateNodeText, updateChoiceText
+- **연결 관리** (2개): connectNodes, disconnectNodes
+- **유틸리티** (3개): generateNodeKey, getCurrentNodeCount, canCreateNewNode
+- **참조/상태 업데이트** (4개): updateNodeKeyReference, updateChoiceKeyReference, updateNodeVisibility, updateNodePositionAndVisibility
+
+**도메인 특성**:
+- **핵심 기능**: 노드의 모든 기본적인 CRUD 및 관리 기능
+- **의존성**: CORE SERVICES (pushToHistory, generateNodeKey), LocalizationStore 연동
+- **헬퍼 메서드**: 15개 private 헬퍼 메서드 포함 (삭제, 이동, 로컬라이제이션 관리)
+
+##### **⚡ Execution (실행)**
+
+**새로 생성된 파일**:
+```typescript
+// src/store/domains/nodeDomain.ts (676줄)
+export class NodeDomain {
+  constructor(
+    private getState: () => any,
+    private setState: (partial: any) => void,
+    private coreServices: ICoreServices
+  ) {}
+
+  // 20개 핵심 메서드 완전 구현
+  // 15개 private 헬퍼 메서드 포함
+}
+```
+
+**린터 오류 수정 작업** (2025-06-21 12:00 ~ 12:17):
+1. ✅ **속성명 수정**: `key` → `nodeKey` (EditorNodeWrapper 타입 정합성)
+2. ✅ **연결 해제 개선**: `delete` 연산자 → `undefined` 할당 (타입 안전성)
+3. ✅ **노드 삭제 로직**: 타입 가드 적용으로 스프레드 연산자 문제 해결
+4. ✅ **타입 캐스팅**: 명시적 타입 캐스팅으로 TypeScript 에러 0개 달성
+
+##### **📊 Performance Impact (성능 영향)**
+
+**코드 품질 개선**:
+✅ **타입 안전성**: TypeScript 컴파일 에러 0개 완전 달성  
+✅ **코드 분리**: 노드 핵심 기능 676줄로 독립 분리  
+✅ **가독성**: 명확한 책임 분리 및 메서드 단일 책임 원칙  
+✅ **유지보수성**: 노드 관련 모든 기능 중앙 집중화  
+
+**아키텍처 개선**:
+✅ **도메인 독립성**: CORE SERVICES만 의존하는 깔끔한 구조  
+✅ **확장성**: 새로운 노드 기능 추가 용이  
+✅ **테스트 용이성**: 독립적인 도메인 단위 테스트 가능  
+
+##### **🎯 Achievement Summary (달성 요약)**
+
+**Phase 4.2.1 NODE CORE DOMAIN 분리 ✅ 100% 완료**:
+1. ✅ **도메인 파일 생성**: `domains/nodeDomain.ts` (676줄)
+2. ✅ **메서드 완전 분리**: 20개 핵심 노드 메서드 100% 구현
+3. ✅ **헬퍼 메서드**: 15개 private 헬퍼 메서드 포함
+4. ✅ **의존성 설정**: CORE SERVICES, LocalizationStore 의존성 완료
+5. ✅ **타입 안전성**: 모든 린터 오류 수정 및 TypeScript 에러 0개 달성
+
+**Phase 4.2.2 NODE OPERATIONS & LAYOUT 분할 완벽 준비**:
+✅ **노드 핵심 기능**: 완전 분리된 깔끔한 구조  
+✅ **의존성 체인**: 명확한 도메인 간 의존성 설계  
+✅ **확장 가능**: 복잡한 노드 연산 분리를 위한 기반 확립  
+✅ **유지보수**: 도메인별 로직 완전 독립화  
+
+**다음 단계 준비도**: **100% 완료** 🎉
+
 ---
