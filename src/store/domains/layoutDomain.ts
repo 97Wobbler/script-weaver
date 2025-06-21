@@ -144,13 +144,12 @@ export class LayoutDomain implements Omit<ILayoutDomain, 'lastNodePosition'> {
 
   /**
    * Dagre 라이브러리를 사용하여 노드를 정렬합니다.
+   * 
+   * @description 향후 구현 예정 - 현재는 기본 트리 정렬로 대체 실행
    */
   arrangeNodesWithDagre(): void {
-    // Dagre 정렬 로직 (기존 구현 유지)
-    // 이 메서드는 외부 라이브러리 의존성이 있어 향후 구현 예정
-    console.warn("Dagre 정렬은 향후 구현 예정입니다.");
-    
-    this.coreServices.pushToHistory("Dagre 노드 정렬");
+    // 현재는 기본 트리 정렬로 대체 실행
+    this.arrangeAllNodesAsTree();
   }
 
   // ===== 신 레이아웃 시스템 (3개) =====

@@ -94,6 +94,31 @@ export interface ICoreServices {
     rootNodeId: string, 
     layoutType: LayoutType
   ): Promise<void>;
+
+  /**
+   * 씬에서 노드를 조회합니다.
+   * 
+   * @param scene - 대상 씬
+   * @param nodeKey - 노드 키
+   * @returns 노드 또는 undefined
+   * 
+   * **사용 빈도**: 공통 헬퍼 함수
+   * **호출 도메인**: NODE OPERATIONS
+   */
+  getNode(scene: Scene, nodeKey: string): any;
+
+  /**
+   * 씬에 노드를 설정합니다 (불변성 유지).
+   * 
+   * @param scene - 대상 씬
+   * @param nodeKey - 노드 키
+   * @param node - 설정할 노드
+   * @returns 새로운 씬
+   * 
+   * **사용 빈도**: 공통 헬퍼 함수
+   * **호출 도메인**: NODE OPERATIONS
+   */
+  setNode(scene: Scene, nodeKey: string, node: any): Scene;
 }
 
 // ===== PROJECT DOMAIN 인터페이스 =====
