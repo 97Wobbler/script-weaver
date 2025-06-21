@@ -7,7 +7,7 @@
  * 이 파일은 7개 도메인 분할을 위한 공통 타입들을 정의합니다.
  */
 
-import type { Scene, ValidationResult, TemplateDialogues } from '../../types/dialogue';
+import type { Scene, ValidationResult, TemplateDialogues, EditorNodeWrapper, Dialogue } from '../../types/dialogue';
 import type { LocalizationData } from '../localizationStore';
 
 // ===== CORE SERVICES 관련 타입 =====
@@ -380,6 +380,271 @@ export interface HistoryOperationOptions {
   skipCompoundAction?: boolean;
   maxHistorySize?: number;
 }
+
+// ===== NODE CORE DOMAIN 인터페이스 =====
+
+/**
+ * 노드 핵심 도메인 인터페이스
+ * 
+ * 노드의 기본 CRUD, 선택 관리, 내용 수정, 연결 관리 등 핵심 기능을 담당합니다.
+ * CORE SERVICES와 HISTORY DOMAIN에 의존합니다.
+ */
+export interface INodeDomain {
+  // ===== 상태 =====
+  
+  /**
+   * 연속 드래그 감지용 - 마지막 드래그된 노드 키
+   */
+  lastDraggedNodeKey: string | null;
+
+  /**
+   * 연속 드래그 감지용 - 마지막 드래그 액션 시간
+   */
+  lastDragActionTime: number;
+
+  /**
+   * 다중 선택된 노드 키들
+   */
+  selectedNodeKeys: Set<string>;
+
+  // ===== 선택 관리 =====
+
+  /**
+   * 단일 노드를 선택합니다.
+   * 
+   * @param nodeKey - 선택할 노드 키 (undefined시 선택 해제)
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  setSelectedNode(nodeKey?: string): void;
+
+  /**
+   * 노드 선택을 토글합니다.
+   * 
+   * @param nodeKey - 토글할 노드 키
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  toggleNodeSelection(nodeKey: string): void;
+
+  /**
+   * 모든 선택을 해제합니다.
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  clearSelection(): void;
+
+  /**
+   * 여러 노드를 한번에 선택합니다.
+   * 
+   * @param nodeKeys - 선택할 노드 키 배열
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  selectMultipleNodes(nodeKeys: string[]): void;
+
+  // ===== 기본 CRUD =====
+
+  /**
+   * 새 노드를 추가합니다.
+   * 
+   * @param node - 추가할 노드 래퍼
+   * 
+   * **의존성**: CORE SERVICES (pushToHistory)
+   */
+  addNode(node: EditorNodeWrapper): void;
+
+  /**
+   * 기존 노드를 업데이트합니다.
+   * 
+   * @param nodeKey - 업데이트할 노드 키
+   * @param updates - 업데이트할 속성들
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  updateNode(nodeKey: string, updates: Partial<EditorNodeWrapper>): void;
+
+  /**
+   * 노드를 삭제합니다.
+   * 
+   * @param nodeKey - 삭제할 노드 키
+   * 
+   * **의존성**: CORE SERVICES (pushToHistory), LocalizationStore (내부적)
+   */
+  deleteNode(nodeKey: string): void;
+
+  /**
+   * 노드를 이동합니다.
+   * 
+   * @param nodeKey - 이동할 노드 키
+   * @param position - 새 위치
+   * 
+   * **의존성**: CORE SERVICES (pushToHistory)
+   */
+  moveNode(nodeKey: string, position: { x: number; y: number }): void;
+
+  // ===== 내용 수정 =====
+
+  /**
+   * 노드의 대화 내용을 업데이트합니다.
+   * 
+   * @param nodeKey - 업데이트할 노드 키
+   * @param dialogue - 업데이트할 대화 내용
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  updateDialogue(nodeKey: string, dialogue: Partial<Dialogue>): void;
+
+  /**
+   * 노드의 텍스트를 업데이트합니다.
+   * 
+   * @param nodeKey - 업데이트할 노드 키
+   * @param speakerText - 화자 텍스트 (선택적)
+   * @param contentText - 내용 텍스트 (선택적)
+   * 
+   * **의존성**: LocalizationStore (내부적)
+   */
+  updateNodeText(nodeKey: string, speakerText?: string, contentText?: string): void;
+
+  /**
+   * 선택지 텍스트를 업데이트합니다.
+   * 
+   * @param nodeKey - 업데이트할 노드 키
+   * @param choiceKey - 선택지 키
+   * @param choiceText - 새 선택지 텍스트
+   * 
+   * **의존성**: LocalizationStore (내부적)
+   */
+  updateChoiceText(nodeKey: string, choiceKey: string, choiceText: string): void;
+
+  // ===== 연결 관리 =====
+
+  /**
+   * 두 노드를 연결합니다.
+   * 
+   * @param fromNodeKey - 출발 노드 키
+   * @param toNodeKey - 도착 노드 키
+   * @param choiceKey - 선택지 키 (선택지 노드인 경우)
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  connectNodes(fromNodeKey: string, toNodeKey: string, choiceKey?: string): void;
+
+  /**
+   * 노드 연결을 끊습니다.
+   * 
+   * @param fromNodeKey - 출발 노드 키
+   * @param choiceKey - 선택지 키 (선택지 노드인 경우)
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  disconnectNodes(fromNodeKey: string, choiceKey?: string): void;
+
+  // ===== 유틸리티 =====
+
+  /**
+   * 고유한 노드 키를 생성합니다.
+   * 
+   * @returns 생성된 노드 키
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  generateNodeKey(): string;
+
+  /**
+   * 현재 노드 개수를 반환합니다.
+   * 
+   * @returns 현재 노드 개수
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  getCurrentNodeCount(): number;
+
+  /**
+   * 새 노드 생성이 가능한지 확인합니다.
+   * 
+   * @returns 생성 가능 여부
+   * 
+   * **의존성**: getCurrentNodeCount
+   */
+  canCreateNewNode(): boolean;
+
+  // ===== 참조/상태 업데이트 =====
+
+  /**
+   * 노드의 키 참조를 업데이트합니다.
+   * 
+   * @param nodeKey - 업데이트할 노드 키
+   * @param keyType - 키 타입 ("speaker" | "text")
+   * @param newKeyRef - 새 키 참조
+   * 
+   * **의존성**: LocalizationStore (내부적)
+   */
+  updateNodeKeyReference(nodeKey: string, keyType: "speaker" | "text", newKeyRef: string): void;
+
+  /**
+   * 선택지의 키 참조를 업데이트합니다.
+   * 
+   * @param nodeKey - 업데이트할 노드 키
+   * @param choiceKey - 선택지 키
+   * @param newKeyRef - 새 키 참조
+   * 
+   * **의존성**: LocalizationStore (내부적)
+   */
+  updateChoiceKeyReference(nodeKey: string, choiceKey: string, newKeyRef: string): void;
+
+  /**
+   * 노드의 가시성을 업데이트합니다.
+   * 
+   * @param nodeKey - 업데이트할 노드 키
+   * @param hidden - 숨김 여부
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  updateNodeVisibility(nodeKey: string, hidden: boolean): void;
+
+  /**
+   * 노드의 위치와 가시성을 동시에 업데이트합니다.
+   * 
+   * @param nodeKey - 업데이트할 노드 키
+   * @param position - 새 위치
+   * @param hidden - 숨김 여부
+   * 
+   * **의존성**: 없음 (독립적)
+   */
+  updateNodePositionAndVisibility(nodeKey: string, position: { x: number; y: number }, hidden: boolean): void;
+}
+
+// ===== NODE CORE DOMAIN 관련 타입 =====
+
+/**
+ * 노드 위치 타입
+ */
+export interface NodePosition {
+  x: number;
+  y: number;
+}
+
+/**
+ * 노드 선택 결과
+ */
+export interface NodeSelectionResult {
+  selectedCount: number;
+  selectedKeys: string[];
+}
+
+/**
+ * 노드 업데이트 옵션
+ */
+export interface NodeUpdateOptions {
+  skipHistory?: boolean;
+  skipValidation?: boolean;
+}
+
+/**
+ * 키 타입 정의
+ */
+export type KeyType = "speaker" | "text";
 
 // ===== 의존성 주입 관련 타입 =====
 

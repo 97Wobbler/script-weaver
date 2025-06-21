@@ -1074,3 +1074,100 @@ export interface IHistoryDomain {
 ✅ **Phase 3.1.4 준비** 완료 (NODE CORE DOMAIN 인터페이스 설계를 위한 기반 확립)  
 
 **다음 단계**: Phase 3.1.4 NODE CORE DOMAIN 인터페이스 설계
+
+#### **Phase 3.1.4: NODE CORE DOMAIN 인터페이스 설계** (2025-06-21 09:51) ✅ **완료**
+
+**목표**: NODE CORE DOMAIN 인터페이스 (INodeDomain) 설계 및 관련 타입 정의
+
+##### **📋 Context Analysis (컨텍스트 분석)**
+
+**확인된 NODE CORE DOMAIN 메서드 시그니처** (20개):
+- **선택 관리** (4개): setSelectedNode, toggleNodeSelection, clearSelection, selectMultipleNodes
+- **기본 CRUD** (4개): addNode, updateNode, deleteNode, moveNode
+- **내용 수정** (3개): updateDialogue, updateNodeText, updateChoiceText
+- **연결 관리** (2개): connectNodes, disconnectNodes
+- **유틸리티** (3개): generateNodeKey, getCurrentNodeCount, canCreateNewNode
+- **참조/상태 업데이트** (4개): updateNodeKeyReference, updateChoiceKeyReference, updateNodeVisibility, updateNodePositionAndVisibility
+
+**확인된 NODE CORE DOMAIN 상태** (3개):
+1. **lastDraggedNodeKey**: `string | null` - 연속 드래그 감지용
+2. **lastDragActionTime**: `number` - 드래그 액션 시간
+3. **selectedNodeKeys**: `Set<string>` - 다중 선택된 노드들
+
+**의존성 타입 확인**:
+- `EditorNodeWrapper`, `Dialogue` 타입: `types/dialogue.ts`에서 정의됨
+- LocalizationStore 내부적 의존성
+
+##### **🎯 Planning (계획 수립)**
+
+**Phase 2.2.3 확정 구조 반영**:
+1. `INodeDomain` 인터페이스 설계 - 20개 메서드 + 3개 상태 포함
+2. 6개 기능 그룹별 체계적 분류 (상태, 선택 관리, 기본 CRUD, 내용 수정, 연결 관리, 유틸리티, 참조/상태 업데이트)
+3. 관련 보조 타입 정의 (`NodePosition`, `NodeSelectionResult`, `NodeUpdateOptions`, `KeyType`)
+4. 의존성 문서화 (CORE SERVICES, LocalizationStore 내부 의존성 명시)
+
+##### **⚡ Execution (실행)**
+
+**수정된 파일**: `src/store/types/editorTypes.ts` (+234줄)
+
+**핵심 인터페이스 정의**:
+```typescript
+export interface INodeDomain {
+  // 상태 (3개)
+  lastDraggedNodeKey: string | null;
+  lastDragActionTime: number;
+  selectedNodeKeys: Set<string>;
+  
+  // 선택 관리 (4개)
+  setSelectedNode, toggleNodeSelection, clearSelection, selectMultipleNodes
+  
+  // 기본 CRUD (4개)
+  addNode, updateNode, deleteNode, moveNode
+  
+  // 내용 수정 (3개)
+  updateDialogue, updateNodeText, updateChoiceText
+  
+  // 연결 관리 (2개)
+  connectNodes, disconnectNodes
+  
+  // 유틸리티 (3개)
+  generateNodeKey, getCurrentNodeCount, canCreateNewNode
+  
+  // 참조/상태 업데이트 (4개)
+  updateNodeKeyReference, updateChoiceKeyReference, updateNodeVisibility, updateNodePositionAndVisibility
+}
+```
+
+**주요 특징**:
+- **핵심 기능 집중**: 노드의 기본 CRUD 및 선택 관리에 집중
+- **명확한 JSDoc**: 각 메서드의 기능, 매개변수, 의존성 관계 상세 문서화
+- **타입 안전성**: EditorNodeWrapper, Dialogue 포함 모든 타입 명시
+- **기능별 그룹핑**: 6개 기능 영역별 논리적 분류
+
+**보조 타입 정의**:
+- `NodePosition`: 노드 위치 타입
+- `NodeSelectionResult`: 노드 선택 결과 타입
+- `NodeUpdateOptions`: 노드 업데이트 옵션 타입
+- `KeyType`: 키 타입 정의
+- `EditorNodeWrapper`, `Dialogue` import 추가
+
+##### **✅ 달성 성과**
+
+**인터페이스 설계**:
+✅ **NODE CORE DOMAIN 인터페이스** 완성 (20개 메서드 + 3개 상태)  
+✅ **타입 안전성** 확보 (모든 시그니처 명시)  
+✅ **기능별 분류** 달성 (6개 기능 그룹)  
+✅ **문서화** 완료 (JSDoc으로 의존성까지 상세 설명)  
+
+**코드 품질**:
+✅ **TypeScript 에러 0개** 달성  
+✅ **의존성 분석** 완료 (CORE SERVICES, LocalizationStore 내부 의존성만 확인)  
+✅ **일관된 명명 규칙** 적용  
+✅ **확장 가능한 구조** 설계  
+
+**Phase 3-4 연계성**:
+✅ **도메인 분할 준비** 완료 (nodeDomain.ts 구현을 위한 명확한 가이드라인)  
+✅ **의존성 체인** 설계 (CORE SERVICES, HISTORY DOMAIN 의존)  
+✅ **Phase 3.1.5 준비** 완료 (NODE OPERATIONS DOMAIN 인터페이스 설계를 위한 기반 확립)  
+
+**다음 단계**: Phase 3.1.5 NODE OPERATIONS DOMAIN 인터페이스 설계

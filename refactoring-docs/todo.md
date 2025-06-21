@@ -306,13 +306,13 @@ interface EditorState {
     -   [x] 히스토리 관리 (pushToHistory, pushToHistoryWithTextEdit)
     -   [x] Undo/Redo 액션 (undo, redo, canUndo, canRedo)
 
--   [ ] **NODE CORE DOMAIN 인터페이스** (`INodeDomain`) 설계
-    -   [ ] 선택 관리 인터페이스 (setSelectedNode, toggleNodeSelection, clearSelection, selectMultipleNodes)
-    -   [ ] 기본 CRUD 인터페이스 (addNode, updateNode, deleteNode, moveNode)
-    -   [ ] 내용 수정 인터페이스 (updateDialogue, updateNodeText, updateChoiceText)
-    -   [ ] 연결 관리 인터페이스 (connectNodes, disconnectNodes)
-    -   [ ] 유틸리티 인터페이스 (generateNodeKey, getCurrentNodeCount, canCreateNewNode)
-    -   [ ] 참조/상태 업데이트 인터페이스
+-   [x] **NODE CORE DOMAIN 인터페이스** (`INodeDomain`) 설계 ✅ **완료**
+    -   [x] 선택 관리 인터페이스 (setSelectedNode, toggleNodeSelection, clearSelection, selectMultipleNodes)
+    -   [x] 기본 CRUD 인터페이스 (addNode, updateNode, deleteNode, moveNode)
+    -   [x] 내용 수정 인터페이스 (updateDialogue, updateNodeText, updateChoiceText)
+    -   [x] 연결 관리 인터페이스 (connectNodes, disconnectNodes)
+    -   [x] 유틸리티 인터페이스 (generateNodeKey, getCurrentNodeCount, canCreateNewNode)
+    -   [x] 참조/상태 업데이트 인터페이스
 
 -   [ ] **NODE OPERATIONS DOMAIN 인터페이스** (`INodeOperationsDomain`) 설계
     -   [ ] 노드 생성 인터페이스 (createTextNode, createChoiceNode)
