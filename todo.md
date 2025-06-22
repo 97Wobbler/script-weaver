@@ -203,6 +203,10 @@
 -   [ ] **노드 타입 모듈화**: TextDialogue/ChoiceDialogue 공통 부모 클래스/인터페이스 설계
     -   BaseDialogueNode 추상화로 확장성 확보 (InputDialogue, 커스텀 노드 대비)
     -   노드 생성/검증/직렬화 로직 통합, 타입 안전성 향상
+    -   노드 컴포넌트는 시각적 요소만 남기고 논리적 코드는 외부로 이동
+    -   inputDialogue 추가
+    -   조건확인(if, switch) 노드 추가,
+    -   씬 시작 블럭 추가 (데이터 구조 수정 필요함, 큰 작업)
 -   큰 컴포넌트 분리
     -   [ ] **PropertyPanel.tsx 분리**: UI 컴포넌트 과부하 해결
     -   [ ] **App.tsx 분리**: 루트 컴포넌트 책임 분리
