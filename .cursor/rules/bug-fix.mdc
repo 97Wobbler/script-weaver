@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 # Bug Fix Workflow
 
-1. 🛠 Receive Bug Information
+1. 🛠 Collect Bug Report
 
     - Require the user to provide:
         - Expected behavior vs. actual behavior
@@ -18,7 +18,7 @@ alwaysApply: false
     - Trace key state changes and event flows
     - Add temporary logs to narrow down the problem area
 
-3. 🔁 Ask the user to reproduce the issue and provide logs
+3. 🔁 Ask the user to reproduce the issue and collect logs
 
 4. 🧩 Fix the root cause with minimal code changes
 
@@ -35,19 +35,19 @@ alwaysApply: false
 
 7. ✅ If the issue is resolved, remove all debugging logs
 
-8. And commit the fix:
+8. 💾 Commit the Fix
 
 ```
-fix: F00 [한국어로 문제 내용 요약] 문제 수정
+fix: [한국어로 문제 내용 요약] 문제 수정
 ```
 
-9. 📝 Update documentation:
+9. 📝 Update documentation (if applicable)
 
-    - `todo.md`: Update task status
-    - `log.md`: Document cause and solution clearly in log.md by **appending to the end of the file**
+    - e.g. `todo.md`: Update task status
+    - e.g. `log.md`: Document cause and solution clearly in log.md by **appending to the end of the file**
 
-10. 🗃 Commit documentation update:
+10. 🗃 Commit documentation update
 
 ```
-docs: F00 [한국어로 문제 내용 요약] 문제 수정 기록
+docs: [한국어로 문제 내용 요약] 문제 수정 기록
 ```
