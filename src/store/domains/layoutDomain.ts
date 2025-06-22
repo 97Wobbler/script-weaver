@@ -1,13 +1,12 @@
 import type { Scene, EditorNodeWrapper } from "../../types/dialogue";
-import type { ICoreServices, ILayoutDomain, NodePosition, LayoutType, NodeRelationMaps, LevelMap, PositionMap, NodeDimensions, PositionInitData } from "../types/editorTypes";
+import type { ICoreServices, ILayoutDomain, NodePosition, LayoutType, NodeRelationMaps, PositionMap, NodeDimensions, PositionInitData } from "../types/editorTypes";
 
 /**
  * Layout Domain - 노드 레이아웃 및 자동 정렬 관리
  *
  * ## 📋 주요 책임
  * - **위치 계산**: 새 노드 배치 위치 및 자식 노드 위치 계산
- * - **구 트리 정렬**: 기존 트리 구조 기반 노드 정렬 (3개 메서드)
- * - **신 레이아웃 시스템**: 글로벌 레이아웃 엔진 기반 정렬 (3개 메서드)
+ * - **레이아웃 시스템**: 글로벌 레이아웃 엔진 기반 정렬 (3개 메서드)
  * - **겹침 방지**: 노드 배치 시 다른 노드와의 겹침 검사 및 회피
  * - **관계 분석**: 부모-자식, 형제 관계 기반 레이아웃 최적화
  *
@@ -17,13 +16,13 @@ import type { ICoreServices, ILayoutDomain, NodePosition, LayoutType, NodeRelati
  * - **독립성**: 다른 도메인과 순환 의존성 없음
  *
  * ## 🎯 핵심 특징
- * - **이중 시스템**: 구 트리 정렬 + 신 글로벌 레이아웃 시스템 지원
+ * - **글로벌 레이아웃**: 다중 그래프 지원하는 통합 레이아웃 시스템
  * - **스마트 배치**: 노드 크기 추정 및 겹침 방지 알고리즘
  * - **계층 관리**: depth 기반 부모-자식-후손 관계 처리
  * - **비동기 처리**: 레이아웃 실행 중 상태 변경 안전성 보장
  * - **성능 최적화**: 변경된 노드만 선별적 정렬
  *
- * @description 8개 public 메서드 + 20개 private 헬퍼 메서드
+ * @description 5개 public 메서드 + 20개 private 헬퍼 메서드
  */
 export class LayoutDomain implements Omit<ILayoutDomain, "lastNodePosition"> {
   constructor(private getState: () => any, private setState: (partial: any) => void, private coreServices: ICoreServices) {}
@@ -68,90 +67,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, "lastNodePosition"> {
     return this.getNextNodePosition();
   }
 
-  // ===== 구 트리 정렬 시스템 (3개) =====
-
-  /**
-   * 자식 노드들을 트리 형태로 정렬합니다.
-   */
-  arrangeChildNodesAsTree(rootNodeKey: string): void {
-    const state = this.getState();
-    const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-
-    if (!currentScene || !currentScene[rootNodeKey]) {
-      return;
-    }
-
-    const allNodeKeys = Object.keys(currentScene);
-    const { childrenMap } = this._buildNodeRelationMaps(currentScene, allNodeKeys);
-
-    // 레벨별 노드 매핑 구축
-    const levelMap = this._buildNodeLevelMap(rootNodeKey, childrenMap);
-
-    // 루트 노드 기준 시작 위치 설정
-    const rootNode = currentScene[rootNodeKey];
-    const startX = rootNode.position.x;
-    const startY = rootNode.position.y + 200;
-
-    this._updateChildNodePositions(levelMap, rootNodeKey, startX, startY);
-
-    this.coreServices.pushToHistory(`자식 노드 트리 정렬 (${rootNodeKey})`);
-  }
-
-  /**
-   * 모든 노드를 트리 형태로 정렬합니다.
-   */
-  arrangeAllNodesAsTree(): void {
-    const state = this.getState();
-    const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-
-    if (!currentScene) {
-      return;
-    }
-
-    const allNodeKeys = Object.keys(currentScene);
-    if (allNodeKeys.length === 0) {
-      return;
-    }
-
-    // 노드 관계 분석
-    const { childrenMap, parentMap } = this._buildNodeRelationMaps(currentScene, allNodeKeys);
-
-    // 루트 노드 찾기 (부모가 없는 노드)
-    let rootNodeKey = "";
-    for (const nodeKey of allNodeKeys) {
-      if (!parentMap.has(nodeKey) || parentMap.get(nodeKey)!.length === 0) {
-        rootNodeKey = nodeKey;
-        break;
-      }
-    }
-
-    if (!rootNodeKey) {
-      rootNodeKey = allNodeKeys[0]; // 순환 참조인 경우 첫 번째 노드를 루트로
-    }
-
-    // 레벨별 노드 매핑 구축
-    const levelMap = this._buildNodeLevelMap(rootNodeKey, childrenMap);
-
-    // 시작 위치 설정
-    const startX = 100;
-    const rootY = 100;
-
-    this._updateLevelNodePositions(levelMap, startX, rootY);
-
-    this.coreServices.pushToHistory("전체 노드 트리 정렬");
-  }
-
-  /**
-   * Dagre 라이브러리를 사용하여 노드를 정렬합니다.
-   *
-   * @description 향후 구현 예정 - 현재는 기본 트리 정렬로 대체 실행
-   */
-  arrangeNodesWithDagre(): void {
-    // 현재는 기본 트리 정렬로 대체 실행
-    this.arrangeAllNodesAsTree();
-  }
-
-  // ===== 신 레이아웃 시스템 (3개) =====
+    // ===== 레이아웃 시스템 (3개) =====
 
   /**
    * 전체 캔버스의 모든 노드를 정렬합니다.
@@ -451,68 +367,7 @@ export class LayoutDomain implements Omit<ILayoutDomain, "lastNodePosition"> {
     return { childrenMap, parentMap };
   }
 
-  /**
-   * 노드 레벨 매핑을 구축합니다.
-   */
-  private _buildNodeLevelMap(rootNodeKey: string, childrenMap: Map<string, string[]>): LevelMap {
-    const levelMap = new Map<number, string[]>();
-    const visited = new Set<string>();
 
-    const buildLevel = (nodeKey: string, level: number) => {
-      if (visited.has(nodeKey)) return;
-      visited.add(nodeKey);
-
-      if (!levelMap.has(level)) {
-        levelMap.set(level, []);
-      }
-      levelMap.get(level)!.push(nodeKey);
-
-      const children = childrenMap.get(nodeKey) || [];
-      for (const child of children) {
-        buildLevel(child, level + 1);
-      }
-    };
-
-    buildLevel(rootNodeKey, 0);
-    return levelMap;
-  }
-
-  /**
-   * 레벨별 노드 위치를 업데이트합니다.
-   */
-  private _updateLevelNodePositions(levelMap: LevelMap, startX: number, rootY: number): void {
-    const LEVEL_SPACING_Y = 200;
-    const NODE_SPACING_X = 250;
-
-    for (const [level, nodeKeys] of levelMap.entries()) {
-      const y = rootY + level * LEVEL_SPACING_Y;
-
-      nodeKeys.forEach((nodeKey, index) => {
-        const x = startX + index * NODE_SPACING_X;
-        this._updateNodePosition(nodeKey, { x, y });
-      });
-    }
-  }
-
-  /**
-   * 자식 노드 위치를 업데이트합니다.
-   */
-  private _updateChildNodePositions(levelMap: LevelMap, rootNodeKey: string, startX: number, startY: number): void {
-    const LEVEL_SPACING_Y = 150;
-    const NODE_SPACING_X = 200;
-
-    // 루트 노드는 제외하고 자식들만 업데이트
-    for (const [level, nodeKeys] of levelMap.entries()) {
-      if (level === 0) continue; // 루트 노드 제외
-
-      const y = startY + (level - 1) * LEVEL_SPACING_Y;
-
-      nodeKeys.forEach((nodeKey, index) => {
-        const x = startX + index * NODE_SPACING_X;
-        this._updateNodePosition(nodeKey, { x, y });
-      });
-    }
-  }
 
   /**
    * 노드 위치를 업데이트합니다.

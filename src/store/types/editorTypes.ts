@@ -865,32 +865,7 @@ export interface ILayoutDomain {
    */
   calculateChildNodePosition(parentNodeKey: string, choiceKey?: string): NodePosition;
 
-  // ===== 구 트리 정렬 시스템 =====
-
-  /**
-   * 자식 노드들을 트리 형태로 정렬합니다.
-   *
-   * @param rootNodeKey - 루트 노드 키
-   *
-   * **의존성**: CORE SERVICES (pushToHistory)
-   */
-  arrangeChildNodesAsTree(rootNodeKey: string): void;
-
-  /**
-   * 모든 노드를 트리 형태로 정렬합니다.
-   *
-   * **의존성**: CORE SERVICES (pushToHistory)
-   */
-  arrangeAllNodesAsTree(): void;
-
-  /**
-   * Dagre 라이브러리를 사용하여 노드를 정렬합니다.
-   *
-   * **의존성**: CORE SERVICES (pushToHistory)
-   */
-  arrangeNodesWithDagre(): void;
-
-  // ===== 신 레이아웃 시스템 =====
+  // ===== 레이아웃 시스템 =====
 
   /**
    * 전체 캔버스의 모든 노드를 정렬합니다.
@@ -963,7 +938,7 @@ export interface NodeRelationMaps {
 /**
  * 레벨 매핑 타입
  */
-export type LevelMap = Map<number, string[]>;
+
 
 /**
  * 위치 초기화 데이터 타입

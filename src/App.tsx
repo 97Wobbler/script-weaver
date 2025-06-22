@@ -25,9 +25,6 @@ function App() {
     validateAllData,
     setSelectedNode,
     selectedNodeKey,
-    arrangeChildNodesAsTree,
-    arrangeAllNodesAsTree,
-    arrangeNodesWithDagre,
     arrangeAllNodes,
     arrangeSelectedNodeChildren,
     arrangeSelectedNodeDescendants,
@@ -117,17 +114,6 @@ function App() {
       setSelectedNode(nodeKey);
     } catch (error) {
       alert(error instanceof Error ? error.message : "노드 생성에 실패했습니다.");
-    }
-  };
-
-  // 노드 정렬 핸들러 (기존)
-  const handleArrangeNodes = () => {
-    if (selectedNodeKey) {
-      // 선택된 노드가 있으면 그 자식 노드들을 정렬
-      arrangeChildNodesAsTree(selectedNodeKey);
-    } else {
-      // 선택된 노드가 없으면 모든 노드를 정렬
-      arrangeAllNodesAsTree();
     }
   };
 
@@ -276,7 +262,7 @@ function App() {
             </div>
 
             <div>
-              <h3 className="text-sm font-medium text-gray-900 mb-2">스마트 정렬 🚀</h3>
+              <h3 className="text-sm font-medium text-gray-900 mb-2">정렬</h3>
               <div className="space-y-2">
                 <button
                   onClick={handleNewLayoutAll}
@@ -302,25 +288,6 @@ function App() {
                   title={selectedNodeKey ? `선택된 노드의 모든 후손들을 정렬합니다` : "노드를 선택해주세요"}>
                   🌳 후손 전체 정렬
                 </button>
-              </div>
-
-              {/* 기존 정렬 (호환성) */}
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <h4 className="text-xs font-medium text-gray-500 mb-2">기존 정렬 (호환성)</h4>
-                <div className="space-y-1">
-                  <button
-                    onClick={handleArrangeNodes}
-                    className="w-full px-2 py-1 text-xs bg-orange-50 text-orange-600 border border-orange-200 rounded hover:bg-orange-100 transition-colors"
-                    title={selectedNodeKey ? `기존 방식: 자식 노드 정렬` : "기존 방식: 전체 정렬"}>
-                    {selectedNodeKey ? "🔗 기존 자식 정렬" : "📐 기존 전체 정렬"}
-                  </button>
-                  <button
-                    onClick={arrangeNodesWithDagre}
-                    className="w-full px-2 py-1 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded hover:bg-gray-100 transition-colors"
-                    title="기존 Dagre 정렬">
-                    ✨ 기존 Dagre
-                  </button>
-                </div>
               </div>
             </div>
 

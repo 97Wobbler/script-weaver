@@ -259,21 +259,6 @@ export const useEditorStore = create<IEditorStore>()(
           return nodeDomain.canCreateNewNode();
         },
 
-        // Dagre 기반 자동 정렬 (향상된 버전)
-        arrangeNodesWithDagre: () => {
-          layoutDomain.arrangeNodesWithDagre();
-        },
-
-        // 노드 자동 정렬 - 선택된 노드를 루트로 하여 자식 노드들을 트리 형태로 배치 (리팩터링됨)
-        arrangeChildNodesAsTree: (rootNodeKey) => {
-          layoutDomain.arrangeChildNodesAsTree(rootNodeKey);
-        },
-
-        // 전체 노드 자동 정렬 - 모든 노드를 계층적으로 배치 (리팩터링됨)
-        arrangeAllNodesAsTree: () => {
-          layoutDomain.arrangeAllNodesAsTree();
-        },
-
         // 검증
         validateCurrentScene: () => {
           return projectDomain.validateCurrentScene();
