@@ -279,33 +279,6 @@ export interface HistoryState {
  * 독립적으로 운영되며 다른 도메인과 의존성이 없습니다.
  */
 export interface IHistoryDomain {
-  // ===== 상태 =====
-
-  /**
-   * 히스토리 스택
-   */
-  history: HistoryState[];
-
-  /**
-   * 현재 히스토리 인덱스
-   */
-  historyIndex: number;
-
-  /**
-   * 실행취소/재실행 진행 중 플래그
-   */
-  isUndoRedoInProgress: boolean;
-
-  /**
-   * 현재 복합 액션 ID
-   */
-  currentCompoundActionId: string | null;
-
-  /**
-   * 복합 액션 시작 상태
-   */
-  compoundActionStartState: HistoryState | null;
-
   // ===== 복합 액션 관리 =====
 
   /**
@@ -407,23 +380,6 @@ export interface HistoryOperationOptions {
  * CORE SERVICES와 HISTORY DOMAIN에 의존합니다.
  */
 export interface INodeDomain {
-  // ===== 상태 =====
-
-  /**
-   * 연속 드래그 감지용 - 마지막 드래그된 노드 키
-   */
-  lastDraggedNodeKey: string | null;
-
-  /**
-   * 연속 드래그 감지용 - 마지막 드래그 액션 시간
-   */
-  lastDragActionTime: number;
-
-  /**
-   * 다중 선택된 노드 키들
-   */
-  selectedNodeKeys: Set<string>;
-
   // ===== 선택 관리 =====
 
   /**
@@ -864,17 +820,10 @@ export type NodeType = "text" | "choice";
 /**
  * 레이아웃 도메인 인터페이스
  *
- * 노드 배치, 위치 계산, 자동 정렬 등 레이아웃 관련 기능을 담당합니다.
+ * 노드 위치 계산과 자동 정렬 기능을 담당합니다.
  * CORE SERVICES와 HISTORY DOMAIN에 의존합니다.
  */
 export interface ILayoutDomain {
-  // ===== 상태 =====
-
-  /**
-   * 마지막 노드 위치 (새 노드 생성 시 참조)
-   */
-  lastNodePosition: NodePosition;
-
   // ===== 위치 계산 =====
 
   /**
@@ -1053,50 +1002,17 @@ export interface IDependencyContainer {
  */
 export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
-/**
- * 메서드 실행 결과를 나타내는 기본 타입
- */
-export interface ExecutionResult {
-  success: boolean;
-  message?: string;
-  data?: any;
-}
-
 // ===== 통합 스토어 인터페이스 =====
 
 /**
  * 통합 에디터 스토어 인터페이스
  *
+ * EditorState를 상속하여 모든 상태를 포함하고,
  * 모든 도메인 인터페이스를 통합하여 단일 스토어 인터페이스를 제공합니다.
  * Zustand를 기반으로 하며 persist 미들웨어를 사용합니다.
  */
-export interface IEditorStore extends IProjectDomain, IHistoryDomain, INodeDomain, INodeOperationsDomain, ILayoutDomain {
-  // ===== 추가 상태 (EditorState 기반) =====
-
-  /**
-   * 현재 선택된 템플릿 키
-   */
-  currentTemplate: string;
-
-  /**
-   * 전체 템플릿 데이터
-   */
-  templateData: TemplateDialogues;
-
-  /**
-   * 현재 선택된 씬 키
-   */
-  currentScene: string;
-
-  /**
-   * 단일 선택된 노드 키 (UI 상태)
-   */
-  selectedNodeKey?: string;
-
-  /**
-   * 전역 토스트 메시지 함수 (UI 도메인)
-   */
-  showToast?: (message: string, type?: "success" | "info" | "warning") => void;
+export interface IEditorStore extends EditorState, IProjectDomain, IHistoryDomain, INodeDomain, INodeOperationsDomain, ILayoutDomain {
+  // EditorState에서 모든 상태를 상속받고, 도메인 인터페이스에서 메서드를 상속받음
 }
 
 /**
@@ -1206,7 +1122,7 @@ export interface StoreFactoryOptions {
 // ===== 타입 유틸리티 =====
 
 /**
- * 실행 결과 타입
+ * 실행 결과 타입 (확장된 버전)
  */
 export interface ExecutionResult {
   success: boolean;
