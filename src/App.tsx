@@ -405,7 +405,7 @@ function App() {
 
       {/* 토스트 알림 */}
       {toastState.isVisible && (
-        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 animate-fadeIn">
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 animate-fadeIn" style={{ marginLeft: "32px" }}>
           <div
             className={`
             px-4 py-3 rounded-lg shadow-lg flex items-center space-x-3 min-w-80
