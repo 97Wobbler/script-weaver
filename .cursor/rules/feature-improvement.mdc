@@ -1,0 +1,71 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+[Instructions]
+
+For any feature improvement or extension task, strictly follow the workflow below.
+If the context is missing or the request is unclear, stop immediately and ask the user for clarification.
+
+⸻
+
+[Workflow Steps]
+
+1. Context Analysis
+   • Check whether relevant code (snippet, module, component, or service) is provided.
+   • If not, pause the task and request an explicit reference.
+   • Prioritize investigation of the following:
+   • Interfaces and I/O behavior
+   • Dependencies
+   • If necessary, expand the scope to utilities and global state.
+
+2. Suggest Technical Directions and Wait for User Selection
+   • Based on the user’s request, suggest at least two technically feasible implementation directions.
+   • Minimize experimental approaches and prioritize stability and predictability.
+   • Wait for the user to select one of the proposed directions before proceeding.
+
+3. Plan the Task and Record in todo.md
+   • Based on the selected direction, analyze the gap between the current state and the goal.
+   • If the task is large or token limitations are expected, break it down into subtasks and write them clearly in todo.md.
+   • Record the background, approach, and improvement summary briefly in todo.md.
+   • Focus on only one (sub)task at a time.
+
+4. Implement, Debug, and Verify (Repeat Until No Errors)
+   • Attempt the implementation of the selected task.
+   • Add temporary console logs to aid debugging and verify internal state changes if needed.
+   • Build the project and resolve all errors. TypeScript type safety is mandatory.
+   • Repeat this step until the build is clean and the code behaves as expected.
+
+5. Provide Test Case and Wait for User Confirmation
+   • Provide the user with a simple test case (TC) to verify the behavior.
+   • Wait until the user tests it and reports the result.
+   • If failed: return to Step 4 and revise the implementation.
+   • If passed: proceed to the next step.
+
+6. Finalize and Commit
+   • Remove all temporary console logs or debug statements used during development.
+   • Review and delete any leftover code from earlier failed approaches that are no longer used or relevant, to ensure only the final solution is committed.
+   • Mark the task as completed in todo.md and briefly summarize what was improved and how.
+   • Commit both code and documentation updates in a single commit.
+   • Commit message format:
+
+    ```plaintext
+    feat: [short summary in Korean] 기능 개선
+    ```
+
+7. Check for Remaining Tasks and Wait for User Approval
+   • If additional tasks or subtasks remain, ask the user whether to proceed with the next one.
+   • Continue only after receiving approval.
+
+⸻
+
+[Core Principles]
+• Always follow the exact order:
+Plan → User Approval → Record → Implement (repeat until clean) → Test Case → If passed, Record + Commit → Check next step
+• Always wait for user input where required (e.g., direction choice, test confirmation, continuation).
+• Combine code and todo.md changes in a single commit.
+• Avoid experimental or speculative changes unless explicitly requested.
+• Use subtasks if the task is large or risks token overflow during processing.
+• Use todo.md as the primary source of task tracking. log.md is not used.
+⸻
