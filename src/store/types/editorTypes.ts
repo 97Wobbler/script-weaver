@@ -485,10 +485,11 @@ export interface INodeDomain {
    * 노드를 삭제합니다.
    *
    * @param nodeKey - 삭제할 노드 키
+   * @param skipHistory - 히스토리 기록 생략 여부 (기본값: false)
    *
-   * **의존성**: CORE SERVICES (pushToHistory), LocalizationStore (내부적)
+   * **의존성**: CORE SERVICES (pushToHistory), LOCALIZATION STORE (키 정리)
    */
-  deleteNode(nodeKey: string): void;
+  deleteNode(nodeKey: string, skipHistory?: boolean): void;
 
   /**
    * 노드를 이동합니다.

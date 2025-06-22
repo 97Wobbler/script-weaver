@@ -186,16 +186,14 @@ export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "las
       return;
     }
 
-    const nodeToDelete = currentScene[nodeKey];
-
-    // 1. 로컬라이제이션 키 수집
-    const keysToCleanup = this._collectNodeKeysForCleanup(nodeToDelete);
-
-    // 2. 실제 노드 삭제 수행
+    // 1. 실제 노드 삭제 수행
     this._performNodeDeletion(nodeKey);
 
-    // 3. 로컬라이제이션 정리 및 히스토리 기록
-    this._cleanupAfterNodeDeletion(keysToCleanup, skipHistory);
+    // 2. 단일 삭제에서만 키 정리 수행 (다중 삭제에서는 마지막에 일괄 처리)
+    if (!skipHistory) {
+      this._cleanupUnusedKeysAfterDeletion();
+      this.coreServices.pushToHistory("노드 삭제");
+    }
   }
 
   /**
@@ -749,6 +747,39 @@ export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "las
    */
   private _addMoveHistory(nodeKey: string): void {
     this.coreServices.pushToHistory(`노드 이동 (${nodeKey})`);
+  }
+
+  /**
+   * 노드 삭제 후 사용되지 않는 키들을 정리합니다.
+   * (새로운 방식: 전체 스캔하여 미사용 키 정리)
+   */
+  private _cleanupUnusedKeysAfterDeletion(): void {
+    const state = this.getState();
+    const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+
+    if (!currentScene) {
+      return;
+    }
+
+    const localizationStore = useLocalizationStore.getState();
+    const allKeysInStore = localizationStore.getAllKeys();
+    const keysToDelete: string[] = [];
+    
+    // 각 키에 대해 실제 사용 여부 확인
+    allKeysInStore.forEach(key => {
+      const nodesUsingKey = localizationStore.findNodesUsingKey(key);
+      
+      if (nodesUsingKey.length === 0) {
+        keysToDelete.push(key);
+      }
+    });
+
+    // 미사용 키 삭제 실행
+    if (keysToDelete.length > 0) {
+      keysToDelete.forEach(key => {
+        localizationStore.deleteKey(key);
+      });
+    }
   }
 }
 

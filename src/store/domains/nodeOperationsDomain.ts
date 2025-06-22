@@ -327,9 +327,10 @@ export class NodeOperationsDomain {
     const { targetKeys, currentScene } = this._getNodesForDeletion();
     if (targetKeys.length === 0 || !currentScene) return;
 
-    const allKeysToCleanup = this._collectKeysForCleanup(targetKeys, currentScene);
+    // 새로운 방식: 삭제 후 전체 스캔하여 키 정리
     this._performNodesDeletion(targetKeys);
-    this._finalizeNodesDeletion(allKeysToCleanup, targetKeys);
+    this._cleanupUnusedKeysAfterDeletion(); // 삭제 후 미사용 키 정리
+    this._finalizeNodesDeletion(targetKeys);
   }
 
   /**
@@ -509,28 +510,149 @@ export class NodeOperationsDomain {
     return { targetKeys, currentScene };
   }
 
-  private _collectKeysForCleanup(targetKeys: string[], currentScene: Scene): string[] {
-    const allNodes = Object.values(currentScene).filter((item): item is EditorNodeWrapper => typeof item === "object" && item !== null && "nodeKey" in item);
-    const nodesToDelete = allNodes.filter((node) => targetKeys.includes(node.nodeKey));
-    return this._collectLocalizationKeys(nodesToDelete);
-  }
-
   private _performNodesDeletion(targetKeys: string[]): void {
     targetKeys.forEach((nodeKey) => {
-      this.nodeDomain.deleteNode(nodeKey, true); // 개별 히스토리 기록 생략
+      this.nodeDomain.deleteNode(nodeKey, true); // skipHistory=true (키 정리는 마지막에 일괄 처리)
     });
   }
 
-  private _finalizeNodesDeletion(allKeysToCleanup: string[], targetKeys: string[]): void {
-    // 로컬라이제이션 키 정리는 이미 개별 deleteNode에서 처리됨
-    // 중복 정리 제거
-
+  private _finalizeNodesDeletion(targetKeys: string[]): void {
     // 선택 상태 정리
     this.nodeDomain.clearSelection();
 
     // 히스토리 추가 (통합 히스토리)
     this.coreServices.pushToHistory(`${targetKeys.length}개 노드 삭제`);
     this.updateLocalizationStoreRef();
+  }
+
+  // 유틸리티 헬퍼들
+  private _ensureSceneExists(templateData: TemplateDialogues, templateKey: string, sceneKey: string): TemplateDialogues {
+    if (!templateData[templateKey]) {
+      templateData = {
+        ...templateData,
+        [templateKey]: {},
+      };
+    }
+
+    if (!templateData[templateKey][sceneKey]) {
+      templateData = {
+        ...templateData,
+        [templateKey]: {
+          ...templateData[templateKey],
+          [sceneKey]: {},
+        },
+      };
+    }
+
+    return templateData;
+  }
+
+  private _createBaseTextDialogue(speakerText: string = "", contentText: string = "", speakerKeyRef?: string, textKeyRef?: string, nextNodeKey?: string): TextDialogue {
+    return {
+      type: "text",
+      speakerText,
+      contentText,
+      speakerKeyRef,
+      textKeyRef,
+      nextNodeKey,
+    };
+  }
+
+  private _createBaseChoiceDialogue(
+    speakerText: string = "",
+    contentText: string = "",
+    speakerKeyRef?: string,
+    textKeyRef?: string,
+    choices: ChoiceDialogue["choices"] = {}
+  ): ChoiceDialogue {
+    const defaultChoices =
+      choices && Object.keys(choices).length > 0
+        ? choices
+        : {
+            choice_1: {
+              choiceText: "선택지 1",
+              textKeyRef: "",
+              nextNodeKey: "",
+            },
+            choice_2: {
+              choiceText: "선택지 2",
+              textKeyRef: "",
+              nextNodeKey: "",
+            },
+          };
+
+    return {
+      type: "choice",
+      speakerText,
+      contentText,
+      speakerKeyRef,
+      textKeyRef,
+      choices: defaultChoices,
+    };
+  }
+
+  /**
+   * 삭제 후 전체 씬을 스캔하여 미사용 키들을 정리합니다.
+   * 이 방식이 더 안전하고 정확합니다.
+   */
+  private _cleanupUnusedKeysAfterDeletion(): void {
+    const state = this.getState();
+    const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+    
+    if (!currentScene) {
+      return;
+    }
+
+    const localizationStore = useLocalizationStore.getState();
+    const allKeysInStore = localizationStore.getAllKeys();
+    const keysToDelete: string[] = [];
+    
+    // 각 키에 대해 현재 씬에서 실제 사용 여부 확인
+    allKeysInStore.forEach(key => {
+      let isUsed = false;
+      
+      // 현재 씬의 모든 노드를 직접 스캔
+      Object.values(currentScene).forEach((item) => {
+        // 타입 가드: EditorNodeWrapper인지 확인
+        const nodeWrapper = item as EditorNodeWrapper;
+        if (!nodeWrapper || !nodeWrapper.dialogue) return;
+        
+        const dialogue = nodeWrapper.dialogue;
+        
+        // 화자 키 확인
+        if (dialogue.speakerKeyRef === key) {
+          isUsed = true;
+          return;
+        }
+        
+        // 텍스트 키 확인  
+        if (dialogue.textKeyRef === key) {
+          isUsed = true;
+          return;
+        }
+        
+        // 선택지 키 확인
+        if (dialogue.type === "choice" && dialogue.choices) {
+          Object.values(dialogue.choices).forEach((choice) => {
+            if (choice && choice.textKeyRef === key) {
+              isUsed = true;
+              return;
+            }
+          });
+        }
+      });
+      
+      if (!isUsed) {
+        keysToDelete.push(key);
+      }
+    });
+
+    // 미사용 키 삭제 실행
+    if (keysToDelete.length > 0) {
+      keysToDelete.forEach(key => {
+        localizationStore.deleteKey(key);
+      });
+    }
   }
 
   // 노드 생성/연결 헬퍼들
@@ -718,92 +840,6 @@ export class NodeOperationsDomain {
     this.nodeDomain.updateNodeVisibility(newNodeKey, false);
 
     this.coreServices.endCompoundAction();
-  }
-
-  // 로컬라이제이션 키 수집
-  private _collectLocalizationKeys(nodes: EditorNodeWrapper[]): string[] {
-    const keys: string[] = [];
-
-    nodes.forEach((node) => {
-      if (node.dialogue.type === "text" || node.dialogue.type === "choice") {
-        if (node.dialogue.speakerKeyRef) keys.push(node.dialogue.speakerKeyRef);
-        if (node.dialogue.textKeyRef) keys.push(node.dialogue.textKeyRef);
-      }
-
-      if (node.dialogue.type === "choice" && node.dialogue.choices) {
-        Object.values(node.dialogue.choices).forEach((choice) => {
-          if (choice.textKeyRef) keys.push(choice.textKeyRef);
-        });
-      }
-    });
-
-    return keys;
-  }
-
-  // 유틸리티 헬퍼들
-  private _ensureSceneExists(templateData: TemplateDialogues, templateKey: string, sceneKey: string): TemplateDialogues {
-    if (!templateData[templateKey]) {
-      templateData = {
-        ...templateData,
-        [templateKey]: {},
-      };
-    }
-
-    if (!templateData[templateKey][sceneKey]) {
-      templateData = {
-        ...templateData,
-        [templateKey]: {
-          ...templateData[templateKey],
-          [sceneKey]: {},
-        },
-      };
-    }
-
-    return templateData;
-  }
-
-  private _createBaseTextDialogue(speakerText: string = "", contentText: string = "", speakerKeyRef?: string, textKeyRef?: string, nextNodeKey?: string): TextDialogue {
-    return {
-      type: "text",
-      speakerText,
-      contentText,
-      speakerKeyRef,
-      textKeyRef,
-      nextNodeKey,
-    };
-  }
-
-  private _createBaseChoiceDialogue(
-    speakerText: string = "",
-    contentText: string = "",
-    speakerKeyRef?: string,
-    textKeyRef?: string,
-    choices: ChoiceDialogue["choices"] = {}
-  ): ChoiceDialogue {
-    const defaultChoices =
-      choices && Object.keys(choices).length > 0
-        ? choices
-        : {
-            choice_1: {
-              choiceText: "선택지 1",
-              textKeyRef: "",
-              nextNodeKey: "",
-            },
-            choice_2: {
-              choiceText: "선택지 2",
-              textKeyRef: "",
-              nextNodeKey: "",
-            },
-          };
-
-    return {
-      type: "choice",
-      speakerText,
-      contentText,
-      speakerKeyRef,
-      textKeyRef,
-      choices: defaultChoices,
-    };
   }
 }
 
