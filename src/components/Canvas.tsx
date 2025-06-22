@@ -326,17 +326,14 @@ export default function Canvas() {
             });
           });
 
-          // 확인 메시지 구성
-          let confirmMessage = `${targetKeys.length}개 노드를 삭제하시겠습니까?\n삭제 대상: ${targetKeys.join(", ")}`;
-          if (referencingNodes.length > 0) {
-            confirmMessage += `\n\n⚠️ ${referencingNodes.length}개의 연결이 함께 제거됩니다:\n• ${referencingNodes.slice(0, 10).join("\n• ")}`;
-            if (referencingNodes.length > 10) {
-              confirmMessage += `\n• ... 외 ${referencingNodes.length - 10}개`;
-            }
-          }
-
-          if (confirm(confirmMessage)) {
-            deleteSelectedNodes();
+          // 확인 없이 즉시 삭제하고 토스트 메시지 표시
+          deleteSelectedNodes();
+          
+          // 삭제 완료 토스트 메시지
+          const { showToast } = useEditorStore.getState();
+          if (showToast) {
+            const message = `${targetKeys.length}개 노드가 삭제되었습니다`;
+            showToast(message, "success");
           }
         }
         return;
