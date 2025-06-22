@@ -154,11 +154,12 @@
   - **핵심 개선**:
     - 도메인 인터페이스에서 상태 프로퍼티 제거 (IHistoryDomain, INodeDomain, ILayoutDomain)
     - IEditorStore를 EditorState 상속 방식으로 변경하여 중복 제거
+    - **EditorStore 인터페이스 완전 제거**: 130줄 중복 메서드/상태 선언 제거 후 인터페이스 자체도 삭제
     - 중복된 ExecutionResult 타입 정의 통합
     - 오타 파일 제거 (editerTypes.ts → editorTypes.ts)
-  - **아키텍처 개선**: 상태는 EditorState에서만 정의, 도메인 인터페이스는 메서드만 정의
-  - **효과**: 타입 정의 단순화, 코드 복잡성 감소, 유지보수성 향상
-- [ ] **키 정리 로직 중복 제거 및 공통화** - 중복 메서드 정리 완료 ✅ **완료 (2025-01-18)**
+  - **아키텍처 개선**: 상태는 EditorState에서만 정의, 도메인 인터페이스는 메서드만 정의, 불필요한 중간 인터페이스 제거
+  - **효과**: 타입 정의 단순화, 코드 복잡성 감소, 유지보수성 향상, 중복 제거로 일관성 확보
+- [x] **키 정리 로직 중복 제거 및 공통화** - 중복 메서드 정리 완료 ✅ **완료 (2025-01-18)**
   - **문제 해결**: nodeDomain.ts와 nodeOperationsDomain.ts의 중복된 `_cleanupUnusedKeysAfterDeletion` 메서드 제거
   - **공통 유틸리티**: `src/utils/keyCleanup.ts`에 `cleanupUnusedKeysAfterDeletion` 함수 분리
   - **중복 제거**: 약 60줄의 중복 코드 제거, 의존성 순환 문제 해결

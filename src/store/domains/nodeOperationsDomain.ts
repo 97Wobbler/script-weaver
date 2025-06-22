@@ -1,5 +1,5 @@
 import type { EditorNodeWrapper, Dialogue, Scene, TemplateDialogues, TextDialogue, ChoiceDialogue } from "../../types/dialogue";
-import type { ICoreServices, NodeDeletionOptions } from "../types/editorTypes";
+import type { ICoreServices } from "../types/editorTypes";
 import { useLocalizationStore } from "../localizationStore";
 import { cleanupUnusedKeysAfterDeletion } from "../../utils/keyCleanup";
 
@@ -330,12 +330,12 @@ export class NodeOperationsDomain {
 
     // 새로운 방식: 삭제 후 전체 스캔하여 키 정리
     this._performNodesDeletion(targetKeys);
-    
+
     // 삭제 후 현재 씬 상태를 가져와서 키 정리
     const updatedState = this.getState();
     const updatedScene = updatedState.templateData[updatedState.currentTemplate]?.[updatedState.currentScene];
     cleanupUnusedKeysAfterDeletion(updatedScene);
-    
+
     this._finalizeNodesDeletion(targetKeys);
   }
 
@@ -596,8 +596,6 @@ export class NodeOperationsDomain {
       choices: defaultChoices,
     };
   }
-
-
 
   // 노드 생성/연결 헬퍼들
   private _validateChoiceNodeCreation(

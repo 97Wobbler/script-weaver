@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { EditorState, EditorNodeWrapper, Dialogue, Scene, TemplateDialogues, ValidationResult } from "../types/dialogue";
-import type { IEditorStore, HistoryState, ICoreServices } from "./types/editorTypes";
+import type { EditorState, Scene, TemplateDialogues } from "../types/dialogue";
+import type { IEditorStore, ICoreServices } from "./types/editorTypes";
 import { createCoreServices } from "./services/coreServices";
 import { createHistoryDomain } from "./domains/historyDomain";
 import { createProjectDomain } from "./domains/projectDomain";
@@ -9,137 +9,6 @@ import { createNodeDomain } from "./domains/nodeDomain";
 import { createLayoutDomain } from "./domains/layoutDomain";
 import { createNodeOperationsDomain } from "./domains/nodeOperationsDomain";
 import { useLocalizationStore } from "./localizationStore";
-
-interface EditorStore extends IEditorStore {
-  // === PROJECT DOMAIN - 액션들 ===
-  // 기본 액션들
-  setCurrentTemplate: (templateKey: string) => void;
-  setCurrentScene: (sceneKey: string) => void;
-
-  // 템플릿/씬 관리 액션들
-  createTemplate: (templateKey: string) => void;
-  createScene: (templateKey: string, sceneKey: string) => void;
-
-  // 검증 액션들
-  validateCurrentScene: () => { isValid: boolean; errors: string[] };
-  validateAllData: () => ValidationResult;
-
-  // Import/Export 액션들
-  exportToJSON: () => string;
-  exportToCSV: () => { dialogue: string; localization: string };
-  importFromJSON: (jsonString: string) => void;
-
-  // 데이터 관리 액션들
-  resetEditor: () => void;
-  loadFromLocalStorage: () => void;
-  migrateToNewArchitecture: () => void;
-
-  // === NODE DOMAIN ===
-  // 연속 드래그 감지용 상태
-  lastDraggedNodeKey: string | null;
-  lastDragActionTime: number;
-
-  // 다중 선택 상태
-  selectedNodeKeys: Set<string>;
-
-  // 노드 선택 액션
-  setSelectedNode: (nodeKey?: string) => void;
-
-  // 다중 선택 액션들
-  toggleNodeSelection: (nodeKey: string) => void;
-  clearSelection: () => void;
-  selectMultipleNodes: (nodeKeys: string[]) => void;
-
-  // 복사/붙여넣기
-  copySelectedNodes: () => void;
-  pasteNodes: (position?: { x: number; y: number }) => void;
-  duplicateNode: (nodeKey: string) => string;
-
-  // 다중 조작
-  deleteSelectedNodes: () => void;
-  moveSelectedNodes: (deltaX: number, deltaY: number) => void;
-
-  // 노드 관리
-  addNode: (node: EditorNodeWrapper) => void;
-  updateNode: (nodeKey: string, updates: Partial<EditorNodeWrapper>) => void;
-  deleteNode: (nodeKey: string) => void;
-  moveNode: (nodeKey: string, position: { x: number; y: number }) => void;
-
-  // 대화 내용 수정 (실제 텍스트 기반)
-  updateDialogue: (nodeKey: string, dialogue: Partial<Dialogue>) => void;
-  updateNodeText: (nodeKey: string, speakerText?: string, contentText?: string) => void;
-  updateChoiceText: (nodeKey: string, choiceKey: string, choiceText: string) => void;
-
-  // 자동 노드 생성 (실제 텍스트 기반)
-  createTextNode: (contentText?: string, speakerText?: string) => string;
-  createChoiceNode: (contentText?: string, speakerText?: string) => string;
-
-  // 선택지 관리 (실제 텍스트 기반)
-  addChoice: (nodeKey: string, choiceKey: string, choiceText: string, nextNodeKey?: string) => void;
-  removeChoice: (nodeKey: string, choiceKey: string) => void;
-
-  // 노드 연결 관리
-  connectNodes: (fromNodeKey: string, toNodeKey: string, choiceKey?: string) => void;
-  disconnectNodes: (fromNodeKey: string, choiceKey?: string) => void;
-
-  // 자식 노드 생성 및 연결
-  createAndConnectChoiceNode: (fromNodeKey: string, choiceKey: string, nodeType?: "text" | "choice") => Promise<string>;
-  createAndConnectTextNode: (fromNodeKey: string, nodeType?: "text" | "choice") => Promise<string>;
-
-  // 유틸리티 액션들
-  generateNodeKey: () => string;
-  getCurrentNodeCount: () => number;
-  canCreateNewNode: () => boolean;
-
-  // 키 참조 업데이트 액션들
-  updateNodeKeyReference: (nodeKey: string, keyType: "speaker" | "text", newKeyRef: string) => void;
-  updateChoiceKeyReference: (nodeKey: string, choiceKey: string, newKeyRef: string) => void;
-
-  // 노드 업데이트 함수
-  updateNodeVisibility: (nodeKey: string, hidden: boolean) => void;
-  updateNodePositionAndVisibility: (nodeKey: string, position: { x: number; y: number }, hidden: boolean) => void;
-
-  // === HISTORY DOMAIN ===
-  // Undo/Redo 상태
-  history: HistoryState[];
-  historyIndex: number;
-  isUndoRedoInProgress: boolean;
-
-  // 복합 액션 그룹 관리
-  currentCompoundActionId: string | null;
-  compoundActionStartState: HistoryState | null;
-
-  // 복합 액션 그룹 관리
-  startCompoundAction: (actionName: string) => string;
-  endCompoundAction: () => void;
-
-  // Undo/Redo 액션들
-  pushToHistory: (action: string) => void;
-  pushToHistoryWithTextEdit: (action: string) => void; // 텍스트 편집 전용 히스토리
-  undo: () => void;
-  redo: () => void;
-  canUndo: () => boolean;
-  canRedo: () => boolean;
-
-  // === LAYOUT DOMAIN
-  // 위치 계산 액션들
-  getNextNodePosition: () => { x: number; y: number };
-  calculateChildNodePosition: (parentNodeKey: string, choiceKey?: string) => { x: number; y: number };
-
-  // 노드 자동 정렬 (기존)
-  arrangeChildNodesAsTree: (rootNodeKey: string) => void;
-  arrangeAllNodesAsTree: () => void;
-  arrangeNodesWithDagre: () => void;
-
-  // 새로운 레이아웃 시스템 (즉시 배치)
-  arrangeAllNodes: (internal?: boolean) => Promise<void>;
-  arrangeSelectedNodeChildren: (nodeKey: string, internal?: boolean) => Promise<void>;
-  arrangeSelectedNodeDescendants: (nodeKey: string, internal?: boolean) => Promise<void>;
-
-  // === UI DOMAIN ===
-  // 전역 토스트 함수
-  showToast?: (message: string, type?: "success" | "info" | "warning") => void;
-}
 
 // 타입 안전한 헬퍼 함수들
 const createEmptyScene = (): Scene => ({});
@@ -164,7 +33,7 @@ const initialState: EditorState = {
   lastNodePosition: { x: 250, y: 100 },
 };
 
-export const useEditorStore = create<EditorStore>()(
+export const useEditorStore = create<IEditorStore>()(
   persist(
     (set, get) => {
       const updateLocalizationStoreRef = () => {
