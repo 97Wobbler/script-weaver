@@ -144,22 +144,21 @@
 - [ ] **타입별 중복 검사 강화** - 화자/대사/선택지별 독립적 중복 감지
 
 #### 코드 구조 개선 및 리팩터링 🧹 **기술 부채 정리**
-- [ ] **skipHistory 매개변수 → 옵션 객체 패턴 개선** - 매개변수 확장성 확보
-  - **현재 문제**: `skipHistory: boolean` 매개변수가 여러 함수에 분산되어 확장성 부족
-  - **개선 방향**: `{ recordHistory?: boolean, skipValidation?: boolean }` 옵션 객체 패턴 채택
-  - **적용 범위**: 노드 생성/수정/삭제 관련 주요 함수들
+- [x] **skipHistory 매개변수 → 옵션 객체 패턴 개선** - 매개변수 확장성 확보 ✅ **완료 (2025-01-18)**
+  - **해결**: `skipHistory: boolean` → `NodeDeletionOptions` 옵션 객체 패턴으로 변경
+  - **적용 범위**: nodeDomain.ts, nodeOperationsDomain.ts의 deleteNode 관련 함수들
+  - **개선 효과**: `{ recordHistory?: boolean, skipValidation?: boolean, skipKeyCleanup?: boolean }` 확장 가능
   - **장점**: 향후 매개변수 추가 시 기존 호출부 수정 없이 확장 가능
+- [x] **키 정리 로직 중복 제거 및 공통화** - 중복 메서드 정리 완료 ✅ **완료 (2025-01-18)**
+  - **문제 해결**: nodeDomain.ts와 nodeOperationsDomain.ts의 중복된 `_cleanupUnusedKeysAfterDeletion` 메서드 제거
+  - **공통 유틸리티**: `src/utils/keyCleanup.ts`에 `cleanupUnusedKeysAfterDeletion` 함수 분리
+  - **중복 제거**: 약 60줄의 중복 코드 제거, 의존성 순환 문제 해결
+  - **확장성**: 향후 KeyCleanupService 도입 시 기반 코드 완성
 - [ ] **IEditorStore 인터페이스 정리** - 불필요한 선언 및 구현부 제거
   - **현재 문제**: 도메인별 스토어와 중복되는 메서드 선언이 IEditorStore에 존재
   - **분석 필요**: 실제 사용되지 않는 인터페이스 메서드 식별
   - **정리 대상**: 중복 선언된 메서드 및 해당 구현부 제거
   - **효과**: 타입 정의 단순화, 코드 복잡성 감소
-- [ ] **KeyCleanupService 도입** - 키 정리 로직 서비스 분리
-  - **현재 상태**: `_cleanupUnusedKeysAfterDeletion()` 함수가 nodeDomain에 위치
-  - **개선 목표**: 키 정리 관련 로직을 독립적인 서비스로 분리
-  - **구현 방향**: `src/store/services/keyCleanupService.ts` 생성
-  - **책임 분리**: 노드 도메인에서 키 관리 책임 제거, 단일 책임 원칙 준수
-  - **확장성**: 향후 고아 키 정리, 키 최적화 등 추가 기능 수용 가능
 
 ### Phase 3: 폴리싱 🟢 **선택적**
 - [ ] **시각적 개선**: 애니메이션 및 트랜지션 추가

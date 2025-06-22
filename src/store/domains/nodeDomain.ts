@@ -1,6 +1,7 @@
-import type { EditorNodeWrapper, Dialogue, Scene, TextDialogue, ChoiceDialogue } from "../../types/dialogue";
-import type { ICoreServices, INodeDomain } from "../types/editorTypes";
 import { useLocalizationStore } from "../localizationStore";
+import type { EditorNodeWrapper, Dialogue, Scene, TextDialogue, ChoiceDialogue } from "../../types/dialogue";
+import type { ICoreServices, INodeDomain, NodeDeletionOptions } from "../types/editorTypes";
+import { cleanupUnusedKeysAfterDeletion } from "../../utils/keyCleanup";
 
 /**
  * Node Domain - 노드 핵심 CRUD 관리
@@ -178,7 +179,9 @@ export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "las
   /**
    * 노드를 삭제합니다.
    */
-  deleteNode(nodeKey: string, skipHistory: boolean = false): void {
+  deleteNode(nodeKey: string, options: NodeDeletionOptions = {}): void {
+    const { recordHistory = true, skipKeyCleanup = false } = options;
+    
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
 
@@ -190,8 +193,11 @@ export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "las
     this._performNodeDeletion(nodeKey);
 
     // 2. 단일 삭제에서만 키 정리 수행 (다중 삭제에서는 마지막에 일괄 처리)
-    if (!skipHistory) {
-      this._cleanupUnusedKeysAfterDeletion();
+    if (recordHistory && !skipKeyCleanup) {
+      // 삭제 후 현재 씬 상태를 가져와서 키 정리
+      const updatedState = this.getState();
+      const updatedScene = updatedState.templateData[updatedState.currentTemplate]?.[updatedState.currentScene];
+      cleanupUnusedKeysAfterDeletion(updatedScene);
       this.coreServices.pushToHistory("노드 삭제");
     }
   }
@@ -664,24 +670,6 @@ export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "las
   }
 
   /**
-   * 노드 삭제 후 정리 작업을 수행합니다.
-   */
-  private _cleanupAfterNodeDeletion(keysToCleanup: string[], skipHistory: boolean = false): void {
-    // 로컬라이제이션 키 정리
-    if (keysToCleanup.length > 0) {
-      const localizationStore = useLocalizationStore.getState();
-      keysToCleanup.forEach((key) => {
-        localizationStore.deleteKey(key);
-      });
-    }
-
-    // skipHistory가 true가 아닌 경우에만 히스토리에 기록
-    if (!skipHistory) {
-      this.coreServices.pushToHistory("노드 삭제");
-    }
-  }
-
-  /**
    * 노드 이동 유효성을 검사합니다.
    */
   private _validateNodeMovement(
@@ -747,39 +735,6 @@ export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "las
    */
   private _addMoveHistory(nodeKey: string): void {
     this.coreServices.pushToHistory(`노드 이동 (${nodeKey})`);
-  }
-
-  /**
-   * 노드 삭제 후 사용되지 않는 키들을 정리합니다.
-   * (새로운 방식: 전체 스캔하여 미사용 키 정리)
-   */
-  private _cleanupUnusedKeysAfterDeletion(): void {
-    const state = this.getState();
-    const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-
-    if (!currentScene) {
-      return;
-    }
-
-    const localizationStore = useLocalizationStore.getState();
-    const allKeysInStore = localizationStore.getAllKeys();
-    const keysToDelete: string[] = [];
-    
-    // 각 키에 대해 실제 사용 여부 확인
-    allKeysInStore.forEach(key => {
-      const nodesUsingKey = localizationStore.findNodesUsingKey(key);
-      
-      if (nodesUsingKey.length === 0) {
-        keysToDelete.push(key);
-      }
-    });
-
-    // 미사용 키 삭제 실행
-    if (keysToDelete.length > 0) {
-      keysToDelete.forEach(key => {
-        localizationStore.deleteKey(key);
-      });
-    }
   }
 }
 

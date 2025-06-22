@@ -1,6 +1,7 @@
 import type { EditorNodeWrapper, Dialogue, Scene, TemplateDialogues, TextDialogue, ChoiceDialogue } from "../../types/dialogue";
-import type { ICoreServices } from "../types/editorTypes";
+import type { ICoreServices, NodeDeletionOptions } from "../types/editorTypes";
 import { useLocalizationStore } from "../localizationStore";
+import { cleanupUnusedKeysAfterDeletion } from "../../utils/keyCleanup";
 
 // 클립보드 데이터 (모듈 레벨)
 let clipboardData: EditorNodeWrapper[] = [];
@@ -329,7 +330,12 @@ export class NodeOperationsDomain {
 
     // 새로운 방식: 삭제 후 전체 스캔하여 키 정리
     this._performNodesDeletion(targetKeys);
-    this._cleanupUnusedKeysAfterDeletion(); // 삭제 후 미사용 키 정리
+    
+    // 삭제 후 현재 씬 상태를 가져와서 키 정리
+    const updatedState = this.getState();
+    const updatedScene = updatedState.templateData[updatedState.currentTemplate]?.[updatedState.currentScene];
+    cleanupUnusedKeysAfterDeletion(updatedScene);
+    
     this._finalizeNodesDeletion(targetKeys);
   }
 
@@ -512,7 +518,7 @@ export class NodeOperationsDomain {
 
   private _performNodesDeletion(targetKeys: string[]): void {
     targetKeys.forEach((nodeKey) => {
-      this.nodeDomain.deleteNode(nodeKey, true); // skipHistory=true (키 정리는 마지막에 일괄 처리)
+      this.nodeDomain.deleteNode(nodeKey, { recordHistory: false, skipKeyCleanup: true }); // 키 정리는 마지막에 일괄 처리
     });
   }
 
@@ -591,69 +597,7 @@ export class NodeOperationsDomain {
     };
   }
 
-  /**
-   * 삭제 후 전체 씬을 스캔하여 미사용 키들을 정리합니다.
-   * 이 방식이 더 안전하고 정확합니다.
-   */
-  private _cleanupUnusedKeysAfterDeletion(): void {
-    const state = this.getState();
-    const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
-    
-    if (!currentScene) {
-      return;
-    }
 
-    const localizationStore = useLocalizationStore.getState();
-    const allKeysInStore = localizationStore.getAllKeys();
-    const keysToDelete: string[] = [];
-    
-    // 각 키에 대해 현재 씬에서 실제 사용 여부 확인
-    allKeysInStore.forEach(key => {
-      let isUsed = false;
-      
-      // 현재 씬의 모든 노드를 직접 스캔
-      Object.values(currentScene).forEach((item) => {
-        // 타입 가드: EditorNodeWrapper인지 확인
-        const nodeWrapper = item as EditorNodeWrapper;
-        if (!nodeWrapper || !nodeWrapper.dialogue) return;
-        
-        const dialogue = nodeWrapper.dialogue;
-        
-        // 화자 키 확인
-        if (dialogue.speakerKeyRef === key) {
-          isUsed = true;
-          return;
-        }
-        
-        // 텍스트 키 확인  
-        if (dialogue.textKeyRef === key) {
-          isUsed = true;
-          return;
-        }
-        
-        // 선택지 키 확인
-        if (dialogue.type === "choice" && dialogue.choices) {
-          Object.values(dialogue.choices).forEach((choice) => {
-            if (choice && choice.textKeyRef === key) {
-              isUsed = true;
-              return;
-            }
-          });
-        }
-      });
-      
-      if (!isUsed) {
-        keysToDelete.push(key);
-      }
-    });
-
-    // 미사용 키 삭제 실행
-    if (keysToDelete.length > 0) {
-      keysToDelete.forEach(key => {
-        localizationStore.deleteKey(key);
-      });
-    }
-  }
 
   // 노드 생성/연결 헬퍼들
   private _validateChoiceNodeCreation(

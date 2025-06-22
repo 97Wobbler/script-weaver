@@ -485,11 +485,11 @@ export interface INodeDomain {
    * 노드를 삭제합니다.
    *
    * @param nodeKey - 삭제할 노드 키
-   * @param skipHistory - 히스토리 기록 생략 여부 (기본값: false)
+   * @param options - 삭제 옵션 (기본값: { recordHistory: true })
    *
    * **의존성**: CORE SERVICES (pushToHistory), LOCALIZATION STORE (키 정리)
    */
-  deleteNode(nodeKey: string, skipHistory?: boolean): void;
+  deleteNode(nodeKey: string, options?: NodeDeletionOptions): void;
 
   /**
    * 노드를 이동합니다.
@@ -657,6 +657,15 @@ export interface NodeSelectionResult {
 export interface NodeUpdateOptions {
   skipHistory?: boolean;
   skipValidation?: boolean;
+}
+
+/**
+ * 노드 삭제 옵션
+ */
+export interface NodeDeletionOptions {
+  recordHistory?: boolean;
+  skipValidation?: boolean;
+  skipKeyCleanup?: boolean;
 }
 
 /**
