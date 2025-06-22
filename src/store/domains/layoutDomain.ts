@@ -172,10 +172,10 @@ export class LayoutDomain implements Omit<ILayoutDomain, "lastNodePosition"> {
     // 현재 위치 스냅샷
     const beforePositions = this._captureNodePositions(allNodeKeys);
 
-    // 루트 노드 찾기
+    // 루트 노드 찾기 (하위 호환성을 위해 유지)
     const rootNodeKey = this._findRootNodeForLayout(currentScene, allNodeKeys);
 
-    // 글로벌 레이아웃 시스템 실행
+    // 글로벌 레이아웃 시스템 실행 (다중 그래프 지원)
     await this._runGlobalLayoutSystem(currentScene, rootNodeKey);
 
     // 결과 처리

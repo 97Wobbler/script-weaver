@@ -191,42 +191,74 @@ export class CoreServices implements ICoreServices {
 
     const config = layoutConfigs[layoutType];
 
-    await globalLayoutSystem.runLayout(
-      currentScene,
-      {
-        rootNodeId,
-        depth: config.depth,
-        includeRoot: true,
-        direction: "LR",
-        nodeSpacing: 50,
-        rankSpacing: 100,
-        anchorNodeId: config.anchorNodeId,
-      },
-      (nodeId, position) => {
-        // moveNode를 직접 호출하지 않고 위치만 업데이트 (히스토리 중복 방지)
-        const currentState = this.getState();
-        const currentScene = currentState.templateData[currentState.currentTemplate]?.[currentState.currentScene];
-        if (!currentScene) return;
+    if (layoutType === "global") {
+      // 전체 정렬의 경우 다중 그래프 레이아웃 사용
+      await globalLayoutSystem.runMultiGraphLayout(
+        currentScene,
+        {
+          depth: config.depth,
+          includeRoot: true,
+          direction: "LR",
+          nodeSpacing: 30,
+          rankSpacing: 80,
+          anchorNodeId: config.anchorNodeId,
+        },
+        (nodeId: string, position: { x: number; y: number }) => {
+          this.setState((state) => {
+            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+            if (!currentScene || !currentScene[nodeId]) return state;
 
-        const currentNode = this.getNode(currentScene, nodeId);
-        if (!currentNode) return;
+            const updatedNode = { ...currentScene[nodeId], position };
+            const updatedScene = { ...currentScene, [nodeId]: updatedNode };
 
-        const updatedNode = { ...currentNode, position };
-        const updatedScene = this.setNode(currentScene, nodeId, updatedNode);
+            return {
+              ...state,
+              templateData: {
+                ...state.templateData,
+                [state.currentTemplate]: {
+                  ...state.templateData[state.currentTemplate],
+                  [state.currentScene]: updatedScene,
+                },
+              },
+            };
+          });
+        }
+      );
+    } else {
+      // 기존 단일 루트 레이아웃 사용
+      await globalLayoutSystem.runLayout(
+        currentScene,
+        {
+          rootNodeId,
+          depth: config.depth,
+          includeRoot: true,
+          direction: "LR",
+          nodeSpacing: 30,
+          rankSpacing: 80,
+          anchorNodeId: config.anchorNodeId,
+        },
+        (nodeId: string, position: { x: number; y: number }) => {
+          this.setState((state) => {
+            const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+            if (!currentScene || !currentScene[nodeId]) return state;
 
-        this.setState((state) => ({
-          ...state,
-          templateData: {
-            ...state.templateData,
-            [state.currentTemplate]: {
-              ...state.templateData[state.currentTemplate],
-              [state.currentScene]: updatedScene,
-            },
-          },
-          lastNodePosition: position,
-        }));
-      }
-    );
+            const updatedNode = { ...currentScene[nodeId], position };
+            const updatedScene = { ...currentScene, [nodeId]: updatedNode };
+
+            return {
+              ...state,
+              templateData: {
+                ...state.templateData,
+                [state.currentTemplate]: {
+                  ...state.templateData[state.currentTemplate],
+                  [state.currentScene]: updatedScene,
+                },
+              },
+            };
+          });
+        }
+      );
+    }
   }
 
   /**

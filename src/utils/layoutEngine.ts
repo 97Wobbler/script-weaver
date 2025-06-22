@@ -245,6 +245,70 @@ export class NodeMeasurementSystem {
   }
 }
 
+// 다중 그래프 지원을 위한 루트 노드들 수집
+export function findAllRootNodes(scene: Record<string, EditorNodeWrapper>): string[] {
+  const allNodeKeys = Object.keys(scene);
+  const childNodeKeys = new Set<string>();
+
+  // 모든 자식 노드들을 수집
+  for (const nodeKey of allNodeKeys) {
+    const node = scene[nodeKey];
+    if (!node) continue;
+
+    if (node.dialogue.type === "text" && node.dialogue.nextNodeKey) {
+      childNodeKeys.add(node.dialogue.nextNodeKey);
+    } else if (node.dialogue.type === "choice") {
+      Object.values(node.dialogue.choices).forEach((choice) => {
+        if (choice.nextNodeKey) {
+          childNodeKeys.add(choice.nextNodeKey);
+        }
+      });
+    }
+  }
+
+  // 자식이 아닌 노드들이 루트 노드들
+  return allNodeKeys.filter((nodeKey) => !childNodeKeys.has(nodeKey));
+}
+
+// 다중 그래프를 가상 루트로 연결하여 수집
+export function collectMultipleGraphs(
+  scene: Record<string, EditorNodeWrapper>,
+  options: Omit<NodeCollectionOptions, 'rootNodeId'>
+): { nodes: EditorNodeWrapper[]; edges: Array<{ source: string; target: string; id: string }> } {
+  const rootNodes = findAllRootNodes(scene);
+
+  if (rootNodes.length === 0) {
+    return { nodes: [], edges: [] };
+  }
+
+  if (rootNodes.length === 1) {
+    // 단일 그래프면 기존 로직 사용
+    return collectNodes(scene, { ...options, rootNodeId: rootNodes[0] });
+  }
+
+  // 다중 그래프 처리: 각 그래프를 개별 수집 후 통합
+  const allNodes: EditorNodeWrapper[] = [];
+  const allEdges: Array<{ source: string; target: string; id: string }> = [];
+  const processedNodes = new Set<string>();
+
+  for (const rootNodeId of rootNodes) {
+    const { nodes, edges } = collectNodes(scene, { ...options, rootNodeId });
+    
+    // 중복 노드 제거
+    for (const node of nodes) {
+      if (!processedNodes.has(node.nodeKey)) {
+        allNodes.push(node);
+        processedNodes.add(node.nodeKey);
+      }
+    }
+
+    // 엣지 추가
+    allEdges.push(...edges);
+  }
+
+  return { nodes: allNodes, edges: allEdges };
+}
+
 // 노드 수집 시스템 (depth 기반)
 export interface NodeCollectionOptions {
   rootNodeId: string;
@@ -356,6 +420,38 @@ export class LayoutSystem {
 
     // 4단계: 즉시 위치 업데이트
     this.applyLayoutImmediately(layoutResult, onPositionUpdate, options.anchorNodeId, nodes);
+  }
+
+  // 다중 그래프 레이아웃 실행
+  async runMultiGraphLayout(
+    scene: Record<string, EditorNodeWrapper>,
+    options: Omit<NodeCollectionOptions, 'rootNodeId'> & LayoutOptions,
+    onPositionUpdate: (nodeId: string, position: { x: number; y: number }) => void
+  ): Promise<void> {
+    // 1단계: 다중 그래프 수집
+    const { nodes, edges } = collectMultipleGraphs(scene, options);
+
+    if (nodes.length === 0) {
+      console.warn("[LayoutSystem] 레이아웃할 노드가 없음");
+      return;
+    }
+
+    // 2단계: DOM 실측 (모든 노드 크기 측정)
+    const layoutNodes = await this.measureNodes(nodes);
+
+    // 3단계: 실측값으로 레이아웃 계산
+    const layoutResult = await this.engine.layout(
+      layoutNodes,
+      edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+      })),
+      options
+    );
+
+    // 4단계: 즉시 위치 업데이트 (앵커 없이)
+    this.applyLayoutImmediately(layoutResult, onPositionUpdate, undefined, nodes);
   }
 
   // 노드 크기 측정
