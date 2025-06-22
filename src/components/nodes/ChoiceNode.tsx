@@ -53,7 +53,6 @@ export default function ChoiceNode({ data, selected }: NodeProps<ChoiceNodeData>
       <div className="bg-green-50 px-3 py-2 border-b border-gray-200 rounded-t-lg">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-green-700">선택지 노드</span>
-          <span className="text-xs text-gray-500">{nodeKey}</span>
         </div>
       </div>
 
