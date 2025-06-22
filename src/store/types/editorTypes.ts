@@ -587,6 +587,16 @@ export interface INodeDomain {
    * **의존성**: 없음 (독립적)
    */
   updateNodePositionAndVisibility(nodeKey: string, position: { x: number; y: number }, hidden: boolean): void;
+
+  /**
+   * 노드 타입을 변환합니다 (TextNode ↔ ChoiceNode).
+   *
+   * @param nodeKey - 변환할 노드 키
+   * @param targetType - 변환할 타입 ("text" | "choice")
+   *
+   * **의존성**: CORE SERVICES (pushToHistory), LocalizationStore (내부적)
+   */
+  convertNodeType(nodeKey: string, targetType: "text" | "choice"): void;
 }
 
 // ===== NODE CORE DOMAIN 관련 타입 =====

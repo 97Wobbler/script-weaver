@@ -84,9 +84,13 @@
 
 #### 핵심 편집 기능 개선 ⭐ **높은 우선순위**
 
--   [ ] **노드 타입 변환 기능** - PropertyPanel에서 TextNode ↔ ChoiceNode 변환
-    -   구현 목표: 기존 텍스트 유지하면서 노드 타입만 변경
-    -   변환 로직: TextNode → ChoiceNode (기본 선택지 1개), ChoiceNode → TextNode (첫 번째 선택지를 다음 노드로)
+-   [x] **노드 타입 변환 기능** - PropertyPanel에서 TextNode ↔ ChoiceNode 변환 **완료**
+    -   **구현 완료**: PropertyPanel에 노드 타입 드롭다운 추가, 직접 변환 방식 구현
+    -   **변환 로직 구현됨**: 
+        - TextNode → ChoiceNode: `nextNodeKey`를 첫 번째 선택지로 이동, 기본 선택지 2개 자동 생성
+        - ChoiceNode → TextNode: 첫 번째 선택지의 `nextNodeKey`를 노드로 이동
+    -   **보존 정보**: `speakerText`, `contentText`, `speed`, 로컬라이제이션 키 참조 완벽 유지
+    -   **구현 결과**: NodeDomain.convertNodeType() 메서드, 히스토리 연동, 성공 토스트 완료
 
 #### 데이터 관리 및 기타 개선 🔧 **중요**
 
@@ -212,6 +216,11 @@
     -   inputDialogue 추가
     -   조건확인(if, switch) 노드 추가,
     -   씬 시작 블럭 추가 (데이터 구조 수정 필요함, 큰 작업)
+-   [ ] **노드 변환 로직 범용화**: 하드코딩된 타입별 변환을 전략 패턴으로 리팩토링
+    -   현재: `if (targetType === "choice")` 하드코딩 방식
+    -   개선: BaseDialogue 공통 속성 기반 변환 전략 패턴 적용
+    -   각 노드 타입별 변환 규칙을 독립적 전략으로 분리
+    -   InputDialogue 등 추가 타입 확장 시 용이하도록 설계
 -   큰 컴포넌트 분리
     -   [ ] **PropertyPanel.tsx 분리**: UI 컴포넌트 과부하 해결
     -   [ ] **App.tsx 분리**: 루트 컴포넌트 책임 분리

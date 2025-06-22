@@ -190,6 +190,12 @@ export const useEditorStore = create<IEditorStore>()(
           nodeDomain.updateChoiceText(nodeKey, choiceKey, choiceText);
         },
 
+        // 노드 타입 변환
+        convertNodeType: (nodeKey, targetType) => {
+          nodeDomain.convertNodeType(nodeKey, targetType);
+          updateLocalizationStoreRef();
+        },
+
         // 자동 노드 생성 (실제 텍스트 기반)
         createTextNode: (contentText = "", speakerText = "") => {
           return nodeOperationsDomain.createTextNode(contentText, speakerText);
