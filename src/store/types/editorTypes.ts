@@ -782,11 +782,30 @@ export interface NodeConnectionOptions {
 }
 
 /**
+ * 노드 간 연결 정보 타입
+ */
+export interface ConnectionInfo {
+  sourceNodeKey: string;
+  targetNodeKey: string;
+  connectionType: "text" | "choice";
+  choiceKey?: string; // 선택지 연결인 경우
+}
+
+/**
+ * 확장된 클립보드 데이터 타입
+ */
+export interface ExtendedClipboardData {
+  nodes: EditorNodeWrapper[];
+  connections: ConnectionInfo[];
+}
+
+/**
  * 복사/붙여넣기 결과 타입
  */
 export interface PasteResult {
   success: boolean;
   pastedNodeKeys: string[];
+  restoredConnections: number;
   errors?: string[];
 }
 

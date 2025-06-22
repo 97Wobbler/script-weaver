@@ -1,10 +1,10 @@
 import type { EditorNodeWrapper, Dialogue, Scene, TemplateDialogues, TextDialogue, ChoiceDialogue } from "../../types/dialogue";
-import type { ICoreServices } from "../types/editorTypes";
+import type { ICoreServices, ExtendedClipboardData, ConnectionInfo } from "../types/editorTypes";
 import { useLocalizationStore } from "../localizationStore";
 import { cleanupUnusedKeysAfterDeletion } from "../../utils/keyCleanup";
 
-// 클립보드 데이터 (모듈 레벨)
-let clipboardData: EditorNodeWrapper[] = [];
+// 확장된 클립보드 데이터 (모듈 레벨)
+let clipboardData: ExtendedClipboardData = { nodes: [], connections: [] };
 
 /**
  * Node Operations Domain - 노드 복합 연산 관리
@@ -207,18 +207,17 @@ export class NodeOperationsDomain {
   // === 복사/붙여넣기 (3개) ===
 
   /**
-   * 선택된 노드들 복사
+   * 선택된 노드들 복사 (내부 연결 관계 포함)
    */
   copySelectedNodes(): void {
     const state = this.getState();
     const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
     if (!currentScene) return;
 
-    const nodesToCopy: EditorNodeWrapper[] = [];
-
     // 선택된 노드가 있으면 선택된 노드들을, 없으면 현재 선택된 단일 노드를 복사
     const targetKeys = state.selectedNodeKeys.size > 0 ? Array.from(state.selectedNodeKeys) : state.selectedNodeKey ? [state.selectedNodeKey] : [];
 
+    const nodesToCopy: EditorNodeWrapper[] = [];
     targetKeys.forEach((nodeKey: string) => {
       const node = this.coreServices.getNode(currentScene, nodeKey);
       if (node) {
@@ -226,21 +225,31 @@ export class NodeOperationsDomain {
       }
     });
 
-    clipboardData = nodesToCopy;
+    // 선택된 노드들 간의 내부 연결 관계 추출
+    const connections = this._extractInternalConnections(targetKeys, currentScene);
+
+    clipboardData = {
+      nodes: nodesToCopy,
+      connections: connections
+    };
 
     if (state.showToast && nodesToCopy.length > 0) {
-      state.showToast(`${nodesToCopy.length}개 노드를 복사했습니다.`, "success");
+      const connectionCount = connections.length;
+      const message = connectionCount > 0 
+        ? `${nodesToCopy.length}개 노드와 ${connectionCount}개 연결을 복사했습니다.`
+        : `${nodesToCopy.length}개 노드를 복사했습니다.`;
+      state.showToast(message, "success");
     }
   }
 
   /**
-   * 노드 붙여넣기
+   * 노드 붙여넣기 (내부 연결 관계 복원)
    */
   pasteNodes(position?: { x: number; y: number }): void {
-    if (clipboardData.length === 0) return;
+    if (clipboardData.nodes.length === 0) return;
 
     const state = this.getState();
-    const nodesToPaste = clipboardData.length;
+    const nodesToPaste = clipboardData.nodes.length;
 
     // 1. 붙여넣기 작업 검증
     if (!this._validatePasteOperation(nodesToPaste)) {
@@ -251,8 +260,8 @@ export class NodeOperationsDomain {
     const startX = position?.x ?? state.lastNodePosition.x + 50;
     const startY = position?.y ?? state.lastNodePosition.y + 50;
 
-    // 3. 새 노드들 생성
-    const { newNodes, newNodeKeys } = this._createPastedNodes(startX, startY);
+    // 3. 새 노드들 생성 및 ID 매핑 테이블 생성
+    const { newNodes, newNodeKeys, nodeIdMapping } = this._createPastedNodesWithMapping(startX, startY);
 
     // 4. 모든 노드를 한 번에 추가
     this.setState((currentState: any) => {
@@ -284,12 +293,18 @@ export class NodeOperationsDomain {
       };
     });
 
-    // 5. 상태 변경 후에 히스토리에 추가
+    // 5. 연결 관계 복원
+    const restoredConnections = this._restoreConnections(nodeIdMapping);
+
+    // 6. 상태 변경 후에 히스토리에 추가
     this.coreServices.pushToHistory("노드 붙여넣기");
     this.updateLocalizationStoreRef();
 
     if (state.showToast) {
-      state.showToast(`${clipboardData.length}개 노드를 붙여넣었습니다.`, "success");
+      const message = restoredConnections > 0 
+        ? `${clipboardData.nodes.length}개 노드와 ${restoredConnections}개 연결을 붙여넣었습니다.`
+        : `${clipboardData.nodes.length}개 노드를 붙여넣었습니다.`;
+      state.showToast(message, "success");
     }
   }
 
@@ -304,9 +319,12 @@ export class NodeOperationsDomain {
     const originalNode = this.coreServices.getNode(currentScene, nodeKey);
     if (!originalNode) return "";
 
-    // 임시로 클립보드에 저장하고 붙여넣기
-    const originalClipboard = [...clipboardData];
-    clipboardData = [originalNode];
+    // 임시로 클립보드에 저장하고 붙여넣기 (단일 노드는 연결 없음)
+    const originalClipboard = { ...clipboardData };
+    clipboardData = { 
+      nodes: [originalNode], 
+      connections: [] 
+    };
 
     this.pasteNodes({
       x: originalNode.position.x + 50,
@@ -481,30 +499,51 @@ export class NodeOperationsDomain {
     }
   }
 
-  private _createPastedNodes(startX: number, startY: number): { newNodes: EditorNodeWrapper[]; newNodeKeys: string[] } {
+  /**
+   * 붙여넣기용 노드들을 생성하고 ID 매핑을 생성합니다.
+   */
+  private _createPastedNodesWithMapping(startX: number, startY: number): { 
+    newNodes: EditorNodeWrapper[]; 
+    newNodeKeys: string[]; 
+    nodeIdMapping: Map<string, string> 
+  } {
     const newNodeKeys: string[] = [];
     const newNodes: EditorNodeWrapper[] = [];
+    const nodeIdMapping = new Map<string, string>(); // 기존 노드 ID → 새 노드 ID
 
-    // 새 노드들을 준비
-    clipboardData.forEach((originalNode, index) => {
+    // 원본 노드들의 경계 박스 계산 (상대적 위치 보존을 위해)
+    const originalPositions = clipboardData.nodes.map(node => node.position);
+    const minX = Math.min(...originalPositions.map(pos => pos.x));
+    const minY = Math.min(...originalPositions.map(pos => pos.y));
+
+    // 새 노드들을 준비 (상대적 위치 보존)
+    clipboardData.nodes.forEach((originalNode, index) => {
       const newNodeKey = this.coreServices.generateNodeKey();
+      
+      // 상대적 위치 계산: 원본의 상대 위치를 유지하면서 새 시작점으로 이동
+      const relativeX = originalNode.position.x - minX;
+      const relativeY = originalNode.position.y - minY;
+      const newPosition = {
+        x: startX + relativeX,
+        y: startY + relativeY,
+      };
+      
       const newNode: EditorNodeWrapper = {
         ...JSON.parse(JSON.stringify(originalNode)),
         nodeKey: newNodeKey,
-        position: {
-          x: startX + index * 20,
-          y: startY + index * 20,
-        },
+        position: newPosition,
       };
 
-      // 로컬라이제이션 설정
-      this._setupPastedNodeLocalization(newNode);
+      // ID 매핑 저장
+      nodeIdMapping.set(originalNode.nodeKey, newNodeKey);
+
+      // 로컬라이제이션 설정 (연결 제거는 하지 않음 - 나중에 복원할 예정)
+      this._setupPastedNodeLocalizationWithoutConnectionCleanup(newNode);
 
       newNodes.push(newNode);
       newNodeKeys.push(newNodeKey);
     });
-
-    return { newNodes, newNodeKeys };
+    return { newNodes, newNodeKeys, nodeIdMapping };
   }
 
   // 삭제 관련 헬퍼들
@@ -782,6 +821,169 @@ export class NodeOperationsDomain {
     this.nodeDomain.updateNodeVisibility(newNodeKey, false);
 
     this.coreServices.endCompoundAction();
+  }
+
+  // === 복사/붙여넣기 고도화 헬퍼 메서드들 ===
+
+    /**
+   * 선택된 노드들 간의 내부 연결 관계를 추출합니다.
+   */
+  private _extractInternalConnections(selectedNodeKeys: string[], currentScene: Scene): ConnectionInfo[] {
+    const connections: ConnectionInfo[] = [];
+    const selectedKeySet = new Set(selectedNodeKeys);
+
+    selectedNodeKeys.forEach(nodeKey => {
+      const node = this.coreServices.getNode(currentScene, nodeKey);
+      if (!node) return;
+
+      // 텍스트 노드의 nextNodeKey 체크
+      if (node.dialogue.type === "text" && node.dialogue.nextNodeKey) {
+        const targetKey = node.dialogue.nextNodeKey;
+        const isInternal = selectedKeySet.has(targetKey);
+        
+        if (isInternal) {
+          connections.push({
+            sourceNodeKey: nodeKey,
+            targetNodeKey: targetKey,
+            connectionType: "text"
+          });
+        }
+      }
+
+      // 선택지 노드의 각 선택지 nextNodeKey 체크
+      if (node.dialogue.type === "choice" && node.dialogue.choices) {
+        const choiceDialogue = node.dialogue as ChoiceDialogue;
+        Object.entries(choiceDialogue.choices).forEach(([choiceKey, choice]) => {
+          if (choice.nextNodeKey) {
+            const isInternal = selectedKeySet.has(choice.nextNodeKey);
+            
+            if (isInternal) {
+              connections.push({
+                sourceNodeKey: nodeKey,
+                targetNodeKey: choice.nextNodeKey,
+                connectionType: "choice",
+                choiceKey: choiceKey
+              });
+            }
+          }
+        });
+      }
+    });
+    return connections;
+  }
+
+  /**
+   * 붙여넣기 시 연결 관계를 복원합니다.
+   */
+  private _restoreConnections(nodeIdMapping: Map<string, string>): number {
+    const state = this.getState();
+    let restoredCount = 0;
+
+    // 노드별로 연결을 그룹화하여 한 번에 업데이트
+    const nodeUpdates = new Map<string, any>();
+
+    clipboardData.connections.forEach((connection, index) => {
+      const newSourceKey = nodeIdMapping.get(connection.sourceNodeKey);
+      const newTargetKey = nodeIdMapping.get(connection.targetNodeKey);
+
+      if (!newSourceKey || !newTargetKey) {
+        return;
+      }
+
+      const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+      if (!currentScene) {
+        return;
+      }
+
+      const sourceNode = this.coreServices.getNode(currentScene, newSourceKey);
+      if (!sourceNode) {
+        return;
+      }
+
+      if (connection.connectionType === "text" && sourceNode.dialogue.type === "text") {
+        // 텍스트 노드 연결 복원
+        nodeUpdates.set(newSourceKey, {
+          dialogue: {
+            ...sourceNode.dialogue,
+            nextNodeKey: newTargetKey
+          }
+        });
+        restoredCount++;
+      } else if (connection.connectionType === "choice" && connection.choiceKey && sourceNode.dialogue.type === "choice") {
+        // 선택지 노드 연결 복원 - 기존 업데이트와 병합
+        const choiceDialogue = sourceNode.dialogue as ChoiceDialogue;
+        const choice = choiceDialogue.choices[connection.choiceKey];
+        
+        if (choice) {
+          // 기존 업데이트가 있는지 확인하고 병합
+          const existingUpdate = nodeUpdates.get(newSourceKey);
+          const baseChoices = existingUpdate?.dialogue?.choices || choiceDialogue.choices;
+          
+          const updatedChoices = {
+            ...baseChoices,
+            [connection.choiceKey]: {
+              ...choice,
+              nextNodeKey: newTargetKey
+            }
+          };
+          
+          nodeUpdates.set(newSourceKey, {
+            dialogue: {
+              ...sourceNode.dialogue,
+              choices: updatedChoices
+            }
+          });
+          
+          restoredCount++;
+        }
+      }
+    });
+
+    // 한 번에 모든 노드 업데이트 실행
+    nodeUpdates.forEach((update, nodeKey) => {
+      this.nodeDomain.updateNode(nodeKey, update);
+    });
+
+    
+    return restoredCount;
+  }
+
+    /**
+   * 연결 제거 없이 로컬라이제이션을 설정합니다.
+   */
+  private _setupPastedNodeLocalizationWithoutConnectionCleanup(newNode: EditorNodeWrapper): void {
+    const localizationStore = useLocalizationStore.getState();
+
+    if (newNode.dialogue.type === "text" || newNode.dialogue.type === "choice") {
+      // 화자 텍스트가 있으면 새 키 생성
+      if (newNode.dialogue.speakerText) {
+        const result = localizationStore.generateSpeakerKey(newNode.dialogue.speakerText);
+        localizationStore.setText(result.key, newNode.dialogue.speakerText);
+        newNode.dialogue.speakerKeyRef = result.key;
+      }
+
+      // 내용 텍스트가 있으면 새 키 생성
+      if (newNode.dialogue.contentText) {
+        const result = localizationStore.generateTextKey(newNode.dialogue.contentText);
+        localizationStore.setText(result.key, newNode.dialogue.contentText);
+        newNode.dialogue.textKeyRef = result.key;
+      }
+    }
+
+    // 선택지 텍스트들도 새 키 생성 (연결은 그대로 유지)
+    if (newNode.dialogue.type === "choice" && newNode.dialogue.choices) {
+      const choiceDialogue = newNode.dialogue as ChoiceDialogue;
+      Object.entries(choiceDialogue.choices).forEach(([choiceKey, choice]) => {
+        if (choice.choiceText) {
+          const result = localizationStore.generateChoiceKey(choice.choiceText);
+          localizationStore.setText(result.key, choice.choiceText);
+          choice.textKeyRef = result.key;
+        }
+        // nextNodeKey는 그대로 유지 (나중에 매핑을 통해 업데이트)
+      });
+    }
+
+    // 텍스트 노드의 nextNodeKey도 그대로 유지 (나중에 매핑을 통해 업데이트)
   }
 }
 
