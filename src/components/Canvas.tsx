@@ -54,12 +54,6 @@ const generateEdges = (nodeWrappers: EditorNodeWrapper[]): Edge[] => {
             target: choice.nextNodeKey,
             sourceHandle: `choice-${choiceKey}`, // ChoiceNode에서 정의한 핸들 ID와 일치
             style: { stroke: "#22c55e", strokeWidth: 2 },
-            label:
-              (choice.choiceText || choice.textKeyRef || choiceKey).length > 20
-                ? `${(choice.choiceText || choice.textKeyRef || choiceKey).substring(0, 20)}...`
-                : choice.choiceText || choice.textKeyRef || choiceKey,
-            labelStyle: { fontSize: 10, fill: "#22c55e" },
-            labelBgStyle: { fill: "#f0fdf4", fillOpacity: 0.8 },
           });
         }
       });
