@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useEditorStore } from "../store/editorStore";
 import { useLocalizationStore } from "../store/localizationStore";
 import { DialogueSpeed } from "../types/dialogue";
@@ -27,6 +27,10 @@ interface PropertyPanelProps {
 }
 
 export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
+  const panelRef = useRef<HTMLElement>(null);
+  const [panelWidth, setPanelWidth] = useState(320); // 기본 너비 320px
+  const [isResizing, setIsResizing] = useState(false);
+
   const {
     selectedNodeKey,
     selectedNodeKeys,
@@ -60,6 +64,37 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     content: false,
     choices: {} as Record<string, boolean>,
   });
+
+  // Resize 핸들러
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  const handleResizeMove = (e: MouseEvent) => {
+    if (!isResizing || !panelRef.current) return;
+
+    const newWidth = window.innerWidth - e.clientX;
+    const clampedWidth = Math.max(320, Math.min(640, newWidth));
+    setPanelWidth(clampedWidth);
+  };
+
+  const handleResizeEnd = () => {
+    setIsResizing(false);
+  };
+
+  // Resize 이벤트 리스너 등록/해제
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMove);
+      document.addEventListener('mouseup', handleResizeEnd);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleResizeMove);
+        document.removeEventListener('mouseup', handleResizeEnd);
+      };
+    }
+  }, [isResizing]);
 
   // 키 편집 모달 ESC 키 처리
   useEffect(() => {
@@ -645,7 +680,17 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   // 노드가 선택되지 않은 경우
   if (!selectedNode) {
     return (
-      <aside className="w-80 bg-white border-l border-gray-200 flex flex-col">
+      <aside 
+        ref={panelRef}
+        className="bg-white border-l border-gray-200 flex flex-col relative"
+        style={{ width: `${panelWidth}px` }}
+      >
+        {/* Resize 핸들러 */}
+        <div
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-200 transition-colors z-10"
+          onMouseDown={handleResizeStart}
+        />
+        
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center text-gray-500">
             <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -670,7 +715,17 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   // 다중 선택된 경우
   if (isMultipleSelection) {
     return (
-      <aside className="w-80 bg-white border-l border-gray-200 flex flex-col">
+      <aside 
+        ref={panelRef}
+        className="bg-white border-l border-gray-200 flex flex-col relative"
+        style={{ width: `${panelWidth}px` }}
+      >
+        {/* Resize 핸들러 */}
+        <div
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-200 transition-colors z-10"
+          onMouseDown={handleResizeStart}
+        />
+        
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center text-gray-500">
             <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -711,7 +766,17 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
   const currentSpeed = selectedNode.dialogue.type === "text" || selectedNode.dialogue.type === "choice" ? selectedNode.dialogue.speed || "NORMAL" : "NORMAL";
 
   return (
-    <aside className="w-80 bg-white border-l border-gray-200 flex flex-col">
+    <aside 
+      ref={panelRef}
+      className="bg-white border-l border-gray-200 flex flex-col relative"
+      style={{ width: `${panelWidth}px` }}
+    >
+      {/* Resize 핸들러 */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-blue-200 transition-colors z-10"
+        onMouseDown={handleResizeStart}
+      />
+      
       <div className="flex-1 overflow-y-auto p-4 min-h-0">
         <div className="space-y-6">
           {/* 노드 정보 헤더 */}
