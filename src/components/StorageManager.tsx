@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useStorageInfo } from "../hooks/useStorageInfo";
 import { cleanupHistory, cleanupUnusedKeys, resetAllData } from "../utils/storageManager";
+import { useEditorStore } from "../store/editorStore";
 
 interface StorageManagerProps {
   showToast?: (message: string, type?: "success" | "info" | "warning") => void;
@@ -12,7 +13,21 @@ export default function StorageManager({ showToast }: StorageManagerProps) {
 
   const handleCleanupHistory = () => {
     const result = cleanupHistory();
+    
     if (result) {
+      // localStorage 정리 성공 시, 메모리 상태도 직접 업데이트
+      const currentEditorStore = useEditorStore.getState();
+      if (currentEditorStore.history.length > 10) {
+        const recentHistory = currentEditorStore.history.slice(-10);
+        const newHistoryIndex = Math.min(currentEditorStore.historyIndex, recentHistory.length - 1);
+        
+        // Zustand setState를 통해 직접 상태 업데이트
+        useEditorStore.setState({
+          history: recentHistory,
+          historyIndex: newHistoryIndex
+        });
+      }
+      
       showToast?.("히스토리 데이터가 정리되었습니다.", "success");
     } else {
       showToast?.("정리할 히스토리가 없습니다.", "info");

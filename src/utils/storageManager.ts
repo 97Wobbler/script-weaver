@@ -68,35 +68,18 @@ export function getStorageInfo(): StorageInfo {
  */
 export function cleanupHistory(): boolean {
   try {
-    console.log('[히스토리 정리] 시작');
     const editorStoreKey = 'script-weaver-editor';
     const editorData = localStorage.getItem(editorStoreKey);
     
-    if (!editorData) {
-      console.log('[히스토리 정리] localStorage에 에디터 데이터가 없음');
-      return false;
-    }
-    
-    console.log('[히스토리 정리] localStorage 데이터 크기:', editorData.length, 'bytes');
+    if (!editorData) return false;
     
     const parsedData = JSON.parse(editorData);
     const state = parsedData.state;
     
-    console.log('[히스토리 정리] 파싱된 state 구조:', {
-      hasHistory: !!state?.history,
-      historyType: Array.isArray(state?.history) ? 'array' : typeof state?.history,
-      historyLength: state?.history?.length,
-      currentHistoryIndex: state?.historyIndex
-    });
-    
     if (state?.history && Array.isArray(state.history) && state.history.length > 10) {
-      console.log('[히스토리 정리] 정리 전 - 히스토리 개수:', state.history.length, '현재 인덱스:', state.historyIndex);
-      
       // 최근 10개 히스토리만 유지
       const recentHistory = state.history.slice(-10);
       const newHistoryIndex = Math.min(state.historyIndex, recentHistory.length - 1);
-      
-      console.log('[히스토리 정리] 정리 후 - 히스토리 개수:', recentHistory.length, '새 인덱스:', newHistoryIndex);
       
       const updatedData = {
         ...parsedData,
@@ -107,26 +90,13 @@ export function cleanupHistory(): boolean {
         },
       };
       
-      const updatedJsonString = JSON.stringify(updatedData);
-      console.log('[히스토리 정리] 저장할 데이터 크기:', updatedJsonString.length, 'bytes');
-      
-      localStorage.setItem(editorStoreKey, updatedJsonString);
-      
-      // 저장 후 검증
-      const verifyData = localStorage.getItem(editorStoreKey);
-      if (verifyData) {
-        const verifyParsed = JSON.parse(verifyData);
-        console.log('[히스토리 정리] 저장 검증 완료 - 히스토리 개수:', verifyParsed.state.history.length, '인덱스:', verifyParsed.state.historyIndex);
-      }
-      
-      console.log('[히스토리 정리] 성공적으로 완료');
+      localStorage.setItem(editorStoreKey, JSON.stringify(updatedData));
       return true;
     }
     
-    console.log('[히스토리 정리] 정리할 히스토리가 없음 (10개 이하)');
     return false;
   } catch (error) {
-    console.error('[히스토리 정리] 오류 발생:', error);
+    console.error('히스토리 정리 중 오류:', error);
     return false;
   }
 }
