@@ -1,0 +1,80 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+[Instructions]
+
+For any **new feature development** task, strictly follow the workflow below.  
+If the purpose or expected behavior of the feature is unclear, begin by asking the user questions to clarify and define the requirements.  
+If any context is missing or the request is vague, stop immediately and request clarification from the user.
+
+⸻
+
+[Workflow Steps]
+
+1. Define the Feature and Clarify Requirements  
+   • If the user's initial explanation is brief or unclear, ask specific questions to clarify the intent and scope of the feature.  
+   • Key questions to ask:
+
+    - What is the primary goal of this feature?
+    - What user action should trigger it?
+    - What input does it take and what output does it produce?
+    - Does it involve UI? If so, what kind of visual behavior is expected?
+    - Are there any constraints, priorities, or edge cases to consider?  
+      • Proceed only after the requirements are sufficiently clarified.
+
+2. Suggest Technical Approaches and Wait for User Selection  
+   • Based on the clarified requirements, suggest at least two technically feasible implementation approaches.  
+   • Avoid experimental or overly speculative solutions unless explicitly requested.  
+   • Focus on maintainability and scalability.  
+   • Do not proceed until the user selects a direction.
+
+3. Plan the Task and Document in todo.md  
+   • Based on the selected direction, identify where and how the new feature should be implemented.  
+   • If the task is large or token usage may become an issue, break it down into clearly defined subtasks and list them in `todo.md`.  
+   • Write a brief summary in `todo.md` including:
+
+    - Background / context
+    - Chosen approach
+    - What will be implemented and why  
+      • Focus on one (sub)task at a time.
+
+4. Implement, Debug, and Verify (Repeat Until Clean)  
+   • Implement the selected task.  
+   • If needed, insert temporary `console.log`s to trace internal state changes and help debugging.  
+   • Build the project and resolve all errors. TypeScript type safety is mandatory.  
+   • Repeat this step until the build is clean and the feature behaves as expected.
+
+5. Provide a Test Case and Wait for User Confirmation  
+   • Share a simple test case (TC) with the user to validate the behavior.  
+   • Wait for the user to test and confirm.  
+   • If it fails: return to Step 4 and revise the implementation.  
+   • If it passes: move on to the next step.
+
+6. Finalize and Commit  
+   • Remove all temporary console logs or debug code used during development.  
+   • Review and delete any leftover code from failed earlier attempts, ensuring only the final solution remains.  
+   • Mark the task as completed in `todo.md` and summarize what was implemented and why.  
+   • Commit both code and documentation updates in a **single commit**.  
+   • Commit message format:
+
+    ```plaintext
+    feat: [short summary in Korean] 기능 개발
+    ```
+
+7. Check for Remaining Tasks and Ask for User Approval  
+   • If there are remaining tasks or subtasks, ask the user whether to proceed to the next one.  
+   • Only continue after explicit user approval.
+
+⸻
+
+[Core Principles]  
+• Always follow this sequence:  
+ Clarify Requirements → Propose Directions → User Approval → Plan & Record → Implement (repeat until clean) → Test Case → If Passed: Record + Commit → Check Next Task  
+• Always wait for user input when required (e.g., direction choice, test confirmation, continuing to the next task).  
+• Combine code changes and `todo.md` updates in a single commit.  
+• Avoid experimental or speculative changes unless explicitly asked.  
+• For large or complex tasks, use subtasks to control token usage and scope.  
+• Use `todo.md` as the **primary task tracker**. `log.md` is not used.
+⸻

@@ -1,7 +1,0 @@
----
-description: 
-globs: 
-alwaysApply: true
----
-If you need to record the current time, note that LLMs cannot directly access the system clock.
-Therefore, first check the current time using a terminal command before proceeding.
