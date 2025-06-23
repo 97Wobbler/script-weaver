@@ -42,6 +42,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     updateChoiceKeyReference,
     setSelectedNode,
     pushToHistoryWithTextEdit,
+    convertNodeType,
   } = useEditorStore();
 
   const { getText, findNodesUsingKey, getKeyUsageCount, updateKeyText } = useLocalizationStore();
@@ -512,7 +513,7 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
     const hasChanges = isTextChanged || isKeyChanged;
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 w-96 max-w-full">
           <h3 className="text-lg font-semibold mb-4">키 편집</h3>
 
@@ -718,8 +719,20 @@ export default function PropertyPanel({ showToast }: PropertyPanelProps = {}) {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">노드 속성</h3>
             <div className="text-sm text-gray-600 space-y-1">
               <p>노드 ID: {selectedNode.nodeKey}</p>
-              <p>타입: {selectedNode.dialogue.type === "text" ? "텍스트" : "선택지"}</p>
             </div>
+          </div>
+
+          {/* 노드 타입 변환 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">노드 타입</label>
+            <select
+              value={selectedNode.dialogue.type}
+              onChange={(e) => convertNodeType(selectedNode.nodeKey, e.target.value as "text" | "choice")}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="text">텍스트 노드</option>
+              <option value="choice">선택지 노드</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500">노드 타입을 변경하면 일부 정보가 손실될 수 있습니다</p>
           </div>
 
           {/* 기본 속성 편집 - 실제 텍스트 기반 */}

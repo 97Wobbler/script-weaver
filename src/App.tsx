@@ -1,9 +1,11 @@
 import React, { useState, useRef } from "react";
 import Canvas from "./components/Canvas";
 import PropertyPanel from "./components/PropertyPanel";
+import StorageManager from "./components/StorageManager";
 import { useEditorStore } from "./store/editorStore";
 import { globalAsyncOperationManager, type SystemStatus } from "./store/asyncOperationManager";
 import { downloadFile, uploadFile } from "./utils/importExport";
+import iconUrl from "../public/icon.svg";
 
 // 전역 토스트 상태 타입
 interface ToastState {
@@ -223,7 +225,8 @@ function App() {
       <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold text-gray-900">Script Weaver</h1>
+            <img src={iconUrl} alt="ScriptWeaver Logo" className="w-8 h-8 mr-2" style={{display:'inline-block', verticalAlign:'middle'}} />
+            <h1 className="text-2xl font-bold text-gray-900">ScriptWeaver</h1>
             <span className="text-sm text-gray-500">Dialogue Editor</span>
           </div>
           <div className="flex items-center space-x-2">
@@ -324,6 +327,11 @@ function App() {
                   JSON 가져오기
                 </button>
               </div>
+            </div>
+
+            {/* 저장 공간 관리 */}
+            <div className="border-t border-gray-200 pt-4">
+              <StorageManager showToast={showToast} />
             </div>
           </div>
         </aside>

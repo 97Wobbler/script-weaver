@@ -499,6 +499,93 @@ export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "las
     this.updateNode(nodeKey, { position, hidden });
   }
 
+  /**
+   * 노드 타입을 변환합니다 (TextNode ↔ ChoiceNode).
+   */
+  convertNodeType(nodeKey: string, targetType: "text" | "choice"): void {
+    const state = this.getState();
+    const currentScene = state.templateData[state.currentTemplate]?.[state.currentScene];
+    const currentNode = currentScene?.[nodeKey];
+
+    if (!currentNode) {
+      state.showToast?.("변환할 노드를 찾을 수 없습니다.", "warning");
+      return;
+    }
+
+    const currentDialogue = currentNode.dialogue;
+
+    // 이미 같은 타입이면 변환하지 않음
+    if (currentDialogue.type === targetType) {
+      return;
+    }
+
+    let newDialogue: Dialogue;
+
+    if (targetType === "choice") {
+      // TextNode → ChoiceNode 변환
+      const textDialogue = currentDialogue as TextDialogue;
+      const localizationStore = useLocalizationStore.getState();
+
+      // 기본 선택지 2개 생성
+      const defaultChoices: ChoiceDialogue["choices"] = {
+        choice_1: {
+          choiceText: "선택지 1",
+          textKeyRef: "",
+          nextNodeKey: textDialogue.nextNodeKey || "",
+        },
+        choice_2: {
+          choiceText: "선택지 2",
+          textKeyRef: "",
+          nextNodeKey: "",
+        },
+      };
+
+      // 선택지 로컬라이제이션 키 생성
+      Object.entries(defaultChoices).forEach(([choiceKey, choice]) => {
+        if (choice.choiceText) {
+          const result = localizationStore.generateChoiceKey(choice.choiceText);
+          localizationStore.setText(result.key, choice.choiceText);
+          choice.textKeyRef = result.key;
+        }
+      });
+
+      newDialogue = {
+        type: "choice",
+        speakerText: textDialogue.speakerText,
+        contentText: textDialogue.contentText,
+        speakerKeyRef: textDialogue.speakerKeyRef,
+        textKeyRef: textDialogue.textKeyRef,
+        speed: textDialogue.speed,
+        choices: defaultChoices,
+      } as ChoiceDialogue;
+
+    } else {
+      // ChoiceNode → TextNode 변환
+      const choiceDialogue = currentDialogue as ChoiceDialogue;
+      const firstChoiceKey = Object.keys(choiceDialogue.choices)[0];
+      const firstChoice = firstChoiceKey ? choiceDialogue.choices[firstChoiceKey] : null;
+
+      newDialogue = {
+        type: "text",
+        speakerText: choiceDialogue.speakerText,
+        contentText: choiceDialogue.contentText,
+        speakerKeyRef: choiceDialogue.speakerKeyRef,
+        textKeyRef: choiceDialogue.textKeyRef,
+        speed: choiceDialogue.speed,
+        nextNodeKey: firstChoice?.nextNodeKey || "",
+      } as TextDialogue;
+    }
+
+    // 노드 업데이트
+    this.updateNode(nodeKey, { dialogue: newDialogue });
+    
+    // 히스토리 기록
+    const typeText = targetType === "choice" ? "선택지 노드" : "텍스트 노드";
+    this.coreServices.pushToHistory(`노드를 ${typeText}로 변환`);
+
+    state.showToast?.(`노드가 ${typeText}로 변환되었습니다.`, "success");
+  }
+
   // ===== Private 헬퍼 메서드들 (15개) =====
 
   /**
