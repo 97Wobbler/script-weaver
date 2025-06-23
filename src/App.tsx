@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import Canvas from "./components/Canvas";
 import PropertyPanel from "./components/PropertyPanel";
+import StorageManager from "./components/StorageManager";
 import { useEditorStore } from "./store/editorStore";
 import { globalAsyncOperationManager, type SystemStatus } from "./store/asyncOperationManager";
 import { downloadFile, uploadFile } from "./utils/importExport";
@@ -324,6 +325,11 @@ function App() {
                   JSON 가져오기
                 </button>
               </div>
+            </div>
+
+            {/* 저장 공간 관리 */}
+            <div className="border-t border-gray-200 pt-4">
+              <StorageManager showToast={showToast} />
             </div>
           </div>
         </aside>
