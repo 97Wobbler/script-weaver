@@ -3,7 +3,7 @@
  * 이 파일은 7개 도메인 분할을 위한 공통 타입들을 정의합니다.
  */
 
-import type { Scene, ValidationResult, TemplateDialogues, EditorNodeWrapper, Dialogue } from "../../types/dialogue";
+import type { Scene, ValidationResult, TemplateDialogues, EditorNodeWrapper, Dialogue, ChoiceDialogue } from "../../types/dialogue";
 import type { LocalizationData } from "../localizationStore";
 
 // ===== CORE SERVICES 관련 타입 =====
@@ -111,6 +111,16 @@ export interface ICoreServices {
    * **호출 도메인**: NODE OPERATIONS
    */
   setNode(scene: Scene, nodeKey: string, node: any): Scene;
+
+  /**
+   * 기본 선택지 구조를 생성합니다.
+   *
+   * @returns 기본 선택지 객체
+   *
+   * **사용 빈도**: 선택지 노드 생성 시
+   * **호출 도메인**: NODE DOMAIN, NODE OPERATIONS
+   */
+  createDefaultChoices(): ChoiceDialogue["choices"];
 }
 
 // ===== PROJECT DOMAIN 인터페이스 =====

@@ -526,28 +526,13 @@ export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "las
       const textDialogue = currentDialogue as TextDialogue;
       const localizationStore = useLocalizationStore.getState();
 
-      // 기본 선택지 2개 생성
-      const defaultChoices: ChoiceDialogue["choices"] = {
-        choice_1: {
-          choiceText: "선택지 1",
-          textKeyRef: "",
-          nextNodeKey: textDialogue.nextNodeKey || "",
-        },
-        choice_2: {
-          choiceText: "선택지 2",
-          textKeyRef: "",
-          nextNodeKey: "",
-        },
-      };
+      // 공통 함수로 기본 선택지 생성
+      const defaultChoices = this.coreServices.createDefaultChoices();
 
-      // 선택지 로컬라이제이션 키 생성
-      Object.entries(defaultChoices).forEach(([choiceKey, choice]) => {
-        if (choice.choiceText) {
-          const result = localizationStore.generateChoiceKey(choice.choiceText);
-          localizationStore.setText(result.key, choice.choiceText);
-          choice.textKeyRef = result.key;
-        }
-      });
+      // 첫 번째 선택지에 기존 nextNodeKey 연결
+      if (textDialogue.nextNodeKey) {
+        defaultChoices.choice_1.nextNodeKey = textDialogue.nextNodeKey;
+      }
 
       newDialogue = {
         type: "choice",

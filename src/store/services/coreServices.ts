@@ -22,7 +22,7 @@
  */
 
 import type { ICoreServices, LayoutType, NodeCountValidationOptions, NodeCountValidationResult } from "../types/editorTypes";
-import type { Scene } from "../../types/dialogue";
+import type { Scene, ChoiceDialogue } from "../../types/dialogue";
 import { useLocalizationStore } from "../localizationStore";
 import { globalAsyncOperationManager } from "../asyncOperationManager";
 
@@ -285,6 +285,38 @@ export class CoreServices implements ICoreServices {
       ...scene,
       [nodeKey]: node,
     };
+  }
+
+  /**
+   * 기본 선택지 구조 생성
+   *
+   * @returns 기본 선택지 객체
+   * @description 선택지 노드 생성 시 사용되는 공통 선택지 팩토리
+   */
+  createDefaultChoices(): ChoiceDialogue["choices"] {
+    return {
+      choice_1: {
+        choiceText: "", // 빈 텍스트로 시작
+        textKeyRef: "",
+        nextNodeKey: "",
+      },
+      choice_2: {
+        choiceText: "", // 빈 텍스트로 시작
+        textKeyRef: "",
+        nextNodeKey: "",
+      },
+    };
+  }
+
+  /**
+   * 씬에서 특정 노드 조회
+   *
+   * @param scene 씬 객체
+   * @param nodeKey 노드 키
+   * @returns 노드 객체 또는 null
+   */
+  getSpecificNode(scene: Scene, nodeKey: string) {
+    return scene[nodeKey];
   }
 }
 

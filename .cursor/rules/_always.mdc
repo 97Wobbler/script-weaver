@@ -1,0 +1,17 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+1. **No Code Changes Without Explicit Instructions**  
+   • If the user asks a question, respond with an answer only.  
+   • Do **not** modify or write any code unless the user gives a clear instruction such as “fix,” “change,” or “implement.”
+
+2. **Always Record Timestamps When Logging Work**  
+   • When writing entries to `todo.md`, `log.md`, or any related file, always include the current timestamp.  
+   • Since the LLM may not know the current time, use a terminal command such as `date` to check the time.  
+   • Format the timestamp as: `YYYY/MM/DD HH:mm`.
+
+3. **Summarize Only Critical Information in Logs**  
+   • When summarizing work in `todo.md` or `log.md`, focus only on structural decisions and special considerations that are essential for understanding the project.  
+   • Omit minor bug fixes or incidental notes to keep the files concise and efficient for LLM processing.
