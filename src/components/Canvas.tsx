@@ -313,6 +313,20 @@ export default function Canvas() {
         return;
       }
 
+      // 일반 Delete/Backspace: 선택된 노드만 삭제
+      if ((event.key === "Delete" || event.key === "Backspace") && !(event.ctrlKey || event.metaKey)) {
+        if (!isInputting) {
+          event.preventDefault();
+          const safeSelectedNodeKeys = selectedNodeKeys instanceof Set ? selectedNodeKeys : new Set(Array.isArray(selectedNodeKeys) ? selectedNodeKeys : []);
+          const targetKeys = safeSelectedNodeKeys.size > 0 ? Array.from(safeSelectedNodeKeys) : selectedNodeKey ? [selectedNodeKey] : [];
+          if (targetKeys.length === 0) return;
+          // 선택된 노드들만 삭제 (후손 제외)
+          selectMultipleNodes(targetKeys);
+          deleteSelectedNodes();
+        }
+        return;
+      }
+
       // 복사는 텍스트 입력 중이 아닐 때 전역적으로 작동
       if (cmdKey && event.key === "c") {
         if (!isInputting) {
