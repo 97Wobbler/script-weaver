@@ -5,6 +5,7 @@ import TextNode from "./nodes/TextNode";
 import ChoiceNode from "./nodes/ChoiceNode";
 import { useEditorStore } from "../store/editorStore";
 import type { EditorNodeWrapper } from "../types/dialogue";
+import { collectNodes } from "../utils/layoutEngine";
 
 // React Flow nodeTypes는 컴포넌트 외부에서 정의하여 재생성 방지
 const nodeTypes = {
@@ -86,6 +87,7 @@ export default function Canvas() {
     deleteSelectedNodes,
     duplicateNode,
     pushToHistory,
+    arrangeSelectedNodeDescendants,
   } = useEditorStore();
 
   // Canvas 영역 참조
@@ -283,51 +285,29 @@ export default function Canvas() {
       }
 
       // 노드 삭제 (Delete/Backspace)는 텍스트 입력 중이 아닐 때 전역적으로 작동
-      if (event.key === "Delete" || event.key === "Backspace") {
+      if ((event.key === "Delete" || event.key === "Backspace") && (event.ctrlKey || event.metaKey)) {
+        // ctrl/cmd + Delete: 선택 노드 + 후손까지 일괄 삭제
         if (!isInputting) {
           event.preventDefault();
-
           const safeSelectedNodeKeys = selectedNodeKeys instanceof Set ? selectedNodeKeys : new Set(Array.isArray(selectedNodeKeys) ? selectedNodeKeys : []);
           const targetKeys = safeSelectedNodeKeys.size > 0 ? Array.from(safeSelectedNodeKeys) : selectedNodeKey ? [selectedNodeKey] : [];
-
           if (targetKeys.length === 0) return;
-
-          // 현재 씬 데이터 가져오기
           const currentSceneData = templateData[currentTemplate]?.[currentScene];
           if (!currentSceneData) return;
-
-          // 삭제할 노드들을 참조하는 다른 노드들 찾기
-          const referencingNodes: string[] = [];
-          targetKeys.forEach((nodeKey) => {
-            Object.entries(currentSceneData).forEach(([key, nodeWrapper]) => {
-              if (targetKeys.includes(key)) return; // 삭제 대상은 제외
-
-              const { dialogue } = nodeWrapper;
-
-              // TextDialogue 참조 확인
-              if (dialogue.type === "text" && dialogue.nextNodeKey === nodeKey) {
-                referencingNodes.push(`${key} → ${nodeKey} (텍스트 연결)`);
-              }
-
-              // ChoiceDialogue 참조 확인
-              if (dialogue.type === "choice" && dialogue.choices) {
-                Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
-                  if (choice.nextNodeKey === nodeKey) {
-                    referencingNodes.push(`${key} → ${nodeKey} (선택지 "${choice.choiceText || choice.textKeyRef || choiceKey}")`);
-                  }
-                });
-              }
-            });
+          // 후손까지 모두 수집
+          let allKeysToDelete = new Set<string>();
+          targetKeys.forEach((rootKey) => {
+            const { nodes } = collectNodes(currentSceneData, { rootNodeId: rootKey, depth: null, includeRoot: true });
+            nodes.forEach((node) => allKeysToDelete.add(node.nodeKey));
           });
-
-          // 확인 없이 즉시 삭제하고 토스트 메시지 표시
+          if (allKeysToDelete.size === 0) return;
+          // 선택 상태를 일시적으로 allKeysToDelete로 변경 후 삭제
+          selectMultipleNodes(Array.from(allKeysToDelete));
           deleteSelectedNodes();
-          
-          // 삭제 완료 토스트 메시지
+          // 토스트 메시지
           const { showToast } = useEditorStore.getState();
           if (showToast) {
-            const message = `${targetKeys.length}개 노드가 삭제되었습니다`;
-            showToast(message, "success");
+            showToast(`${allKeysToDelete.size}개 노드(후손 포함)가 삭제되었습니다`, "success");
           }
         }
         return;
@@ -415,6 +395,19 @@ export default function Canvas() {
     };
   }, [handleKeyDown]);
 
+  // React Flow의 노드 더블클릭 핸들러
+  const handleNodeDoubleClick = useCallback(
+    async (_event: any, node: any) => {
+      if (!node?.id) return;
+      await arrangeSelectedNodeDescendants(node.id);
+      const { showToast } = useEditorStore.getState();
+      if (showToast) {
+        showToast(`후손 노드 자동 정렬 완료`, "success");
+      }
+    },
+    [arrangeSelectedNodeDescendants]
+  );
+
   return (
     <div ref={canvasRef} className="h-full w-full outline-none" tabIndex={0} onMouseDown={handleCanvasMouseDown} onFocus={handleCanvasFocus} onBlur={handleCanvasBlur}>
       <ReactFlow
@@ -423,6 +416,7 @@ export default function Canvas() {
         onNodesChange={handleNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
+        onNodeDoubleClick={handleNodeDoubleClick}
         onNodeDragStop={handleNodeDragStop}
         onPaneClick={handlePaneClick}
         onConnect={handleConnect}
