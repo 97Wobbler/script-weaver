@@ -124,27 +124,7 @@ export class NodeOperationsDomain {
     }
 
     // 기본 선택지 생성
-    const defaultChoices: ChoiceDialogue["choices"] = {
-      choice_1: {
-        choiceText: "선택지 1",
-        textKeyRef: "",
-        nextNodeKey: "",
-      },
-      choice_2: {
-        choiceText: "선택지 2",
-        textKeyRef: "",
-        nextNodeKey: "",
-      },
-    };
-
-    // 선택지 로컬라이제이션 설정
-    Object.entries(defaultChoices).forEach(([choiceKey, choice]) => {
-      if (choice.choiceText) {
-        const result = localizationStore.generateChoiceKey(choice.choiceText);
-        localizationStore.setText(result.key, choice.choiceText);
-        choice.textKeyRef = result.key;
-      }
-    });
+    const defaultChoices = this.coreServices.createDefaultChoices();
 
     const dialogue: ChoiceDialogue = {
       type: "choice",
@@ -615,18 +595,7 @@ export class NodeOperationsDomain {
     const defaultChoices =
       choices && Object.keys(choices).length > 0
         ? choices
-        : {
-            choice_1: {
-              choiceText: "선택지 1",
-              textKeyRef: "",
-              nextNodeKey: "",
-            },
-            choice_2: {
-              choiceText: "선택지 2",
-              textKeyRef: "",
-              nextNodeKey: "",
-            },
-          };
+        : this.coreServices.createDefaultChoices();
 
     return {
       type: "choice",
