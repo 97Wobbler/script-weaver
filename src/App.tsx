@@ -2,6 +2,8 @@ import React, { useState, useRef } from "react";
 import Canvas from "./components/Canvas";
 import PropertyPanel from "./components/PropertyPanel";
 import StorageManager from "./components/StorageManager";
+import LocalizationTab from "./components/LocalizationTab";
+import LocalizationTools from "./components/LocalizationTools";
 import { useEditorStore } from "./store/editorStore";
 import { globalAsyncOperationManager, type SystemStatus } from "./store/asyncOperationManager";
 import { downloadFile, uploadFile } from "./utils/importExport";
@@ -14,7 +16,11 @@ interface ToastState {
   type: "success" | "info" | "warning";
 }
 
+type MainTabType = "editor" | "localization";
+
 function App() {
+  const [activeTab, setActiveTab] = useState<MainTabType>("editor");
+  
   const {
     createTextNode,
     createChoiceNode,
@@ -224,12 +230,51 @@ function App() {
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <img src={iconUrl} alt="ScriptWeaver Logo" className="w-8 h-8 mr-2" style={{display:'inline-block', verticalAlign:'middle'}} />
-            <h1 className="text-2xl font-bold text-gray-900">ScriptWeaver</h1>
-            <span className="text-sm text-gray-500">Dialogue Editor</span>
+          {/* 좌측: 로고 + 탭 */}
+          <div className="flex items-center space-x-8">
+            <div className="flex items-center space-x-4">
+              <img src={iconUrl} alt="ScriptWeaver Logo" className="w-8 h-8 mr-2" style={{display:'inline-block', verticalAlign:'middle'}} />
+              <h1 className="text-2xl font-bold text-gray-900">ScriptWeaver</h1>
+              <span className="text-sm text-gray-500">Dialogue Editor</span>
+            </div>
+            
+            {/* 탭 네비게이션 */}
+            <nav className="flex space-x-8">
+              <button
+                onClick={() => setActiveTab("editor")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "editor"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}>
+                에디터
+              </button>
+              <button
+                onClick={() => setActiveTab("localization")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "localization"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}>
+                로컬라이징
+              </button>
+            </nav>
           </div>
-          <div className="flex items-center space-x-2">
+
+          {/* 우측: 프로젝트 메뉴 + 버전 */}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleExportJSON}
+                className="px-3 py-2 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors">
+                프로젝트 저장
+              </button>
+              <button
+                onClick={handleImportJSON}
+                className="px-3 py-2 text-sm bg-purple-50 text-purple-700 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors">
+                프로젝트 열기
+              </button>
+            </div>
             <span className="text-sm text-gray-600">MVP v0.1.0</span>
           </div>
         </div>
@@ -239,110 +284,103 @@ function App() {
       <div className="flex-1 flex overflow-hidden">
         {/* Toolbar */}
         <aside className="w-64 bg-white border-r border-gray-200 p-4 flex flex-col overflow-y-auto">
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-sm font-medium text-gray-900 mb-2">노드 추가</h3>
-              <div className="space-y-2">
-                <button
-                  onClick={handleCreateTextNode}
-                  disabled={!canCreateNode}
-                  className={`w-full px-3 py-2 text-sm border rounded-md transition-colors ${
-                    canCreateNode ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                  }`}
-                  title={!canCreateNode ? `노드 개수 제한 (${nodeCount}/${maxNodes})` : "새 텍스트 노드 추가"}>
-                  + 텍스트 노드
-                </button>
-                <button
-                  onClick={handleCreateChoiceNode}
-                  disabled={!canCreateNode}
-                  className={`w-full px-3 py-2 text-sm border rounded-md transition-colors ${
-                    canCreateNode ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                  }`}
-                  title={!canCreateNode ? `노드 개수 제한 (${nodeCount}/${maxNodes})` : "새 선택지 노드 추가"}>
-                  + 선택지 노드
-                </button>
+          {activeTab === "editor" ? (
+            // 에디터 탭용 도구들
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium text-gray-900 mb-2">노드 추가</h3>
+                <div className="space-y-2">
+                  <button
+                    onClick={handleCreateTextNode}
+                    disabled={!canCreateNode}
+                    className={`w-full px-3 py-2 text-sm border rounded-md transition-colors ${
+                      canCreateNode ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                    }`}
+                    title={!canCreateNode ? `노드 개수 제한 (${nodeCount}/${maxNodes})` : "새 텍스트 노드 추가"}>
+                    + 텍스트 노드
+                  </button>
+                  <button
+                    onClick={handleCreateChoiceNode}
+                    disabled={!canCreateNode}
+                    className={`w-full px-3 py-2 text-sm border rounded-md transition-colors ${
+                      canCreateNode ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                    }`}
+                    title={!canCreateNode ? `노드 개수 제한 (${nodeCount}/${maxNodes})` : "새 선택지 노드 추가"}>
+                    + 선택지 노드
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-900 mb-2">정렬</h3>
+                <div className="space-y-2">
+                  <button
+                    onClick={handleNewLayoutAll}
+                    className="w-full px-3 py-2 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+                    title="전체 캔버스의 모든 노드를 최적 배치합니다 (3단계 해결 방식)">
+                    🌐 전체 캔버스 정렬
+                  </button>
+                  <button
+                    onClick={handleNewLayoutChildren}
+                    disabled={!selectedNodeKey}
+                    className={`w-full px-3 py-2 text-sm border rounded-md transition-colors ${
+                      selectedNodeKey ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                    }`}
+                    title={selectedNodeKey ? `선택된 노드의 직접 자식들만 정렬합니다` : "노드를 선택해주세요"}>
+                    🔗 자식 노드 정렬
+                  </button>
+                  <button
+                    onClick={handleNewLayoutDescendants}
+                    disabled={!selectedNodeKey}
+                    className={`w-full px-3 py-2 text-sm border rounded-md transition-colors ${
+                      selectedNodeKey ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100" : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                    }`}
+                    title={selectedNodeKey ? `선택된 노드의 모든 후손들을 정렬합니다` : "노드를 선택해주세요"}>
+                    🌳 후손 전체 정렬
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-gray-900 mb-2">프로젝트</h3>
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-600">템플릿: {currentTemplate}</p>
+                  <p className="text-sm text-gray-600">씬: {currentScene}</p>
+                </div>
+              </div>
+
+              {/* 저장 공간 관리 */}
+              <div className="border-t border-gray-200 pt-4">
+                <StorageManager showToast={showToast} />
               </div>
             </div>
-
-            <div>
-              <h3 className="text-sm font-medium text-gray-900 mb-2">정렬</h3>
-              <div className="space-y-2">
-                <button
-                  onClick={handleNewLayoutAll}
-                  className="w-full px-3 py-2 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
-                  title="전체 캔버스의 모든 노드를 최적 배치합니다 (3단계 해결 방식)">
-                  🌐 전체 캔버스 정렬
-                </button>
-                <button
-                  onClick={handleNewLayoutChildren}
-                  disabled={!selectedNodeKey}
-                  className={`w-full px-3 py-2 text-sm border rounded-md transition-colors ${
-                    selectedNodeKey ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                  }`}
-                  title={selectedNodeKey ? `선택된 노드의 직접 자식들만 정렬합니다` : "노드를 선택해주세요"}>
-                  🔗 자식 노드 정렬
-                </button>
-                <button
-                  onClick={handleNewLayoutDescendants}
-                  disabled={!selectedNodeKey}
-                  className={`w-full px-3 py-2 text-sm border rounded-md transition-colors ${
-                    selectedNodeKey ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100" : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
-                  }`}
-                  title={selectedNodeKey ? `선택된 노드의 모든 후손들을 정렬합니다` : "노드를 선택해주세요"}>
-                  🌳 후손 전체 정렬
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-medium text-gray-900 mb-2">프로젝트</h3>
-              <div className="space-y-1">
-                <p className="text-sm text-gray-600">템플릿: {currentTemplate}</p>
-                <p className="text-sm text-gray-600">씬: {currentScene}</p>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-medium text-gray-900 mb-2">내보내기</h3>
-              <div className="space-y-2">
-                <button
-                  onClick={handleExportJSON}
-                  className="w-full px-3 py-2 text-sm bg-gray-50 text-gray-700 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors">
-                  JSON 내보내기
-                </button>
-                <button
-                  onClick={handleExportCSV}
-                  className="w-full px-3 py-2 text-sm bg-gray-50 text-gray-700 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors">
-                  CSV 내보내기
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-medium text-gray-900 mb-2">가져오기</h3>
-              <div className="space-y-2">
-                <button
-                  onClick={handleImportJSON}
-                  className="w-full px-3 py-2 text-sm bg-purple-50 text-purple-700 border border-purple-200 rounded-md hover:bg-purple-100 transition-colors">
-                  JSON 가져오기
-                </button>
-              </div>
-            </div>
-
-            {/* 저장 공간 관리 */}
-            <div className="border-t border-gray-200 pt-4">
-              <StorageManager showToast={showToast} />
-            </div>
-          </div>
+          ) : (
+            // 로컬라이징 탭용 도구들
+            <LocalizationTools showToast={showToast} />
+          )}
         </aside>
 
-        {/* Canvas Area */}
-        <div className="flex-1 relative">
-          <Canvas />
-        </div>
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col">
+          {/* Tab Content */}
+          <div className="flex-1 overflow-hidden">
+            {activeTab === "editor" && (
+              <div className="flex h-full">
+                {/* Canvas Area */}
+                <div className="flex-1 relative">
+                  <Canvas />
+                </div>
 
-        {/* Property Panel */}
-        <PropertyPanel showToast={showToast} />
+                {/* Property Panel */}
+                <PropertyPanel showToast={showToast} />
+              </div>
+            )}
+
+            {activeTab === "localization" && (
+              <LocalizationTab showToast={showToast} />
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Status Bar */}
