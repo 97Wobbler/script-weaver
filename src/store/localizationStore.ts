@@ -89,13 +89,14 @@ export const useLocalizationStore = create<LocalizationStore>()(
 
       editorStoreRef: null,
 
-      setText: (key, text) =>
+      setText: (key, text) => {
         set((state) => ({
           localizationData: {
             ...state.localizationData,
             [key]: text,
           },
-        })),
+        }));
+      },
 
       getText: (key) => {
         const state = get();

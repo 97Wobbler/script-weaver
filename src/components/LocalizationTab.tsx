@@ -28,8 +28,96 @@ export default function LocalizationTab({ showToast }: LocalizationTabProps) {
   const [activeSubTab, setActiveSubTab] = useState<SubTabType>("dialogue");
   const [editingRows, setEditingRows] = useState<Record<string, EditableRow>>({});
   const [editingDialogueRows, setEditingDialogueRows] = useState<Record<string, EditableDialogueRow>>({});
-  const { templateData, exportToCSV } = useEditorStore();
+  const { templateData, exportToCSV, updateNodeText, updateNode } = useEditorStore();
   const { localizationData, setText, deleteKey } = useLocalizationStore();
+
+  // 검색 및 필터링 상태 추가
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterType, setFilterType] = useState<"all" | "speaker" | "text" | "choice">("all");
+
+  // 키보드 단축키 처리
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'z') {
+        e.preventDefault();
+        cancelAllEditing();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // 모든 편집 상태 취소
+  const cancelAllEditing = () => {
+    setEditingRows({});
+    setEditingDialogueRows({});
+    showToast("모든 편집이 취소되었습니다.", "info");
+  };
+
+  // 편집 중인 항목이 있는지 확인
+  const hasEditingItems = Object.keys(editingRows).length > 0 || Object.keys(editingDialogueRows).length > 0;
+
+  // 탭 전환 시 데이터 동기화
+  const handleTabChange = (newTab: SubTabType) => {
+    if (hasEditingItems) {
+      if (confirm("편집 중인 내용이 있습니다. 탭을 전환하면 편집 내용이 사라집니다. 계속하시겠습니까?")) {
+        setActiveSubTab(newTab);
+        setEditingRows({});
+        setEditingDialogueRows({});
+        showToast("탭이 전환되었습니다.", "info");
+      }
+    } else {
+      setActiveSubTab(newTab);
+    }
+  };
+
+  // 유효성 검사
+  const validateData = () => {
+    const issues: string[] = [];
+    
+    // 중복 키 검사
+    const keys = Object.keys(localizationData);
+    const duplicateKeys = keys.filter((key, index) => keys.indexOf(key) !== index);
+    if (duplicateKeys.length > 0) {
+      issues.push(`중복된 키 발견: ${duplicateKeys.join(', ')}`);
+    }
+    
+    // 중복 텍스트 검사
+    const texts = Object.values(localizationData);
+    const textCounts: Record<string, string[]> = {};
+    texts.forEach((text, index) => {
+      if (text && text.trim()) {
+        if (!textCounts[text]) {
+          textCounts[text] = [];
+        }
+        textCounts[text].push(keys[index]);
+      }
+    });
+    
+    const duplicateTexts = Object.entries(textCounts)
+      .filter(([text, keyList]) => keyList.length > 1)
+      .map(([text, keyList]) => `"${text}" (${keyList.join(', ')})`);
+    
+    if (duplicateTexts.length > 0) {
+      issues.push(`중복된 텍스트 발견: ${duplicateTexts.join('; ')}`);
+    }
+    
+    // 빈 값 검사
+    const emptyKeys = keys.filter(key => !localizationData[key] || !localizationData[key].trim());
+    if (emptyKeys.length > 0) {
+      issues.push(`빈 값 키 발견: ${emptyKeys.join(', ')}`);
+    }
+    
+    if (issues.length > 0) {
+      showToast(`유효성 검사 결과: ${issues.length}개 문제 발견`, "warning");
+      console.warn("유효성 검사 결과:", issues);
+      return issues;
+    } else {
+      showToast("유효성 검사 완료: 문제 없음", "success");
+      return [];
+    }
+  };
 
   // CSV 데이터 가져오기
   const getCSVData = () => {
@@ -268,9 +356,60 @@ export default function LocalizationTab({ showToast }: LocalizationTabProps) {
       // 키가 변경된 경우 기존 키 삭제 후 새 키 추가
       if (newKey !== editingRow.originalKey) {
         deleteKey(editingRow.originalKey);
+        
+        // 키가 변경된 경우, 해당 키를 사용하는 모든 노드의 키 참조 업데이트
+        const { templateData, currentTemplate, currentScene } = useEditorStore.getState();
+        const currentSceneData = templateData[currentTemplate]?.[currentScene];
+        
+        if (currentSceneData) {
+          Object.entries(currentSceneData).forEach(([nodeKey, nodeWrapper]) => {
+            const dialogue = nodeWrapper.dialogue;
+            let needsUpdate = false;
+            const updates: any = {};
+
+            // 화자 키 참조 업데이트
+            if (dialogue.speakerKeyRef === editingRow.originalKey) {
+              updates.speakerKeyRef = newKey;
+              needsUpdate = true;
+            }
+
+            // 텍스트 키 참조 업데이트
+            if (dialogue.textKeyRef === editingRow.originalKey) {
+              updates.textKeyRef = newKey;
+              needsUpdate = true;
+            }
+
+            // 선택지 키 참조 업데이트
+            if (dialogue.type === "choice" && dialogue.choices) {
+              const updatedChoices: any = {};
+              Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
+                if (choice.textKeyRef === editingRow.originalKey) {
+                  updatedChoices[choiceKey] = { ...choice, textKeyRef: newKey };
+                } else {
+                  updatedChoices[choiceKey] = choice;
+                }
+              });
+              if (Object.keys(updatedChoices).length > 0) {
+                updates.choices = updatedChoices;
+                needsUpdate = true;
+              }
+            }
+
+            // 노드 업데이트
+            if (needsUpdate) {
+              updateNode(nodeKey, { dialogue: { ...dialogue, ...updates } });
+            }
+          });
+        }
       }
       
       setText(newKey, newText);
+      
+      // 텍스트가 변경된 경우, 해당 키를 사용하는 모든 노드의 실제 텍스트도 업데이트
+      if (newText !== editingRow.originalText) {
+        updateNodesWithTextChange(newKey, newText);
+      }
+      
       showToast("변경사항이 저장되었습니다.", "success");
       stopEditing(key);
     } catch (error) {
@@ -283,12 +422,107 @@ export default function LocalizationTab({ showToast }: LocalizationTabProps) {
   };
 
   const handleDeleteKey = (key: string) => {
-    if (confirm(`키 "${key}"를 삭제하시겠습니까?`)) {
+    // 해당 키를 사용하는 노드들 찾기
+    const { templateData, currentTemplate, currentScene } = useEditorStore.getState();
+    const currentSceneData = templateData[currentTemplate]?.[currentScene];
+    const affectedNodes: string[] = [];
+    
+    if (currentSceneData) {
+      Object.entries(currentSceneData).forEach(([nodeKey, nodeWrapper]) => {
+        const dialogue = nodeWrapper.dialogue;
+        
+        // 화자 키 참조 확인
+        if (dialogue.speakerKeyRef === key) {
+          affectedNodes.push(`${nodeKey} (화자)`);
+        }
+        
+        // 텍스트 키 참조 확인
+        if (dialogue.textKeyRef === key) {
+          affectedNodes.push(`${nodeKey} (내용)`);
+        }
+        
+        // 선택지 키 참조 확인
+        if (dialogue.type === "choice" && dialogue.choices) {
+          Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
+            if (choice.textKeyRef === key) {
+              affectedNodes.push(`${nodeKey} (선택지: ${choiceKey})`);
+            }
+          });
+        }
+      });
+    }
+    
+    // 경고 메시지 생성
+    let warningMessage = `키 "${key}"를 삭제하시겠습니까?\n\n`;
+    warningMessage += `텍스트: "${localizationData[key]}"\n\n`;
+    
+    if (affectedNodes.length > 0) {
+      warningMessage += `⚠️ 이 키를 사용하는 다음 노드들의 텍스트가 비워집니다:\n`;
+      affectedNodes.forEach(node => {
+        warningMessage += `• ${node}\n`;
+      });
+      warningMessage += `\n계속하시겠습니까?`;
+    } else {
+      warningMessage += `이 키는 현재 사용되지 않고 있습니다.\n\n계속하시겠습니까?`;
+    }
+    
+    if (confirm(warningMessage)) {
       try {
+        // 해당 키를 사용하는 모든 노드의 텍스트를 비우고 키 참조 제거
+        if (currentSceneData && affectedNodes.length > 0) {
+          Object.entries(currentSceneData).forEach(([nodeKey, nodeWrapper]) => {
+            const dialogue = nodeWrapper.dialogue;
+            let needsUpdate = false;
+            const updates: any = {};
+
+            // 화자 키 참조 제거
+            if (dialogue.speakerKeyRef === key) {
+              updates.speakerKeyRef = undefined;
+              updates.speakerText = "";
+              needsUpdate = true;
+            }
+
+            // 텍스트 키 참조 제거
+            if (dialogue.textKeyRef === key) {
+              updates.textKeyRef = undefined;
+              updates.contentText = "";
+              needsUpdate = true;
+            }
+
+            // 선택지 키 참조 제거
+            if (dialogue.type === "choice" && dialogue.choices) {
+              const updatedChoices: any = {};
+              let choicesUpdated = false;
+              
+              Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
+                if (choice.textKeyRef === key) {
+                  updatedChoices[choiceKey] = { ...choice, textKeyRef: undefined, choiceText: "" };
+                  choicesUpdated = true;
+                } else {
+                  updatedChoices[choiceKey] = choice;
+                }
+              });
+              
+              if (choicesUpdated) {
+                updates.choices = updatedChoices;
+                needsUpdate = true;
+              }
+            }
+
+            // 노드 업데이트
+            if (needsUpdate) {
+              updateNode(nodeKey, { dialogue: { ...dialogue, ...updates } });
+            }
+          });
+        }
+        
+        // LocalizationStore에서 키 삭제
         deleteKey(key);
+        
         showToast(`키 "${key}"가 삭제되었습니다.`, "success");
       } catch (error) {
-        showToast("삭제에 실패했습니다.", "warning");
+        console.error('❌ [LocalizationTab] 키 삭제 실패:', error);
+        showToast("키 삭제에 실패했습니다.", "warning");
       }
     }
   };
@@ -316,20 +550,88 @@ export default function LocalizationTab({ showToast }: LocalizationTabProps) {
 
   const saveEditingDialogue = (nodeKey: string) => {
     const editingRow = editingDialogueRows[nodeKey];
-    if (!editingRow) return;
+    if (!editingRow) {
+      return;
+    }
 
-    // TODO: EditorStore와 연동하여 실제 노드 데이터 업데이트
-    showToast("Dialogue 편집 기능은 아직 구현 중입니다.", "info");
-    stopEditingDialogue(nodeKey);
+    const { speakerText, contentText } = editingRow.currentData;
+
+    try {
+      // EditorStore를 통해 실제 노드 데이터 업데이트
+      updateNodeText(nodeKey, speakerText, contentText);
+      showToast("Dialogue가 성공적으로 업데이트되었습니다.", "success");
+      stopEditingDialogue(nodeKey);
+    } catch (error) {
+      showToast("Dialogue 업데이트에 실패했습니다.", "warning");
+    }
   };
 
   const cancelEditingDialogue = (nodeKey: string) => {
     stopEditingDialogue(nodeKey);
   };
 
+  // 텍스트 변경 시 노드들을 업데이트하는 함수
+  const updateNodesWithTextChange = (key: string, newText: string) => {
+    const { templateData, currentTemplate, currentScene } = useEditorStore.getState();
+    const currentSceneData = templateData[currentTemplate]?.[currentScene];
+    
+    if (currentSceneData) {
+      Object.entries(currentSceneData).forEach(([nodeKey, nodeWrapper]) => {
+        const dialogue = nodeWrapper.dialogue;
+        let needsUpdate = false;
+        const updates: any = {};
+
+        // 화자 키 참조 업데이트
+        if (dialogue.speakerKeyRef === key) {
+          updates.speakerText = newText;
+          needsUpdate = true;
+        }
+
+        // 텍스트 키 참조 업데이트
+        if (dialogue.textKeyRef === key) {
+          updates.contentText = newText;
+          needsUpdate = true;
+        }
+
+        // 선택지 키 참조 업데이트
+        if (dialogue.type === "choice" && dialogue.choices) {
+          const updatedChoices: any = {};
+          Object.entries(dialogue.choices).forEach(([choiceKey, choice]) => {
+            if (choice.textKeyRef === key) {
+              updatedChoices[choiceKey] = { ...choice, choiceText: newText };
+            } else {
+              updatedChoices[choiceKey] = choice;
+            }
+          });
+          if (Object.keys(updatedChoices).length > 0) {
+            updates.choices = updatedChoices;
+            needsUpdate = true;
+          }
+        }
+
+        // 노드 업데이트
+        if (needsUpdate) {
+          updateNode(nodeKey, { dialogue: { ...dialogue, ...updates } });
+        }
+      });
+    }
+  };
+
   const csvData = getCSVData();
   const localizationEntries = Object.entries(localizationData);
   const dialogueRows = parseDialogueCSV(csvData.dialogue);
+
+  // 검색 및 필터링된 로컬라이제이션 데이터
+  const filteredLocalizationEntries = Object.entries(localizationData).filter(([key, text]) => {
+    const matchesSearch = searchTerm === "" || 
+      key.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      text.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesFilter = filterType === "all" || key.startsWith(filterType === "speaker" ? "npc_" : 
+      filterType === "text" ? "line_" : "choice_");
+    
+    return matchesSearch && matchesFilter;
+  });
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -337,7 +639,7 @@ export default function LocalizationTab({ showToast }: LocalizationTabProps) {
       <div className="border-b border-gray-200">
         <nav className="flex space-x-8 px-6">
           <button
-            onClick={() => setActiveSubTab("dialogue")}
+            onClick={() => handleTabChange("dialogue")}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeSubTab === "dialogue"
                 ? "border-blue-500 text-blue-600"
@@ -346,7 +648,7 @@ export default function LocalizationTab({ showToast }: LocalizationTabProps) {
             Dialogue CSV
           </button>
           <button
-            onClick={() => setActiveSubTab("localization")}
+            onClick={() => handleTabChange("localization")}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeSubTab === "localization"
                 ? "border-blue-500 text-blue-600"
@@ -416,14 +718,52 @@ export default function LocalizationTab({ showToast }: LocalizationTabProps) {
                             </span>
                           </td>
                           <td className="px-4 py-4 text-sm text-gray-900">
-                            <div className="max-w-xs truncate" title={row.speakerText}>
-                              {row.speakerText || "-"}
-                            </div>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editingRow.currentData.speakerText || ""}
+                                onChange={(e) => setEditingDialogueRows(prev => ({
+                                  ...prev,
+                                  [row.nodeKey]: {
+                                    ...editingRow,
+                                    currentData: {
+                                      ...editingRow.currentData,
+                                      speakerText: e.target.value
+                                    }
+                                  }
+                                }))}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="화자"
+                              />
+                            ) : (
+                              <div className="max-w-xs truncate" title={row.speakerText}>
+                                {row.speakerText || "-"}
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-4 text-sm text-gray-900">
-                            <div className="max-w-md whitespace-pre-line" title={row.contentText}>
-                              {row.contentText || "-"}
-                            </div>
+                            {isEditing ? (
+                              <textarea
+                                value={editingRow.currentData.contentText || ""}
+                                onChange={(e) => setEditingDialogueRows(prev => ({
+                                  ...prev,
+                                  [row.nodeKey]: {
+                                    ...editingRow,
+                                    currentData: {
+                                      ...editingRow.currentData,
+                                      contentText: e.target.value
+                                    }
+                                  }
+                                }))}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                rows={3}
+                                placeholder="대화 내용"
+                              />
+                            ) : (
+                              <div className="max-w-md whitespace-pre-line" title={row.contentText}>
+                                {row.contentText || "-"}
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                             {isEditing ? (
@@ -480,6 +820,51 @@ export default function LocalizationTab({ showToast }: LocalizationTabProps) {
               </button>
             </div>
             
+            {/* 검색 및 필터링 */}
+            <div className="mb-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 space-y-2">
+                  <input
+                    type="text"
+                    placeholder="키 또는 텍스트 검색..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <select
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value as any)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="all">모든 키</option>
+                    <option value="speaker">화자 키 (npc_)</option>
+                    <option value="text">텍스트 키 (line_)</option>
+                    <option value="choice">선택지 키 (choice_)</option>
+                  </select>
+                </div>
+                {hasEditingItems && (
+                  <button
+                    onClick={cancelAllEditing}
+                    className="ml-4 px-3 py-2 text-sm bg-red-50 text-red-700 border border-red-200 rounded-md hover:bg-red-100 transition-colors"
+                    title="Ctrl+Z로도 사용 가능">
+                    모두 취소
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center space-x-2">
+                {searchTerm || filterType !== "all" ? (
+                  <div className="text-sm text-gray-600">
+                    검색 결과: {filteredLocalizationEntries.length}개 / 전체: {localizationEntries.length}개
+                  </div>
+                ) : null}
+                <button
+                  onClick={validateData}
+                  className="px-3 py-1 text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-md hover:bg-yellow-100 transition-colors">
+                  유효성 검사
+                </button>
+              </div>
+            </div>
+            
             {/* Localization 편집 테이블 */}
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
@@ -498,7 +883,7 @@ export default function LocalizationTab({ showToast }: LocalizationTabProps) {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {localizationEntries.map(([key, text]) => {
+                    {filteredLocalizationEntries.map(([key, text]) => {
                       const isEditing = editingRows[key]?.isEditing;
                       const editingRow = editingRows[key];
                       
@@ -572,10 +957,16 @@ export default function LocalizationTab({ showToast }: LocalizationTabProps) {
                 </table>
               </div>
               
-              {localizationEntries.length === 0 && (
+              {filteredLocalizationEntries.length === 0 && (
                 <div className="text-center py-8 text-gray-500">
-                  <p>로컬라이제이션 데이터가 없습니다.</p>
-                  <p className="text-sm">에디터에서 노드를 추가하면 키가 자동으로 생성됩니다.</p>
+                  {searchTerm || filterType !== "all" ? (
+                    <p>검색 조건에 맞는 로컬라이제이션 데이터가 없습니다.</p>
+                  ) : (
+                    <>
+                      <p>로컬라이제이션 데이터가 없습니다.</p>
+                      <p className="text-sm">에디터에서 노드를 추가하면 키가 자동으로 생성됩니다.</p>
+                    </>
+                  )}
                 </div>
               )}
             </div>
