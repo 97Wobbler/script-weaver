@@ -238,7 +238,7 @@ function App() {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Toolbar */}
-        <aside className="w-64 bg-white border-r border-gray-200 p-4">
+        <aside className="w-64 bg-white border-r border-gray-200 p-4 flex flex-col overflow-y-auto">
           <div className="space-y-4">
             <div>
               <h3 className="text-sm font-medium text-gray-900 mb-2">노드 추가</h3>
