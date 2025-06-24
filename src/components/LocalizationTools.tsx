@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { useLocalizationStore } from "../store/localizationStore";
 
 interface LocalizationToolsProps {
@@ -6,22 +6,7 @@ interface LocalizationToolsProps {
 }
 
 export default function LocalizationTools({ showToast }: LocalizationToolsProps) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "speaker" | "text" | "choice">("all");
   const { localizationData, deleteKey, getAllKeys } = useLocalizationStore();
-
-  // 검색 및 필터링
-  const filteredKeys = getAllKeys().filter((key) => {
-    const text = localizationData[key] || "";
-    const matchesSearch = searchTerm === "" || 
-      key.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      text.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesFilter = filterType === "all" || key.startsWith(filterType === "speaker" ? "npc_" : 
-      filterType === "text" ? "line_" : "choice_");
-    
-    return matchesSearch && matchesFilter;
-  });
 
   // 키 추가
   const handleAddKey = () => {
@@ -51,29 +36,6 @@ export default function LocalizationTools({ showToast }: LocalizationToolsProps)
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-medium text-gray-900 mb-2">검색 & 필터</h3>
-        <div className="space-y-2">
-          <input
-            type="text"
-            placeholder="키 또는 텍스트 검색..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <select
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value as any)}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">모든 키</option>
-            <option value="speaker">화자 키 (npc_)</option>
-            <option value="text">텍스트 키 (line_)</option>
-            <option value="choice">선택지 키 (choice_)</option>
-          </select>
-        </div>
-      </div>
-
       <div>
         <h3 className="text-sm font-medium text-gray-900 mb-2">키 관리</h3>
         <div className="space-y-2">
@@ -108,31 +70,8 @@ export default function LocalizationTools({ showToast }: LocalizationToolsProps)
           <p>화자 키: {getAllKeys().filter(k => k.startsWith("npc_")).length}개</p>
           <p>텍스트 키: {getAllKeys().filter(k => k.startsWith("line_")).length}개</p>
           <p>선택지 키: {getAllKeys().filter(k => k.startsWith("choice_")).length}개</p>
-          <p>검색 결과: {filteredKeys.length}개</p>
         </div>
       </div>
-
-      {/* 검색 결과 미리보기 */}
-      {searchTerm && (
-        <div>
-          <h3 className="text-sm font-medium text-gray-900 mb-2">검색 결과</h3>
-          <div className="max-h-40 overflow-y-auto space-y-1">
-            {filteredKeys.slice(0, 5).map((key) => (
-              <div key={key} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
-                <span className="truncate">{key}</span>
-                <button
-                  onClick={() => handleDeleteKey(key)}
-                  className="text-red-600 hover:text-red-800 text-xs">
-                  삭제
-                </button>
-              </div>
-            ))}
-            {filteredKeys.length > 5 && (
-              <p className="text-xs text-gray-500">... 외 {filteredKeys.length - 5}개</p>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 } 
