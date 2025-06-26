@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 [Instructions]
 
-Always follow the workflow below for any task.  
+Always follow the workflow below for a refactoring task.
 If context is missing or criteria are unclear, stop immediately and ask for clarification before proceeding.
 
 ---
