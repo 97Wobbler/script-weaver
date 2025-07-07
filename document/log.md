@@ -49,3 +49,24 @@
 - 사용 횟수는 중앙 정렬로 가독성 향상
 
 **파일**: `src/components/LocalizationTab.tsx`
+
+## 2025/07/07 20:53 - 전체 초기화 시 LocalizationStore 유지 문제 수정
+
+**문제**: [저장 공간] - [전체 초기화] 실행 시 LocalizationStore가 유지되는 문제
+
+**원인**: 
+- LocalizationStore의 Zustand persist 미들웨어가 페이지 새로고침 시 localStorage에서 데이터를 복원
+- resetAllData에서 localStorage만 삭제하고 LocalizationStore의 메모리 상태는 초기화하지 않음
+- persist 미들웨어가 localStorage에 기본값을 다시 저장하여 초기화가 무효화됨
+
+**해결**:
+- LocalizationStore의 메모리 상태를 먼저 초기화한 후 localStorage에 빈 상태를 명시적으로 저장
+- LocalizationStore의 persist 설정에 onRehydrateStorage 콜백 추가로 초기화 시점 제어
+- localStorage에 빈 상태를 저장하여 persist 미들웨어가 덮어쓰지 않도록 방지
+
+**수정된 동작**:
+- 전체 초기화 시 LocalizationStore가 완전히 초기화됨
+- 페이지 새로고침 후에도 초기화된 상태가 유지됨
+- EditorStore와 LocalizationStore 모두 완전히 초기화됨
+
+**파일**: `src/utils/storageManager.ts`, `src/store/localizationStore.ts`
