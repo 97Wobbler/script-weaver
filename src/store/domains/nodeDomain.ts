@@ -275,9 +275,26 @@ export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "las
       updates.speakerText = speakerText;
 
       if (speakerText.trim()) {
-        const result = localizationStore.generateSpeakerKey(speakerText);
-        localizationStore.setText(result.key, speakerText);
-        updates.speakerKeyRef = result.key;
+        // 기존 키가 있고 한 곳에서만 사용되는 경우 기존 키 재사용
+        const currentSpeakerKey = this.getState().templateData[this.getState().currentTemplate]?.[this.getState().currentScene]?.[nodeKey]?.dialogue.speakerKeyRef;
+        if (currentSpeakerKey) {
+          const usageCount = localizationStore.getKeyUsageCount(currentSpeakerKey);
+          if (usageCount === 1) {
+            // 한 곳에서만 사용되는 경우 기존 키의 텍스트만 업데이트
+            localizationStore.setText(currentSpeakerKey, speakerText);
+            updates.speakerKeyRef = currentSpeakerKey;
+          } else {
+            // 여러 곳에서 사용되는 경우 새 키 생성
+            const result = localizationStore.generateSpeakerKey(speakerText);
+            localizationStore.setText(result.key, speakerText);
+            updates.speakerKeyRef = result.key;
+          }
+        } else {
+          // 기존 키가 없는 경우 새 키 생성
+          const result = localizationStore.generateSpeakerKey(speakerText);
+          localizationStore.setText(result.key, speakerText);
+          updates.speakerKeyRef = result.key;
+        }
       } else {
         // 빈 텍스트인 경우 키 참조 제거
         updates.speakerKeyRef = undefined;
@@ -289,9 +306,26 @@ export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "las
       updates.contentText = contentText;
 
       if (contentText.trim()) {
-        const result = localizationStore.generateTextKey(contentText);
-        localizationStore.setText(result.key, contentText);
-        updates.textKeyRef = result.key;
+        // 기존 키가 있고 한 곳에서만 사용되는 경우 기존 키 재사용
+        const currentTextKey = this.getState().templateData[this.getState().currentTemplate]?.[this.getState().currentScene]?.[nodeKey]?.dialogue.textKeyRef;
+        if (currentTextKey) {
+          const usageCount = localizationStore.getKeyUsageCount(currentTextKey);
+          if (usageCount === 1) {
+            // 한 곳에서만 사용되는 경우 기존 키의 텍스트만 업데이트
+            localizationStore.setText(currentTextKey, contentText);
+            updates.textKeyRef = currentTextKey;
+          } else {
+            // 여러 곳에서 사용되는 경우 새 키 생성
+            const result = localizationStore.generateTextKey(contentText);
+            localizationStore.setText(result.key, contentText);
+            updates.textKeyRef = result.key;
+          }
+        } else {
+          // 기존 키가 없는 경우 새 키 생성
+          const result = localizationStore.generateTextKey(contentText);
+          localizationStore.setText(result.key, contentText);
+          updates.textKeyRef = result.key;
+        }
       } else {
         // 빈 텍스트인 경우 키 참조 제거
         updates.textKeyRef = undefined;
@@ -324,9 +358,26 @@ export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "las
     let textKeyRef: string | undefined;
 
     if (choiceText.trim()) {
-      const result = localizationStore.generateChoiceKey(choiceText);
-      localizationStore.setText(result.key, choiceText);
-      textKeyRef = result.key;
+      // 기존 키가 있고 한 곳에서만 사용되는 경우 기존 키 재사용
+      const currentChoiceKey = dialogue.choices[choiceKey]?.textKeyRef;
+      if (currentChoiceKey) {
+        const usageCount = localizationStore.getKeyUsageCount(currentChoiceKey);
+        if (usageCount === 1) {
+          // 한 곳에서만 사용되는 경우 기존 키의 텍스트만 업데이트
+          localizationStore.setText(currentChoiceKey, choiceText);
+          textKeyRef = currentChoiceKey;
+        } else {
+          // 여러 곳에서 사용되는 경우 새 키 생성
+          const result = localizationStore.generateChoiceKey(choiceText);
+          localizationStore.setText(result.key, choiceText);
+          textKeyRef = result.key;
+        }
+      } else {
+        // 기존 키가 없는 경우 새 키 생성
+        const result = localizationStore.generateChoiceKey(choiceText);
+        localizationStore.setText(result.key, choiceText);
+        textKeyRef = result.key;
+      }
     } else {
       // 빈 텍스트인 경우 키 참조 제거
       textKeyRef = undefined;
