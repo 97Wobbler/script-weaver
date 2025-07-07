@@ -1,6 +1,7 @@
 /**
  * localStorage 관리 및 용량 계산 유틸리티
  */
+import { useLocalizationStore } from '../store/localizationStore';
 
 export interface StorageInfo {
   totalSize: number;
@@ -116,6 +117,8 @@ export function cleanupUnusedKeys(): boolean {
   }
 }
 
+
+
 /**
  * 전체 데이터를 초기화합니다. (백업 후)
  */
@@ -128,6 +131,8 @@ export function resetAllData(): boolean {
     );
     
     if (!confirmed) return false;
+    
+
     
     // 백업 생성
     const backup = {
@@ -148,9 +153,25 @@ export function resetAllData(): boolean {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    // 데이터 삭제
+    // LocalizationStore 초기화 (메모리 상태 먼저 초기화)
+    useLocalizationStore.getState().resetLocalization();
+    
+    // 데이터 삭제 (LocalizationStore 초기화 후)
     localStorage.removeItem('script-weaver-editor');
     localStorage.removeItem('script-weaver-localization');
+    
+    // LocalizationStore의 persist 미들웨어가 localStorage를 덮어쓰지 않도록 
+    // 빈 상태를 localStorage에 명시적으로 저장
+    localStorage.setItem('script-weaver-localization', JSON.stringify({
+      state: {
+        localizationData: {},
+        lastSpeakerId: 0,
+        lastLineId: 0,
+        lastChoiceId: 0,
+        editorStoreRef: null
+      },
+      version: 1
+    }));
     
     // 페이지 새로고침으로 초기 상태로 복원
     window.location.reload();

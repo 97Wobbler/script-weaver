@@ -89,13 +89,14 @@ export const useLocalizationStore = create<LocalizationStore>()(
 
       editorStoreRef: null,
 
-      setText: (key, text) =>
+      setText: (key, text) => {
         set((state) => ({
           localizationData: {
             ...state.localizationData,
             [key]: text,
           },
-        })),
+        }));
+      },
 
       getText: (key) => {
         const state = get();
@@ -323,6 +324,19 @@ export const useLocalizationStore = create<LocalizationStore>()(
     {
       name: "localization-store",
       version: 1,
+      onRehydrateStorage: () => (state) => {
+        // localStorage에서 복원된 데이터가 있는지 확인
+        const storedData = localStorage.getItem('script-weaver-localization');
+        if (!storedData || storedData === '{}') {
+          // 저장된 데이터가 없으면 완전히 초기화
+          if (state) {
+            state.localizationData = {};
+            state.lastSpeakerId = 0;
+            state.lastLineId = 0;
+            state.lastChoiceId = 0;
+          }
+        }
+      },
     }
   )
 );

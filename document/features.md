@@ -56,3 +56,4 @@
 | F52     | 🎨 UI 커스터마이징   | PropertyPanel 너비 조절 | PropertyPanel.tsx    | 패널 왼쪽 경계를 드래그하여 320~640px 범위에서 너비 조절                                                     |
 | F53     | 🔄 자동화 기능       | 화자 자동 복사          | NodeOperationsDomain | 자식 노드 생성 시 부모 노드의 화자 정보를 자동으로 복사하여 대화 흐름 편의성 향상                            |
 | F54     | 🔄 자동화 기능       | 선택지 기본값 최적화    | NodeOperationsDomain | 선택지 노드 생성 시 빈 텍스트로 시작하여 사용자가 직접 입력하도록 개선                                       |
+| F55     | 🔍 데이터 분석       | 키 사용 횟수 표시      | LocalizationTab.tsx  | Localization CSV 테이블에 각 키가 몇 개의 노드에서 사용되고 있는지 표시 (CSV 복사 시에는 제외)                |

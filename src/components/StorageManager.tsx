@@ -50,6 +50,8 @@ export default function StorageManager({ showToast }: StorageManagerProps) {
     }
   };
 
+
+
   // 용량에 따른 상태 결정
   const getStorageStatus = () => {
     const totalMB = storageInfo.totalSize / (1024 * 1024);
