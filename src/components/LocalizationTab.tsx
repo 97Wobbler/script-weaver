@@ -878,6 +878,9 @@ export default function LocalizationTab({ showToast }: LocalizationTabProps) {
                         한국어 텍스트
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        사용 횟수
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         작업
                       </th>
                     </tr>
@@ -920,6 +923,9 @@ export default function LocalizationTab({ showToast }: LocalizationTabProps) {
                                 {text || ""}
                               </div>
                             )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                            {useLocalizationStore.getState().getKeyUsageCount(key)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {isEditing ? (

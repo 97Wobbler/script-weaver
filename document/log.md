@@ -32,3 +32,20 @@
 - 빈 텍스트로 변경 시 여러 곳에서 사용되는 키: 키 참조만 제거 (기존 동작 유지)
 
 **파일**: `src/store/domains/nodeDomain.ts` 
+
+## 2025/07/07 20:39 - Localization CSV 사용 횟수 칼럼 추가
+
+**요구사항**: Localization CSV 테이블에 각 키가 몇 개의 노드에서 사용되고 있는지 표시하는 칼럼 추가 필요
+
+**구현**:
+- Localization CSV 테이블 헤더에 "사용 횟수" 칼럼 추가
+- 테이블 본문에 각 키의 사용 횟수를 표시하는 칼럼 추가
+- `useLocalizationStore.getState().getKeyUsageCount(key)` 함수를 사용하여 실시간 사용 횟수 계산
+- CSV 복사 기능은 기존 로직 유지 (사용 횟수 칼럼은 복사되지 않음)
+
+**기술적 고려사항**:
+- 기존 `getKeyUsageCount` 함수 활용으로 추가 로직 불필요
+- 테이블 레이아웃 조정으로 4개 칼럼 구조 (키, 한국어 텍스트, 사용 횟수, 작업)
+- 사용 횟수는 중앙 정렬로 가독성 향상
+
+**파일**: `src/components/LocalizationTab.tsx`
