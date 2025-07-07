@@ -296,7 +296,15 @@ export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "las
           updates.speakerKeyRef = result.key;
         }
       } else {
-        // 빈 텍스트인 경우 키 참조 제거
+        // 빈 텍스트인 경우 키 참조 제거 및 키 삭제
+        const currentSpeakerKey = this.getState().templateData[this.getState().currentTemplate]?.[this.getState().currentScene]?.[nodeKey]?.dialogue.speakerKeyRef;
+        if (currentSpeakerKey) {
+          const usageCount = localizationStore.getKeyUsageCount(currentSpeakerKey);
+          if (usageCount === 1) {
+            // 한 곳에서만 사용되는 경우 키 완전 삭제
+            localizationStore.deleteKey(currentSpeakerKey);
+          }
+        }
         updates.speakerKeyRef = undefined;
       }
     }
@@ -327,7 +335,15 @@ export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "las
           updates.textKeyRef = result.key;
         }
       } else {
-        // 빈 텍스트인 경우 키 참조 제거
+        // 빈 텍스트인 경우 키 참조 제거 및 키 삭제
+        const currentTextKey = this.getState().templateData[this.getState().currentTemplate]?.[this.getState().currentScene]?.[nodeKey]?.dialogue.textKeyRef;
+        if (currentTextKey) {
+          const usageCount = localizationStore.getKeyUsageCount(currentTextKey);
+          if (usageCount === 1) {
+            // 한 곳에서만 사용되는 경우 키 완전 삭제
+            localizationStore.deleteKey(currentTextKey);
+          }
+        }
         updates.textKeyRef = undefined;
       }
     }
@@ -379,7 +395,15 @@ export class NodeDomain implements Omit<INodeDomain, "lastDraggedNodeKey" | "las
         textKeyRef = result.key;
       }
     } else {
-      // 빈 텍스트인 경우 키 참조 제거
+      // 빈 텍스트인 경우 키 참조 제거 및 키 삭제
+      const currentChoiceKey = dialogue.choices[choiceKey]?.textKeyRef;
+      if (currentChoiceKey) {
+        const usageCount = localizationStore.getKeyUsageCount(currentChoiceKey);
+        if (usageCount === 1) {
+          // 한 곳에서만 사용되는 경우 키 완전 삭제
+          localizationStore.deleteKey(currentChoiceKey);
+        }
+      }
       textKeyRef = undefined;
     }
 
